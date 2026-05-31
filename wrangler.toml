@@ -1,3 +1,4 @@
 pages_build_output_dir = "dist"
 name = "tncdocuments"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-04-03"
+compatibility_flags = ["nodejs_compat"]
