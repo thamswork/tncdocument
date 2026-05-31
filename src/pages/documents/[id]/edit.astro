@@ -528,7 +528,9 @@ const existingItems = doc.items || [];
   function build(status) {
     var cid=document.getElementById('custId').value;
     if(!cid){ toast('กรุณาเลือกลูกค้าก่อน',true); return null; }
-    if(!cats.length){ toast('กรุณาเพิ่มหมวดงานอย่างน้อย 1 หมวด',true); return null; }
+    if(!cats.length){ 
+      if(!confirm('BOQ ยังไม่มีรายการ ต้องการบันทึกโดยไม่มีรายการงานหรือไม่?')) return null;
+    }
     var items=[].concat.apply([],cats.map(function(c){
       return (ibc[c.tid]||[]).map(function(i){
         return {item_number:i.num,item_code:i.code,description_th:i.desc,
