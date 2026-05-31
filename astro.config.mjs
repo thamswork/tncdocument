@@ -5,8 +5,7 @@ export default defineConfig({
   output: "server",
   adapter: cloudflare({
     imageService: "passthrough",
-    platformProxy: {
-      enabled: false,
-    },
+    platformProxy: { enabled: false },
+    session: false,
   }),
 });
