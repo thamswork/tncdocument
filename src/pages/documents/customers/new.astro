@@ -1,0 +1,114 @@
+---
+import { createCustomer } from '../../../lib/documents';
+const user = Astro.locals.user;
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const result = await createCustomer({
+    customer_code: (form.get('customer_code') as string || '').trim().toUpperCase(),
+    company_name: (form.get('company_name') as string || '').trim(),
+    contact_name: (form.get('contact_name') as string || '') || undefined,
+    address: (form.get('address') as string || '') || undefined,
+    phone: (form.get('phone') as string || '') || undefined,
+    fax: (form.get('fax') as string || '') || undefined,
+    tax_id: (form.get('tax_id') as string || '') || undefined,
+    email: (form.get('email') as string || '') || undefined,
+    notes: (form.get('notes') as string || '') || undefined,
+    created_by: user.id,
+  });
+  if (result.error) { error = result.error.message; }
+  else { return Astro.redirect('/documents/customers'); }
+}
+---
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>เพิ่มลูกค้าใหม่ — TNC Documents</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#F8F7F4;--white:#fff;--border:#E2DFD8;--text:#1A1814;--text2:#6B6860;--text3:#AEABA4;--red:#B94040;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 40px;height:60px;display:flex;align-items:center;gap:14px;position:sticky;top:0;}
+    .back{font-size:12.5px;color:var(--text2);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:4px;}
+    .back:hover{border-color:var(--text);color:var(--text);}
+    .topbar-title{font-size:15px;font-weight:600;flex:1;}
+    .content{padding:32px 40px;max-width:700px;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:32px;}
+    .card-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #EDE9E3;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+    .fg.full{grid-column:span 2;}
+    label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
+    label span{color:var(--red);margin-left:2px;}
+    input,textarea{padding:10px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:13.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;}
+    input:focus,textarea:focus{border-color:var(--text);}
+    textarea{resize:vertical;min-height:72px;}
+    .error{background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;padding:12px 14px;font-size:13px;color:var(--red);margin-bottom:20px;}
+    .actions{display:flex;gap:12px;margin-top:24px;align-items:center;}
+    .btn-submit{padding:11px 24px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:12.5px;font-weight:700;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;}
+    .btn-submit:hover{opacity:.85;}
+    .cancel{font-size:13px;color:var(--text2);text-decoration:none;}
+    .cancel:hover{color:var(--text);}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="/documents/customers" class="back">← กลับ</a>
+    <div class="topbar-title">เพิ่มลูกค้าใหม่</div>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="card-title">ข้อมูลลูกค้า</div>
+      {error && <div class="error">{error}</div>}
+      <form method="POST">
+        <div class="grid">
+          <div class="fg">
+            <label>รหัสลูกค้า <span>*</span></label>
+            <input type="text" name="customer_code" placeholder="เช่น 005212" required />
+          </div>
+          <div class="fg">
+            <label>ชื่อผู้ติดต่อ</label>
+            <input type="text" name="contact_name" placeholder="คุณ..." />
+          </div>
+          <div class="fg full">
+            <label>ชื่อบริษัท / ลูกค้า <span>*</span></label>
+            <input type="text" name="company_name" placeholder="บริษัท ... จำกัด" required />
+          </div>
+          <div class="fg full">
+            <label>ที่อยู่</label>
+            <textarea name="address" placeholder="ที่อยู่สำหรับออกเอกสาร..."></textarea>
+          </div>
+          <div class="fg">
+            <label>โทรศัพท์</label>
+            <input type="text" name="phone" placeholder="02-XXX-XXXX" />
+          </div>
+          <div class="fg">
+            <label>แฟกซ์</label>
+            <input type="text" name="fax" placeholder="02-XXX-XXXX" />
+          </div>
+          <div class="fg">
+            <label>เลขประจำตัวผู้เสียภาษี</label>
+            <input type="text" name="tax_id" placeholder="0XXXXXXXXXX" />
+          </div>
+          <div class="fg">
+            <label>อีเมล</label>
+            <input type="email" name="email" placeholder="email@company.com" />
+          </div>
+          <div class="fg full">
+            <label>หมายเหตุ</label>
+            <textarea name="notes" placeholder="หมายเหตุเพิ่มเติม..."></textarea>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn-submit">บันทึกลูกค้า</button>
+          <a href="/documents/customers" class="cancel">ยกเลิก</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

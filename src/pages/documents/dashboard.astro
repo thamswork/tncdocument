@@ -1,0 +1,449 @@
+---
+import { getDocuments } from '../../lib/documents';
+const user = Astro.locals.user;
+const documents = await getDocuments();
+
+const total = documents.length;
+const drafts = documents.filter((d: any) => d.status === 'draft').length;
+const published = documents.filter((d: any) => d.status === 'published').length;
+const pendingAmt = documents
+  .filter((d: any) => d.status === 'draft')
+  .reduce((s: number, d: any) => s + (Number(d.total_amount)||0), 0);
+const pendingFmt = pendingAmt.toLocaleString('th-TH', {minimumFractionDigits:0, maximumFractionDigits:0});
+
+// Get unique document types for filter
+const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).filter(Boolean))];
+---
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Dashboard — TNC Build Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
+      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
+      --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
+      --green:#2D7A4F;--red:#B94040;--blue:#2D5A9E;
+      --sidebar:220px;
+    }
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+
+    /* ── Sidebar ── */
+    .sidebar{width:var(--sidebar);background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:40;}
+    .sb-brand{padding:20px 20px 16px;border-bottom:1px solid var(--b2);}
+    .sb-brand-name{font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--text);}
+    .sb-brand-sub{font-size:10px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;margin-top:1px;}
+    .sb-user{padding:14px 20px;border-bottom:1px solid var(--b2);}
+    .sb-user-name{font-size:12.5px;font-weight:600;color:var(--text);}
+    .sb-user-role{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-top:1px;}
+    .sb-nav{padding:12px 0;flex:1;}
+    .sb-section{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);padding:8px 20px 4px;}
+    .sb-link{display:flex;align-items:center;gap:10px;padding:8px 20px;font-size:12.5px;color:var(--t2);text-decoration:none;transition:all .15s;border-left:2px solid transparent;}
+    .sb-link:hover{background:var(--bg);color:var(--text);}
+    .sb-link.active{background:var(--gbg);color:var(--text);font-weight:600;border-left-color:var(--gold);}
+    .sb-icon{font-size:14px;width:16px;text-align:center;flex-shrink:0;}
+    .sb-bottom{padding:16px 20px;border-top:1px solid var(--b2);}
+    .sb-logout{width:100%;padding:8px 12px;background:transparent;border:1px solid var(--border);border-radius:4px;font-size:11.5px;font-family:inherit;color:var(--t2);cursor:pointer;transition:all .15s;text-align:center;}
+    .sb-logout:hover{border-color:var(--red);color:var(--red);}
+
+    /* ── Main ── */
+    .main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-width:0;}
+
+    /* ── Topbar ── */
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:52px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:30;}
+    .tb-title{font-size:15px;font-weight:700;flex:1;}
+    .btn{padding:8px 16px;border-radius:4px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:none;letter-spacing:.05em;text-transform:uppercase;transition:all .15s;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+    .btn-solid{background:var(--text);color:var(--bg);}
+    .btn-solid:hover{opacity:.85;}
+    .btn-ol{background:transparent;border:1px solid var(--border);color:var(--t2);}
+    .btn-ol:hover{border-color:var(--text);color:var(--text);}
+
+    /* ── Content ── */
+    .content{padding:24px 28px;display:flex;flex-direction:column;gap:20px;}
+
+    /* ── Stats ── */
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+    .stat-card{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:18px 20px;cursor:pointer;transition:all .2s;}
+    .stat-card:hover{border-color:var(--text);transform:translateY(-1px);}
+    .stat-card.active{background:var(--gbg);border-color:var(--gold);}
+    .stat-n{font-size:32px;font-weight:300;letter-spacing:-.03em;color:var(--text);line-height:1;}
+    .stat-n.gold{color:var(--gold);}
+    .stat-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-top:6px;}
+    .stat-sub{font-size:11px;color:var(--t3);margin-top:2px;}
+    .stat-pending{font-size:10.5px;color:var(--gold);margin-top:5px;font-weight:600;letter-spacing:.01em;opacity:.85;}
+
+    /* ── Table section ── */
+    .table-card{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+    .table-toolbar{padding:14px 18px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+    .tb-info{flex:1;}
+    .tb-info-title{font-size:13px;font-weight:600;}
+    .tb-info-sub{font-size:11px;color:var(--t3);margin-top:1px;}
+
+    /* Search */
+    .search-wrap{position:relative;}
+    .search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:13px;pointer-events:none;}
+    .search-inp{padding:7px 10px 7px 30px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:12.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:220px;}
+    .search-inp:focus{border-color:var(--text);width:260px;}
+    .search-inp::placeholder{color:var(--t3);}
+
+    /* Filter pills */
+    .filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+    .filter-pill{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--t2);transition:all .15s;letter-spacing:.03em;}
+    .filter-pill:hover{border-color:var(--text);color:var(--text);}
+    .filter-pill.active{background:var(--text);border-color:var(--text);color:var(--bg);}
+    .filter-pill.draft.active{background:#6B5B2E;border-color:#6B5B2E;color:#fff;}
+    .filter-pill.published.active{background:var(--green);border-color:var(--green);color:#fff;}
+
+    /* Sort indicator */
+    .sort-btn{background:transparent;border:none;cursor:pointer;color:var(--t3);font-size:11px;padding:0;font-family:inherit;transition:color .15s;display:flex;align-items:center;gap:3px;white-space:nowrap;}
+    .sort-btn:hover,.sort-btn.asc,.sort-btn.desc{color:var(--text);}
+
+    /* Table */
+    .tbl{width:100%;border-collapse:collapse;}
+    .tbl thead th{padding:9px 14px;font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.09em;text-align:left;border-bottom:1px solid var(--b2);background:var(--bg);white-space:nowrap;user-select:none;}
+    .tbl thead th.num{text-align:right;}
+    .tbl tbody tr{border-bottom:1px solid var(--b2);cursor:pointer;transition:background .1s;}
+    .tbl tbody tr:last-child{border-bottom:none;}
+    .tbl tbody tr:hover{background:var(--gbg);}
+    .tbl tbody tr.hidden{display:none;}
+    .tbl td{padding:11px 14px;font-size:12.5px;vertical-align:middle;}
+    .tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}
+
+    /* Doc number */
+    .doc-num{font-weight:700;color:var(--text);font-size:13px;letter-spacing:.01em;}
+
+    /* Type badge */
+    .badge{display:inline-flex;padding:2px 8px;border-radius:3px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+    .badge-SV{background:#EBF0FA;color:#2D5A9E;}
+    .badge-IV{background:#EBF5EE;color:#2D7A4F;}
+    .badge-TX{background:#F5EBEB;color:#B94040;}
+    .badge-BQ{background:var(--gbg);color:#8B6914;}
+    .badge-default{background:var(--b2);color:var(--t2);}
+
+    /* Status badge */
+    .status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;}
+    .sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
+    .status-draft .sdot{background:var(--t3);}
+    .status-draft{color:var(--t2);}
+    .status-published .sdot{background:var(--green);}
+    .status-published{color:var(--green);}
+
+    /* Amount */
+    .amt{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
+    .amt-sub{font-size:10.5px;color:var(--t3);margin-top:1px;}
+
+    /* Open link */
+    .open-btn{color:var(--t3);font-size:12px;text-decoration:none;padding:4px 8px;border-radius:3px;transition:all .15s;white-space:nowrap;}
+    .open-btn:hover{color:var(--text);background:var(--b2);}
+
+    /* Empty state */
+    .empty-row td{padding:40px;text-align:center;color:var(--t3);font-size:13px;}
+    .empty-row-title{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:4px;}
+
+    /* Result count */
+    .result-count{font-size:11px;color:var(--t3);padding:8px 18px;border-top:1px solid var(--b2);text-align:right;}
+
+    /* Keyboard shortcut hint */
+    .kbd{display:inline-block;background:var(--b2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:9.5px;color:var(--t2);font-family:monospace;}
+
+    /* Toast */
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:999;background:var(--text);color:var(--bg);padding:10px 18px;border-radius:4px;font-size:12.5px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;}
+    .toast.show{opacity:1;}
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-name">TNC BUILD STUDIO</div>
+    <div class="sb-brand-sub">ระบบเอกสาร</div>
+  </div>
+  <div class="sb-user">
+    <div class="sb-user-name">{user.full_name}</div>
+    <div class="sb-user-role">{user.role}</div>
+  </div>
+  <div class="sb-nav">
+    <div class="sb-section">เมนูหลัก</div>
+    <a href="/documents/dashboard" class="sb-link active"><span class="sb-icon">⊞</span> หน้าหลัก</a>
+    <a href="/documents/new" class="sb-link"><span class="sb-icon">✦</span> สร้างเอกสารใหม่</a>
+    <a href="/documents/customers" class="sb-link"><span class="sb-icon">◎</span> รายชื่อลูกค้า</a>
+    {user.role === 'superadmin' && <a href="/documents/users" class="sb-link"><span class="sb-icon">◈</span> จัดการผู้ใช้งาน</a>}
+    <a href="/documents/logs" class="sb-link"><span class="sb-icon">≡</span> ประวัติการส่งออก</a>
+  </div>
+  <div class="sb-bottom">
+    <form method="POST" action="/documents/logout">
+      <button type="submit" class="sb-logout">ออกจากระบบ</button>
+    </form>
+  </div>
+</nav>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="tb-title">ภาพรวมเอกสาร</div>
+    <span style="font-size:11px;color:var(--t3);">กด <span class="kbd">/</span> เพื่อค้นหา</span>
+    <a href="/documents/customers/new" class="btn btn-ol">+ เพิ่มลูกค้าใหม่</a>
+    <a href="/documents/new" class="btn btn-solid">+ สร้างเอกสารใหม่</a>
+  </div>
+
+  <div class="content">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card active" id="stat-all" onclick="filterStatus('')">
+        <div class="stat-n gold">{total}</div>
+        <div class="stat-label">เอกสารทั้งหมด</div>
+        <div class="stat-sub">ในระบบ</div>
+      </div>
+      <div class="stat-card" id="stat-draft" onclick="filterStatus('draft')">
+        <div class="stat-n">{drafts}</div>
+        <div class="stat-label">DRAFT</div>
+        <div class="stat-sub">รอดำเนินการ</div>
+        {pendingAmt > 0 && <div class="stat-pending">฿{pendingFmt} รอยืนยัน</div>}
+      </div>
+      <div class="stat-card" id="stat-published" onclick="filterStatus('published')">
+        <div class="stat-n">{published}</div>
+        <div class="stat-label">PUBLISHED</div>
+        <div class="stat-sub">ออกเอกสารแล้ว</div>
+      </div>
+    </div>
+
+    <!-- Document table -->
+    <div class="table-card">
+      <div class="table-toolbar">
+        <div class="tb-info">
+          <div class="tb-info-title">เอกสารทั้งหมด</div>
+          <div class="tb-info-sub">คลิกที่แถวเพื่อเปิดเอกสาร</div>
+        </div>
+
+        <!-- Search -->
+        <div class="search-wrap">
+          <span class="search-ico">🔍</span>
+          <input type="text" class="search-inp" id="searchInp"
+            placeholder="ค้นหาเอกสาร ลูกค้า..."
+            oninput="doSearch(this.value)"
+            autocomplete="off"/>
+        </div>
+
+        <!-- Type filters -->
+        <div class="filters" id="typeFilters">
+          <button class="filter-pill active" data-type="" onclick="filterType(this, '')">ทั้งหมด</button>
+          {docTypes.map((code: any) => (
+            <button class={`filter-pill`} data-type={code} onclick={`filterType(this,'${code}')`}>{code}</button>
+          ))}
+        </div>
+
+        <!-- Status filter -->
+        <div class="filters" id="statusFilters">
+          <button class="filter-pill active" data-status="" onclick="filterStatus('')">ทุกสถานะ</button>
+          <button class="filter-pill draft" data-status="draft" onclick="filterStatus('draft')">Draft</button>
+          <button class="filter-pill published" data-status="published" onclick="filterStatus('published')">Published</button>
+        </div>
+      </div>
+
+      <table class="tbl" id="docTable">
+        <thead>
+          <tr>
+            <th onclick="sortBy('num')" style="cursor:pointer;">เลขที่เอกสาร <span id="sort-num"></span></th>
+            <th>ประเภท</th>
+            <th onclick="sortBy('cust')" style="cursor:pointer;">ชื่อลูกค้า <span id="sort-cust"></span></th>
+            <th onclick="sortBy('date')" style="cursor:pointer;">วันที่ออก <span id="sort-date">↓</span></th>
+            <th class="num" onclick="sortBy('amt')" style="cursor:pointer;">ยอดรวม (บาท) <span id="sort-amt"></span></th>
+            <th>สถานะ</th>
+            <th>ผู้สร้าง</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="docTbody">
+          {documents.map((doc: any) => {
+            const typeCode = doc.document_types?.code || '';
+            const custName = doc.customers?.company_name || '-';
+            const issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '-';
+            const amt = Number(doc.total_amount||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+            const rawAmt = Number(doc.total_amount||0);
+            const issuedBy = doc.tnc_users?.full_name || '-';
+            return (
+              <tr
+                onclick={`window.location.href='/documents/${doc.id}'`}
+                data-num={doc.document_number}
+                data-cust={custName}
+                data-type={typeCode}
+                data-status={doc.status}
+                data-date={doc.issue_date||''}
+                data-amt={rawAmt}
+              >
+                <td><span class="doc-num">{doc.document_number}</span></td>
+                <td><span class={`badge badge-${typeCode||'default'}`}>{doc.document_types?.name_th || typeCode}</span></td>
+                <td>{custName}</td>
+                <td>{issueDate}</td>
+                <td class="num"><span class="amt">{amt}</span></td>
+                <td>
+                  <span class={`status status-${doc.status}`}>
+                    <span class="sdot"></span>
+                    {doc.status === 'draft' ? 'Draft' : 'Published'}
+                  </span>
+                </td>
+                <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
+                <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div class="result-count" id="resultCount"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script is:inline>
+(function(){
+  var searchVal = '';
+  var typeVal = '';
+  var statusVal = '';
+  var sortCol = 'date';
+  var sortDir = 'desc';
+
+  function getRows() {
+    return Array.from(document.querySelectorAll('#docTbody tr'));
+  }
+
+  function applyFilters() {
+    var rows = Array.from(document.querySelectorAll('#docTbody tr[data-num]'));
+    var q = searchVal.toLowerCase().trim();
+    var visible = 0;
+
+    rows.forEach(function(row) {
+      var num    = (row.dataset.num||'').toLowerCase();
+      var cust   = (row.dataset.cust||'').toLowerCase();
+      var type   = (row.dataset.type||'').toLowerCase();
+      var status = row.dataset.status||'';
+
+      var matchSearch = !q || num.includes(q) || cust.includes(q) || type.includes(q);
+      var matchType   = !typeVal || row.dataset.type === typeVal;
+      var matchStatus = !statusVal || status === statusVal;
+
+      if (matchSearch && matchType && matchStatus) {
+        row.classList.remove('hidden');
+        visible++;
+      } else {
+        row.classList.add('hidden');
+      }
+    });
+
+    // Empty state
+    var empty = document.getElementById('emptyRow');
+    if (!visible) {
+      if (!empty) {
+        empty = document.createElement('tr');
+        empty.id = 'emptyRow';
+        empty.className = 'empty-row';
+        empty.innerHTML = '<td colspan="8"><div class="empty-row-title">ไม่พบเอกสาร</div><div>ลองเปลี่ยนเงื่อนไขการค้นหา</div></td>';
+        document.getElementById('docTbody').appendChild(empty);
+      }
+      empty.style.display = '';
+    } else {
+      if (empty) empty.style.display = 'none';
+    }
+
+    var total = Array.from(document.querySelectorAll('#docTbody tr[data-num]')).length;
+    document.getElementById('resultCount').textContent = visible === total
+      ? 'แสดง '+total+' รายการ'
+      : 'แสดง '+visible+' จาก '+total+' รายการ';
+  }
+
+  function sortRows() {
+    var tbody = document.getElementById('docTbody');
+    var rows = Array.from(tbody.querySelectorAll('tr[data-num]'));
+    rows.sort(function(a, b) {
+      var va, vb;
+      if (sortCol === 'amt') {
+        va = parseFloat(a.dataset.amt)||0;
+        vb = parseFloat(b.dataset.amt)||0;
+        return sortDir === 'asc' ? va-vb : vb-va;
+      } else if (sortCol === 'date') {
+        va = a.dataset.date||'';
+        vb = b.dataset.date||'';
+      } else if (sortCol === 'num') {
+        va = a.dataset.num||'';
+        vb = b.dataset.num||'';
+      } else if (sortCol === 'cust') {
+        va = a.dataset.cust||'';
+        vb = b.dataset.cust||'';
+      }
+      if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb,'th') : vb.localeCompare(va,'th');
+      return 0;
+    });
+    rows.forEach(function(r){ tbody.appendChild(r); });
+    // Update sort indicators
+    ['num','cust','date','amt'].forEach(function(c){
+      var el = document.getElementById('sort-'+c);
+      if (!el) return;
+      if (c === sortCol) { el.textContent = sortDir === 'asc' ? '↑' : '↓'; el.style.color = 'var(--text)'; }
+      else { el.textContent = ''; }
+    });
+  }
+
+  window.doSearch = function(v) {
+    searchVal = v;
+    applyFilters();
+  };
+
+  window.filterType = function(el, type) {
+    typeVal = type;
+    document.querySelectorAll('#typeFilters .filter-pill').forEach(function(b){ b.classList.remove('active'); });
+    el.classList.add('active');
+    applyFilters();
+  };
+
+  window.filterStatus = function(status) {
+    statusVal = status;
+    // Update stat cards
+    ['all','draft','published'].forEach(function(s){
+      var el = document.getElementById('stat-'+s);
+      if (el) el.classList.toggle('active', (s === 'all' && !status) || s === status);
+    });
+    // Update status filter pills
+    document.querySelectorAll('#statusFilters .filter-pill').forEach(function(b){
+      b.classList.toggle('active', (b.dataset.status||'') === status);
+    });
+    applyFilters();
+  };
+
+  window.sortBy = function(col) {
+    if (sortCol === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+    else { sortCol = col; sortDir = col === 'amt' ? 'desc' : 'asc'; }
+    sortRows();
+    applyFilters();
+  };
+
+  // Keyboard shortcut: / focuses search
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && document.activeElement !== document.getElementById('searchInp')) {
+      e.preventDefault();
+      document.getElementById('searchInp').focus();
+      document.getElementById('searchInp').select();
+    }
+    if (e.key === 'Escape') {
+      var inp = document.getElementById('searchInp');
+      inp.value = '';
+      inp.blur();
+      window.doSearch('');
+    }
+  });
+
+  // Init
+  sortRows();
+  applyFilters();
+})();
+</script>
+</body>
+</html>

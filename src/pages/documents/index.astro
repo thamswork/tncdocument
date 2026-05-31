@@ -1,0 +1,88 @@
+---
+import { loginUser, createSession, getSessionUser, SESSION_COOKIE } from '../../lib/auth';
+const token = Astro.cookies.get(SESSION_COOKIE)?.value;
+const existingUser = await getSessionUser(token);
+if (existingUser) return Astro.redirect('/documents/dashboard');
+let error = '';
+const returnUrl = Astro.url.searchParams.get('return') || '/documents/dashboard';
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const user = await loginUser(form.get('username') as string, form.get('password') as string);
+  if (user) {
+    const t = await createSession(user.id);
+    Astro.cookies.set(SESSION_COOKIE, t, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 28800, path: '/' });
+    return Astro.redirect(returnUrl);
+  }
+  error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง';
+}
+---
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>เข้าสู่ระบบ — TNC Document System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#F8F7F4;--white:#FFFFFF;--border:#E2DFD8;--text:#1A1814;
+      --text2:#6B6860;--text3:#AEABA4;--gold:#C9A96E;--red:#B94040;
+    }
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+    .container{width:100%;max-width:420px;}
+    .brand{text-align:center;margin-bottom:40px;}
+    .brand-circle{width:56px;height:56px;border:1.5px solid var(--text);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:10px;font-weight:700;letter-spacing:0.05em;color:var(--text);}
+    .brand-name{font-size:14px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text);}
+    .brand-sub{font-size:11px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;margin-top:5px;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:40px 36px 36px;}
+    .card-heading{font-size:18px;font-weight:600;color:var(--text);margin-bottom:6px;letter-spacing:-0.01em;}
+    .card-sub{font-size:13px;color:var(--text3);margin-bottom:28px;}
+    .alert{background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;padding:12px 14px;font-size:13px;color:var(--red);margin-bottom:20px;display:flex;align-items:flex-start;gap:8px;}
+    .alert-icon{font-size:15px;flex-shrink:0;margin-top:1px;}
+    .field{margin-bottom:18px;}
+    .field:last-of-type{margin-bottom:24px;}
+    .field label{display:block;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text2);margin-bottom:8px;}
+    .field input{width:100%;padding:11px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;}
+    .field input:focus{border-color:var(--text);box-shadow:0 0 0 3px rgba(26,24,20,0.06);}
+    .field input::placeholder{color:var(--text3);}
+    .submit-btn{width:100%;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:opacity .2s;}
+    .submit-btn:hover{opacity:.85;}
+    .back{text-align:center;margin-top:20px;font-size:12.5px;color:var(--text3);}
+    .back a{color:var(--text2);text-decoration:none;}
+    .back a:hover{color:var(--text);}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand">
+      <div class="brand-circle">TNC</div>
+      <div class="brand-name">TNC Build Studio</div>
+      <div class="brand-sub">ระบบจัดการเอกสาร</div>
+    </div>
+    <div class="card">
+      <div class="card-heading">เข้าสู่ระบบ</div>
+      <div class="card-sub">กรุณากรอกชื่อผู้ใช้และรหัสผ่านของคุณ</div>
+      {error && (
+        <div class="alert">
+          <span class="alert-icon">!</span>
+          <span>{error}</span>
+        </div>
+      )}
+      <form method="POST">
+        <div class="field">
+          <label for="username">ชื่อผู้ใช้</label>
+          <input type="text" id="username" name="username" placeholder="กรอกชื่อผู้ใช้" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">รหัสผ่าน</label>
+          <input type="password" id="password" name="password" placeholder="กรอกรหัสผ่าน" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="submit-btn">เข้าสู่ระบบ</button>
+      </form>
+    </div>
+    <div class="back"><a href="/">กลับสู่เว็บไซต์หลัก</a></div>
+  </div>
+</body>
+</html>

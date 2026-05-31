@@ -1,0 +1,578 @@
+---
+import { getDocumentTypes, getCustomers, saveDocument } from '../../lib/documents';
+const user = Astro.locals.user;
+const documentTypes = await getDocumentTypes();
+const customers = await getCustomers();
+
+if (Astro.request.method === 'POST') {
+  try {
+    const body = await Astro.request.json();
+    const result = await saveDocument(body.document, body.categories, body.items, user.id);
+    if (result.error) return new Response(JSON.stringify({ error: result.error.message }), { status: 400 });
+    return new Response(JSON.stringify({ id: result.document.id, document_number: result.document.document_number }), { status: 200 });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+  }
+}
+---
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>สร้างเอกสารใหม่ — TNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
+      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
+      --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
+      --green:#2D7A4F;--red:#B94040;
+    }
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+    /* Topbar */
+    .topbar{position:sticky;top:0;z-index:100;background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;gap:10px;}
+    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 11px;border:1px solid var(--border);border-radius:4px;transition:all .15s;}
+    .back:hover{border-color:var(--text);color:var(--text);}
+    .tb-title{font-size:14px;font-weight:600;flex:1;}
+    .tb-status{font-size:11.5px;color:var(--t3);display:flex;align-items:center;gap:5px;}
+    .sdot{width:6px;height:6px;border-radius:50%;background:var(--t3);flex-shrink:0;display:inline-block;}
+    .sdot.ok{background:var(--green);}
+    .btn{padding:7px 15px;border-radius:4px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:none;letter-spacing:.06em;text-transform:uppercase;transition:all .15s;white-space:nowrap;}
+    .btn-ol{background:transparent;color:var(--t2);border:1px solid var(--border);}
+    .btn-ol:hover{border-color:var(--text);color:var(--text);}
+    .btn-gold{background:var(--gold);color:#fff;}
+    .btn-gold:hover{opacity:.9;}
+    .btn-solid{background:var(--text);color:var(--bg);}
+    .btn-solid:hover{opacity:.85;}
+
+    /* Layout */
+    .main{display:grid;grid-template-columns:1fr 280px;min-height:calc(100vh - 52px);}
+    .editor{padding:20px 24px;display:flex;flex-direction:column;gap:12px;min-width:0;}
+
+    /* Meta grid — 3 cards across top */
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+
+    /* Cards */
+    .card{background:var(--white);border:1px solid var(--border);border-radius:6px;display:flex;flex-direction:column;position:relative;}
+    .card-hd{padding:11px 16px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:8px;border-radius:6px 6px 0 0;background:var(--white);}
+    .step-n{width:20px;height:20px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex-shrink:0;}
+    .card-title{font-size:12.5px;font-weight:600;}
+    .card-sub{font-size:11px;color:var(--t3);margin-left:auto;text-decoration:none;}
+    .card-bd{padding:14px 16px;flex:1;}
+
+    /* Form fields */
+    .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
+    .fg:last-child{margin-bottom:0;}
+    .fg2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);}
+    .inp{padding:8px 11px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:100%;}
+    .inp:focus{border-color:var(--text);}
+    .inp::placeholder{color:var(--t3);}
+    textarea.inp{resize:vertical;min-height:64px;line-height:1.6;}
+
+    /* Customer search dropdown */
+    .cust-wrap{position:relative;z-index:50;}
+    .cust-dd{
+      position:absolute;top:calc(100% + 3px);left:0;right:0;
+      background:var(--white);border:1px solid var(--border);border-radius:4px;
+      box-shadow:0 8px 24px rgba(0,0,0,.12);
+      z-index:500;max-height:220px;overflow-y:auto;
+      display:none;
+    }
+    .cust-dd.open{display:block;}
+    .copt{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--b2);}
+    .copt:last-child{border-bottom:none;}
+    .copt:hover,.copt:active{background:var(--gbg);}
+    .copt-name{font-size:12.5px;font-weight:600;color:var(--text);}
+    .copt-code{font-size:11px;color:var(--t3);margin-top:1px;}
+    .cust-sel{background:var(--gbg);border:1px solid var(--gborder);border-radius:4px;padding:9px 12px;margin-top:8px;display:none;}
+    .cust-sel.show{display:block;}
+    .cust-sel-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}
+    .cust-sel-info{font-size:11px;color:var(--t2);line-height:1.7;}
+
+    /* Payment presets */
+    .presets{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;}
+    .preset{background:transparent;color:var(--t3);border:1px dashed var(--border);font-size:10.5px;padding:4px 10px;border-radius:3px;cursor:pointer;font-family:inherit;transition:all .15s;}
+    .preset:hover{border-color:var(--t2);color:var(--t2);}
+
+    /* BOQ card */
+    .boq-card{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+    .boq-hd{padding:12px 16px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:8px;}
+    .boq-title{font-size:13px;font-weight:600;flex:1;}
+    .boq-cnt{font-size:11.5px;color:var(--t2);}
+    .boq-body{padding:12px 14px;}
+
+    /* Category block */
+    .cat-block{border:1px solid var(--border);border-radius:5px;margin-bottom:10px;overflow:hidden;}
+    .cat-hd{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg);border-bottom:1px solid var(--border);}
+    .cbadge{background:var(--text);color:var(--bg);padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.05em;flex-shrink:0;}
+    .cname-inp{flex:1;background:transparent;border:none;border-bottom:1.5px solid var(--b2);padding:2px 0;font-size:13px;font-weight:600;color:var(--text);font-family:inherit;outline:none;transition:border-bottom-color .15s;}
+    .cname-inp:focus{border-bottom-color:var(--text);}
+    .cname-inp::placeholder{color:var(--t3);font-weight:400;}
+    .ctot{margin-left:auto;font-size:12px;font-weight:700;color:var(--t2);white-space:nowrap;}
+    .cdel-btn{background:none;border:none;cursor:pointer;color:var(--t3);font-size:12px;padding:3px 8px;border-radius:3px;font-family:inherit;transition:all .15s;}
+    .cdel-btn:hover{color:var(--red);background:#FFF0F0;}
+
+    /* Items table */
+    .tblw{overflow-x:auto;}
+    .itbl{width:100%;border-collapse:collapse;min-width:580px;}
+    .itbl thead th{padding:5px 6px;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.09em;text-align:left;border-bottom:1px solid var(--b2);background:var(--bg);}
+    .itbl tbody tr{border-bottom:1px solid var(--b2);}
+    .itbl tbody tr:last-child{border-bottom:none;}
+    .itbl tbody tr:hover{background:#FAFAF8;}
+    .itbl tbody tr.subr{background:#F5F4F1;}
+    .itbl td{padding:2px 3px;vertical-align:middle;}
+    .itbl td input,.itbl td select{padding:5px 7px;font-size:12px;background:transparent;border:1.5px solid transparent;border-radius:3px;font-family:inherit;color:var(--text);outline:none;transition:all .15s;width:100%;}
+    .itbl td input:focus,.itbl td select:focus{background:var(--bg);border-color:var(--border);}
+    .itbl td input::placeholder{color:var(--t3);}
+    .w-no{width:52px;}.w-code{width:60px;}.w-desc{min-width:160px;}.w-qty{width:64px;}.w-unit{width:72px;}.w-price{width:88px;}.w-amt{width:90px;text-align:right!important;}.w-del{width:32px;text-align:center!important;}
+    .iamt{font-size:11.5px;font-weight:600;color:var(--t2);text-align:right;padding-right:6px;display:block;}
+    .addrow{padding:7px 12px;border-top:1px solid var(--b2);display:flex;gap:6px;align-items:center;}
+    .addrow-hint{margin-left:auto;font-size:11px;color:var(--t3);}
+    .ghost-btn{background:transparent;color:var(--t2);border:1px dashed var(--border);font-size:11px;padding:5px 11px;border-radius:3px;cursor:pointer;font-family:inherit;transition:all .15s;}
+    .ghost-btn:hover{border-color:var(--gold);color:var(--gold);}
+    .del-btn{background:none;border:none;cursor:pointer;color:var(--t3);font-size:14px;padding:2px 6px;line-height:1;border-radius:3px;font-family:inherit;transition:all .15s;}
+    .del-btn:hover{color:var(--red);background:#FFF0F0;}
+
+    /* BOQ empty state */
+    .boq-empty{text-align:center;padding:36px 20px;border:2px dashed var(--border);border-radius:5px;}
+    .boq-empty-title{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:6px;}
+    .boq-empty-sub{font-size:12px;color:var(--t3);margin-bottom:14px;}
+
+    /* Right sidebar */
+    .rside{background:var(--white);border-left:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;}
+    .sb-lbl{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:9px;}
+    .sum-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--b2);}
+    .sum-row:last-child{border-bottom:none;}
+    .sum-row.tot{border-top:2px solid var(--text);border-bottom:none;padding-top:8px;margin-top:2px;}
+    .sl{font-size:12px;color:var(--t2);}
+    .sv{font-size:12px;font-weight:600;color:var(--text);}
+    .sv.big{font-size:19px;font-weight:300;letter-spacing:-.02em;}
+    .disc-field{display:flex;flex-direction:column;gap:4px;padding:5px 0;border-bottom:1px solid var(--b2);}
+    .disc-lbl{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);}
+    .disc-inp{padding:6px 9px;background:var(--bg);border:1.5px solid var(--border);border-radius:3px;font-size:12.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .15s;width:100%;}
+    .disc-inp:focus{border-color:var(--text);}
+    .notes-inp{padding:7px 9px;background:var(--bg);border:1.5px solid var(--border);border-radius:3px;font-size:12px;font-family:inherit;color:var(--text);outline:none;resize:vertical;min-height:60px;line-height:1.6;width:100%;transition:border-color .15s;}
+    .notes-inp:focus{border-color:var(--text);}
+    .act-btns{display:flex;flex-direction:column;gap:7px;margin-top:auto;padding-top:8px;border-top:1px solid var(--b2);}
+    .act-btn{width:100%;padding:9px;border-radius:4px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:none;letter-spacing:.06em;text-transform:uppercase;transition:all .15s;}
+
+    /* Toast */
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:999;background:var(--text);color:var(--bg);padding:10px 20px;border-radius:4px;font-size:12.5px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;align-items:center;gap:8px;white-space:nowrap;}
+    .toast.err{background:var(--red);}
+    .toast.show{display:flex;}
+    .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;display:none;}
+    .toast.loading .spin{display:block;}
+    @keyframes sp{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/documents/dashboard" class="back">← กลับ</a>
+  <div class="tb-title">สร้างเอกสารใหม่</div>
+  <div class="tb-status"><span class="sdot" id="sDot"></span><span id="sTxt">ยังไม่ได้บันทึก</span></div>
+  <button class="btn btn-ol" onclick="window.saveDraft()">DRAFT</button>
+  <button class="btn btn-gold" onclick="window.savePreview()">PREVIEW PDF</button>
+  <button class="btn btn-solid" onclick="window.saveOpen()">บันทึก + เปิด</button>
+</div>
+
+<div class="main">
+<div class="editor">
+
+  <div class="meta-grid">
+
+    <!-- 1: Document type -->
+    <div class="card">
+      <div class="card-hd">
+        <div class="step-n">1</div>
+        <div class="card-title">ประเภทเอกสาร</div>
+      </div>
+      <div class="card-bd">
+        <div class="fg">
+          <div class="lbl">ประเภท</div>
+          <select class="inp" id="docType">
+            {documentTypes.map((dt: any) => <option value={dt.id}>{dt.name_th}</option>)}
+          </select>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <div class="lbl">วันที่ออก</div>
+            <input type="date" class="inp" id="issueDate"/>
+          </div>
+          <div class="fg">
+            <div class="lbl">วันครบกำหนด</div>
+            <input type="date" class="inp" id="dueDate"/>
+          </div>
+        </div>
+        <div class="fg">
+          <div class="lbl">เลขอ้างอิง P/O</div>
+          <input type="text" class="inp" id="refPO" placeholder="PO-2025-001"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2: Customer -->
+    <div class="card" style="overflow:visible;">
+      <div class="card-hd">
+        <div class="step-n">2</div>
+        <div class="card-title">ลูกค้า</div>
+        <a href="/documents/customers/new" class="card-sub">+ เพิ่มใหม่</a>
+      </div>
+      <div class="card-bd" style="overflow:visible;">
+        <div class="fg">
+          <div class="lbl">ค้นหาลูกค้า</div>
+          <div class="cust-wrap">
+            <input type="text" class="inp" id="custSearch"
+              placeholder="ชื่อบริษัทหรือรหัส..." autocomplete="off"
+              oninput="window.searchCust(this.value)"
+              onfocus="window.openDD()"/>
+            <div id="custDD" class="cust-dd"></div>
+          </div>
+          <input type="hidden" id="custId"/>
+        </div>
+        <div id="custBox" class="cust-sel">
+          <div class="cust-sel-name" id="cName"></div>
+          <div class="cust-sel-info" id="cDet"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3: Payment condition -->
+    <div class="card">
+      <div class="card-hd">
+        <div class="step-n">3</div>
+        <div class="card-title">เงื่อนไขชำระเงิน</div>
+      </div>
+      <div class="card-bd">
+        <textarea class="inp" id="payCond" style="min-height:80px;"
+          placeholder="30% เมื่อตกลงทำสัญญา&#10;20% เมื่อผนังแล้วเสร็จ&#10;30% เมื่อติดตั้งเฟอร์นิเจอร์&#10;20% เมื่อส่งมอบงาน"></textarea>
+        <div class="presets">
+          <button class="preset" onclick="window.setP('30% เมื่อตกลงทำสัญญา\n20% เมื่อผนังแล้วเสร็จ\n30% เมื่อติดตั้งเฟอร์นิเจอร์\n20% เมื่อส่งมอบงาน')">4 งวด</button>
+          <button class="preset" onclick="window.setP('50% เมื่อตกลงทำสัญญา\n50% เมื่อส่งมอบงาน')">50/50</button>
+          <button class="preset" onclick="window.setP('100% เมื่อส่งมอบงาน')">เต็มจำนวน</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 4: BOQ -->
+  <div class="boq-card">
+    <div class="boq-hd">
+      <div class="step-n">4</div>
+      <div class="boq-title">รายการงาน (BOQ)</div>
+      <div class="boq-cnt" id="boqCnt">ยังไม่มีรายการ</div>
+      <button class="btn btn-ol" style="font-size:11px;padding:5px 13px;margin-left:8px;" onclick="window.addCat()">+ เพิ่มหมวดงาน</button>
+    </div>
+    <div class="boq-body">
+      <div id="catsWrap"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Right Sidebar -->
+<div class="rside">
+  <div>
+    <div class="sb-lbl">สรุปราคา</div>
+    <div class="sum-row"><span class="sl">รวมจำนวนเงิน</span><span class="sv" id="rSub">฿0.00</span></div>
+    <div class="disc-field">
+      <div class="disc-lbl">ส่วนลดค่าแบบ (บาท)</div>
+      <input class="disc-inp" type="number" id="dD" value="0" min="0" step="0.01" oninput="window.recalc()"/>
+    </div>
+    <div class="disc-field">
+      <div class="disc-lbl">ส่วนลดการค้า (บาท)</div>
+      <input class="disc-inp" type="number" id="dT" value="0" min="0" step="0.01" oninput="window.recalc()"/>
+    </div>
+    <div class="sum-row"><span class="sl">ราคาก่อน VAT</span><span class="sv" id="rBV">฿0.00</span></div>
+    <div class="sum-row"><span class="sl">VAT 7%</span><span class="sv" id="rVAT">฿0.00</span></div>
+    <div class="sum-row tot">
+      <span class="sl" style="font-size:13px;font-weight:600;">ยอดรวมทั้งสิ้น</span>
+      <span class="sv big" id="rTot">฿0.00</span>
+    </div>
+  </div>
+  <div>
+    <div class="sb-lbl">หมายเหตุ</div>
+    <textarea class="notes-inp" id="docNotes" placeholder="หมายเหตุบน PDF..."></textarea>
+  </div>
+  <div class="act-btns">
+    <button class="act-btn btn-ol" onclick="window.saveDraft()">บันทึก Draft</button>
+    <button class="act-btn btn-gold" onclick="window.savePreview()">บันทึก + Preview PDF</button>
+    <button class="act-btn btn-solid" onclick="window.saveOpen()">บันทึก + เปิดเอกสาร</button>
+  </div>
+</div>
+</div>
+
+<div id="toast" class="toast"><div class="spin"></div><span id="tMsg"></span></div>
+<div id="__cu" data-v={encodeURIComponent(JSON.stringify(customers))} style="display:none"></div>
+
+<script is:inline>
+(function(){
+  var CUSTS = JSON.parse(decodeURIComponent(document.getElementById('__cu').dataset.v || '%5B%5D'));
+  var UNITS = ['งาน','ตร.ม.','เมตร','ชุด','ชิ้น','จุด','เส้น','ตู้','คู่','ลิตร','ใบ','แผ่น'];
+  var cats = [], ibc = {}, cc = 0;
+
+  // Set today's date
+  document.getElementById('issueDate').value = new Date().toISOString().split('T')[0];
+
+  function fmt(n) {
+    return Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  window.recalc = function() {
+    var all = [].concat.apply([], cats.map(function(c){ return ibc[c.tid]||[]; }));
+    var sub = all.filter(function(i){ return !i.sub; }).reduce(function(s,i){ return s+(parseFloat(i.amt)||0); }, 0);
+    var dD = parseFloat(document.getElementById('dD').value)||0;
+    var dT = parseFloat(document.getElementById('dT').value)||0;
+    var bv = sub - dD - dT;
+    var vat = bv * 0.07;
+    document.getElementById('rSub').textContent = '฿'+fmt(sub);
+    document.getElementById('rBV').textContent  = '฿'+fmt(bv);
+    document.getElementById('rVAT').textContent = '฿'+fmt(vat);
+    document.getElementById('rTot').textContent = '฿'+fmt(bv+vat);
+  };
+
+  function updCnt() {
+    var t = cats.reduce(function(s,c){ return s+(ibc[c.tid]||[]).filter(function(i){ return !i.sub; }).length; }, 0);
+    document.getElementById('boqCnt').textContent = t > 0 ? cats.length+' หมวด - '+t+' รายการ' : 'ยังไม่มีรายการ';
+  }
+
+  function uOpts(sel) {
+    return UNITS.map(function(u){ return '<option'+(u===sel?' selected':'')+'>'+u+'</option>'; }).join('');
+  }
+
+  function updSub(tid) {
+    var sub = (ibc[tid]||[]).filter(function(i){ return !i.sub; }).reduce(function(s,i){ return s+(parseFloat(i.amt)||0); }, 0);
+    (ibc[tid]||[]).forEach(function(i){
+      if (i.sub) { i.amt = sub; var el = document.getElementById('a_'+i.id); if(el) el.textContent = '฿'+fmt(sub); }
+    });
+    var el = document.getElementById('cs_'+tid); if(el) el.textContent = '฿'+fmt(sub);
+  }
+
+  function render() {
+    var w = document.getElementById('catsWrap');
+    if (!w) return;
+    if (!cats.length) {
+      w.innerHTML = '<div class="boq-empty">'
+        + '<div class="boq-empty-title">ยังไม่มีหมวดงาน</div>'
+        + '<div class="boq-empty-sub">กด "+ เพิ่มหมวดงาน" เพื่อเริ่มต้น</div>'
+        + '<button class="btn btn-ol" style="margin-top:4px;" onclick="window.addCat()">+ เพิ่มหมวดงานแรก</button>'
+        + '</div>';
+      return;
+    }
+    w.innerHTML = cats.map(function(cat) {
+      var items = ibc[cat.tid]||[];
+      var sub = items.filter(function(i){ return !i.sub; }).reduce(function(s,i){ return s+(parseFloat(i.amt)||0); }, 0);
+      var rows = items.map(function(item) {
+        if (item.sub) {
+          return '<tr class="subr">'
+            + '<td colspan="6" style="text-align:right;padding-right:10px;font-size:11px;font-weight:600;color:var(--t2);">'+item.desc+'</td>'
+            + '<td class="w-amt"><span id="a_'+item.id+'" class="iamt">฿'+fmt(item.amt)+'</span></td>'
+            + '<td class="w-del"><button class="del-btn" onclick="window.removeItem(\''+cat.tid+'\',\''+item.id+'\')">×</button></td>'
+            + '</tr>';
+        }
+        return '<tr>'
+          + '<td class="w-no"><input id="n-'+item.id+'" name="n-'+item.id+'" type="text" value="'+item.num+'" placeholder="1.1" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'num\',this.value)"/></td>'
+          + '<td class="w-code"><input id="c-'+item.id+'" name="c-'+item.id+'" type="text" value="'+item.code+'" placeholder="รหัส" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'code\',this.value)"/></td>'
+          + '<td class="w-desc"><input id="d-'+item.id+'" name="d-'+item.id+'" type="text" value="'+item.desc+'" placeholder="รายละเอียดงาน..." oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'desc\',this.value)"/></td>'
+          + '<td class="w-qty"><input id="q-'+item.id+'" name="q-'+item.id+'" type="number" value="'+item.qty+'" min="0" step="0.001" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'qty\',this.value)"/></td>'
+          + '<td class="w-unit"><select id="u-'+item.id+'" name="u-'+item.id+'" onchange="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'unit\',this.value)">'+uOpts(item.unit)+'</select></td>'
+          + '<td class="w-price"><input id="p-'+item.id+'" name="p-'+item.id+'" type="number" value="'+item.price+'" min="0" step="0.01" placeholder="0.00" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'price\',this.value)"/></td>'
+          + '<td class="w-amt"><span id="a_'+item.id+'" class="iamt">฿'+fmt(item.amt)+'</span></td>'
+          + '<td class="w-del"><button class="del-btn" onclick="window.removeItem(\''+cat.tid+'\',\''+item.id+'\')">×</button></td>'
+          + '</tr>';
+      }).join('');
+      var emptyRow = '<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--t3);font-size:12px;">กด "+ รายการ" เพื่อเพิ่มรายการงาน</td></tr>';
+      return '<div class="cat-block">'
+        + '<div class="cat-hd">'
+        + '<span class="cbadge">หมวด '+cat.num+'</span>'
+        + '<input class="cname-inp" id="cn-'+cat.tid+'" name="cn-'+cat.tid+'" type="text" value="'+cat.name+'" placeholder="ชื่อหมวดงาน..." oninput="window.setCatName(\''+cat.tid+'\',this.value)"/>'
+        + '<span class="ctot" id="cs_'+cat.tid+'">฿'+fmt(sub)+'</span>'
+        + '<button class="cdel-btn" onclick="window.removeCat(\''+cat.tid+'\')">ลบ</button>'
+        + '</div>'
+        + '<div class="tblw"><table class="itbl"><thead><tr>'
+        + '<th class="w-no">ลำดับ</th><th class="w-code">รหัส</th><th class="w-desc">รายการงาน</th>'
+        + '<th class="w-qty">จำนวน</th><th class="w-unit">หน่วย</th><th class="w-price">ราคา/หน่วย</th>'
+        + '<th class="w-amt">จำนวนเงิน</th><th class="w-del"></th>'
+        + '</tr></thead><tbody>'+(rows||emptyRow)+'</tbody></table></div>'
+        + '<div class="addrow">'
+        + '<button class="ghost-btn" onclick="window.addItem(\''+cat.tid+'\')">+ รายการ</button>'
+        + '<button class="ghost-btn" onclick="window.addSub(\''+cat.tid+'\')">+ แถวรวม</button>'
+        + '<span class="addrow-hint">'+items.filter(function(i){ return !i.sub; }).length+' รายการ</span>'
+        + '</div></div>';
+    }).join('');
+    updCnt();
+  }
+
+  /* ── Customer search ── */
+  var custData = {}; // id -> customer object
+  CUSTS.forEach(function(c){ custData[c.id] = c; });
+
+  function renderDD(list) {
+    var dd = document.getElementById('custDD');
+    if (!list.length) {
+      dd.innerHTML = '<div class="copt" style="color:var(--t3);cursor:default;pointer-events:none;">ไม่พบลูกค้า</div>';
+      return;
+    }
+    dd.innerHTML = list.slice(0,10).map(function(c) {
+      return '<div class="copt" data-cid="'+c.id+'">'
+        + '<div class="copt-name">'+c.company_name+'</div>'
+        + '<div class="copt-code">'+(c.customer_code||'')+'</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // mousedown fires before blur — guarantees selection before dropdown closes
+  document.getElementById('custDD').addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    var opt = e.target.closest('[data-cid]');
+    if (!opt) return;
+    var c = custData[opt.getAttribute('data-cid')];
+    if (!c) return;
+    document.getElementById('custId').value = c.id;
+    document.getElementById('custSearch').value = c.company_name;
+    document.getElementById('custDD').classList.remove('open');
+    document.getElementById('cName').textContent = c.company_name;
+    var det = [];
+    if (c.customer_code) det.push('รหัส: '+c.customer_code);
+    if (c.address) det.push(c.address);
+    if (c.phone) det.push('โทร: '+c.phone);
+    if (c.tax_id) det.push('เลขภาษี: '+c.tax_id);
+    document.getElementById('cDet').textContent = det.join(' · ');
+    document.getElementById('custBox').classList.add('show');
+  });
+
+  window.searchCust = function(v) {
+    var q = v.toLowerCase().trim();
+    var list = q ? CUSTS.filter(function(c){
+      return c.company_name.toLowerCase().includes(q) || (c.customer_code||'').toLowerCase().includes(q);
+    }) : CUSTS;
+    renderDD(list);
+    document.getElementById('custDD').classList.add('open');
+  };
+
+  window.openDD = function() {
+    renderDD(CUSTS);
+    document.getElementById('custDD').classList.add('open');
+  };
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.cust-wrap')) {
+      document.getElementById('custDD').classList.remove('open');
+    }
+  });
+
+  /* ── BOQ actions ── */
+  window.setP = function(t) { document.getElementById('payCond').value = t; };
+  window.addCat = function() {
+    cc++;
+    var tid = 'c'+cc;
+    cats.push({tid:tid, num:cats.length+1, name:''});
+    ibc[tid] = [];
+    render();
+  };
+  window.removeCat = function(tid) {
+    if (!confirm('ลบหมวดงานนี้?')) return;
+    cats = cats.filter(function(c){ return c.tid !== tid; });
+    delete ibc[tid];
+    cats.forEach(function(c,i){ c.num = i+1; });
+    render(); window.recalc();
+  };
+  window.setCatName = function(tid, v) {
+    var c = cats.find(function(x){ return x.tid === tid; });
+    if (c) c.name = v;
+  };
+  window.addItem = function(tid) {
+    var cat = cats.find(function(c){ return c.tid === tid; });
+    var ex = (ibc[tid]||[]).filter(function(i){ return !i.sub; });
+    ibc[tid].push({id:'i'+Date.now(), num:cat.num+'.'+(ex.length+1), code:'', desc:'', qty:1, unit:'งาน', price:0, amt:0, sub:false});
+    render();
+  };
+  window.addSub = function(tid) {
+    var cat = cats.find(function(c){ return c.tid === tid; });
+    ibc[tid].push({id:'i'+Date.now()+'s', num:'', code:'', desc:'รวมราคา'+(cat.name||''), qty:0, unit:'', price:0, amt:0, sub:true});
+    render();
+  };
+  window.removeItem = function(tid, iid) {
+    ibc[tid] = (ibc[tid]||[]).filter(function(i){ return i.id !== iid; });
+    render(); window.recalc();
+  };
+  window.updItem = function(tid, iid, f, v) {
+    var item = (ibc[tid]||[]).find(function(i){ return i.id === iid; });
+    if (!item) return;
+    item[f] = v;
+    if (f==='qty'||f==='price') {
+      item.amt = (parseFloat(item.qty)||0) * (parseFloat(item.price)||0);
+      var el = document.getElementById('a_'+iid);
+      if (el) el.textContent = '฿'+fmt(item.amt);
+    }
+    updSub(tid); window.recalc(); updCnt();
+  };
+
+  /* ── Save ── */
+  function build(status) {
+    var cid = document.getElementById('custId').value;
+    if (!cid) { toast('กรุณาเลือกลูกค้าก่อน', true); return null; }
+    if (!cats.length) { toast('กรุณาเพิ่มหมวดงานอย่างน้อย 1 หมวด', true); return null; }
+    var items = [].concat.apply([], cats.map(function(c){
+      return (ibc[c.tid]||[]).map(function(i){
+        return {item_number:i.num, item_code:i.code, description_th:i.desc,
+          quantity:parseFloat(i.qty)||0, unit_th:i.unit,
+          unit_price:parseFloat(i.price)||0, amount:parseFloat(i.amt)||0,
+          is_subtotal_row:i.sub||false, temp_category_id:c.tid};
+      });
+    }));
+    return {
+      document: {
+        document_type_id: document.getElementById('docType').value,
+        customer_id: cid, status: status, language: 'th',
+        issue_date: document.getElementById('issueDate').value,
+        due_date: document.getElementById('dueDate').value||null,
+        reference_po: document.getElementById('refPO').value||null,
+        payment_condition: document.getElementById('payCond').value||null,
+        notes: document.getElementById('docNotes').value||null,
+        discount_design: parseFloat(document.getElementById('dD').value)||0,
+        discount_trade: parseFloat(document.getElementById('dT').value)||0,
+      },
+      categories: cats.map(function(c,i){
+        return {temp_id:c.tid, category_number:c.num, name_th:c.name||'หมวดที่ '+c.num, sort_order:i};
+      }),
+      items: items
+    };
+  }
+
+  async function doSave(p) {
+    toast('กำลังบันทึก...', false, true);
+    try {
+      var res = await fetch('/documents/new', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error||'เกิดข้อผิดพลาด');
+      document.getElementById('sDot').className = 'sdot ok';
+      document.getElementById('sTxt').textContent = 'บันทึกแล้ว - '+data.document_number;
+      toast('บันทึกสำเร็จ! '+data.document_number);
+      return data;
+    } catch(e) { toast(e.message, true); return null; }
+  }
+
+  window.saveDraft   = async function(){ var p=build('draft'); if(p) await doSave(p); };
+  window.saveOpen    = async function(){ var p=build('draft'); if(!p) return; var r=await doSave(p); if(r&&r.id) window.location.href='/documents/'+r.id; };
+  window.savePreview = async function(){ var p=build('draft'); if(!p) return; var r=await doSave(p); if(r&&r.id) window.open('/documents/'+r.id+'/print','_blank'); };
+
+  function toast(msg, err, loading) {
+    var t = document.getElementById('toast');
+    document.getElementById('tMsg').textContent = msg;
+    t.className = 'toast show'+(err?' err':'')+(loading?' loading':'');
+    if (!loading) setTimeout(function(){ t.className='toast'; }, 3500);
+  }
+
+  render();
+  window.recalc();
+})();
+</script>
+</body>
+</html>
