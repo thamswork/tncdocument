@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase';
-import bcrypt from '@node-rs/bcrypt';
+import bcrypt from 'bcrypt-edge';
 
 export interface TNCUser {
   id: string;
