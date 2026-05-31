@@ -1,7 +1,7 @@
 ---
 import { getUsers } from '../../lib/documents';
-
 import { supabaseAdmin } from '../../lib/supabase';
+import { hashPassword } from '../../lib/auth';
 
 const user = Astro.locals.user;
 if (user.role !== 'superadmin') return Astro.redirect('/documents/dashboard');
@@ -47,51 +47,72 @@ const users = await getUsers();
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="robots" content="noindex, nofollow" />
-  <title>จัดการผู้ใช้ — TNC Documents</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>จัดการผู้ใช้ — TNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#F8F7F4;--white:#fff;--border:#E2DFD8;--border2:#EDE9E3;--text:#1A1814;--text2:#6B6860;--text3:#AEABA4;--gold:#C9A96E;--gold-bg:#FAF5EC;--green:#2D7A4F;--green-bg:#EDF7F0;--green-border:#C5E8D2;--red:#B94040;}
+    :root{--bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;--text:#1A1814;--t2:#6B6860;--t3:#AEABA4;--gold:#C9A96E;--gbg:#FAF5EC;--green:#2D7A4F;--red:#B94040;}
     body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 40px;height:60px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10;}
-    .back{font-size:12.5px;color:var(--text2);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:4px;transition:all .15s;}
-    .back:hover{border-color:var(--text);color:var(--text);}
-    .topbar-title{font-size:15px;font-weight:600;}
-    .content{padding:32px 40px;display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start;max-width:1100px;}
-    .card{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
-    .card-head{padding:16px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:baseline;gap:8px;}
-    .card-title{font-size:14px;font-weight:600;}
-    .card-count{font-size:12px;color:var(--text3);}
-    .card-body{padding:24px;}
-    table{width:100%;border-collapse:collapse;}
-    thead th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;background:var(--bg);border-bottom:1px solid var(--border);}
-    tbody tr{border-bottom:1px solid var(--border2);}
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 12px;border:1px solid var(--border);border-radius:5px;-webkit-tap-highlight-color:transparent;}
+    .topbar-title{font-size:15px;font-weight:700;}
+    .content{padding:20px 16px;display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;max-width:1000px;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    .card-head{padding:14px 18px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:8px;}
+    .card-title{font-size:14px;font-weight:600;flex:1;}
+    .card-count{font-size:12px;color:var(--t3);}
+    .card-body{padding:20px;}
+
+    /* Users table - desktop */
+    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    table{width:100%;border-collapse:collapse;min-width:380px;}
+    thead th{padding:9px 14px;text-align:left;font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;background:var(--bg);border-bottom:1px solid var(--border);}
+    tbody tr{border-bottom:1px solid var(--b2);}
     tbody tr:last-child{border-bottom:none;}
-    td{padding:12px 14px;font-size:13px;color:var(--text2);}
+    td{padding:12px 14px;font-size:13px;color:var(--t2);}
     td.strong{color:var(--text);font-weight:600;}
     td.mono{font-family:monospace;font-size:12px;color:var(--text);}
-    .badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:3px;font-size:10.5px;font-weight:700;letter-spacing:.04em;}
-    .badge-superadmin{background:var(--gold-bg);color:#8B6F3E;border:1px solid #E8D5A8;}
-    .badge-admin{background:var(--bg);color:var(--text3);border:1px solid var(--border);}
-    .badge-on{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+
+    /* Mobile user rows */
+    .mob-users{display:none;}
+    .mob-user-item{padding:14px 16px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:12px;}
+    .mob-user-item:last-child{border-bottom:none;}
+    .mob-user-info{flex:1;min-width:0;}
+    .mob-user-name{font-size:13px;font-weight:600;color:var(--text);}
+    .mob-user-meta{font-size:11.5px;color:var(--t3);margin-top:2px;font-family:monospace;}
+
+    .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:4px;font-size:10.5px;font-weight:700;}
+    .badge-superadmin{background:var(--gbg);color:#8B6F3E;border:1px solid #E8D5A8;}
+    .badge-admin{background:var(--bg);color:var(--t3);border:1px solid var(--border);}
+    .badge-on{background:#EDF7F0;color:var(--green);border:1px solid #C5E8D2;}
     .badge-off{background:#FEF2F2;color:var(--red);border:1px solid #FECACA;}
-    .toggle-btn{padding:4px 10px;font-size:11px;font-family:inherit;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text2);transition:all .15s;}
-    .toggle-btn:hover{border-color:var(--text);color:var(--text);}
-    .field{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;}
-    .field label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
+
+    .toggle-btn{padding:6px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--t2);-webkit-tap-highlight-color:transparent;min-height:34px;}
+    .toggle-btn:active{background:var(--bg);}
+
+    /* Form */
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+    .field label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t2);}
     .field label span{color:var(--red);margin-left:2px;}
-    .field input,.field select{padding:10px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:13.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;}
-    .field input:focus,.field select:focus{border-color:var(--text);}
-    .hint{font-size:11.5px;color:var(--text3);margin-top:-10px;margin-bottom:4px;}
-    .alert{border-radius:5px;padding:12px 14px;font-size:13px;margin-bottom:16px;}
-    .alert-ok{background:var(--green-bg);border:1px solid var(--green-border);color:var(--green);}
+    .field input,.field select{padding:11px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none;}
+    .field input:focus,.field select:focus{border-color:var(--text);background:var(--white);}
+    .hint{font-size:11.5px;color:var(--t3);margin-top:-10px;margin-bottom:12px;}
+    .alert{border-radius:5px;padding:11px 14px;font-size:13px;margin-bottom:14px;}
+    .alert-ok{background:#EDF7F0;border:1px solid #C5E8D2;color:var(--green);}
     .alert-err{background:#FEF2F2;border:1px solid #FECACA;color:var(--red);}
-    .btn-submit{width:100%;padding:11px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:12.5px;font-weight:700;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:opacity .2s;}
-    .btn-submit:hover{opacity:.85;}
-    .role-info{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:12px;color:var(--text2);margin-top:16px;line-height:1.7;}
-    .role-info strong{color:var(--text);display:block;margin-bottom:2px;}
+    .btn-submit{width:100%;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:5px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;-webkit-tap-highlight-color:transparent;min-height:48px;}
+    .btn-submit:active{opacity:.85;}
+    .role-info{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--t2);margin-top:14px;line-height:1.8;}
+    .role-info strong{color:var(--text);display:block;}
+
+    @media(max-width:768px){
+      .topbar{padding:0 16px;}
+      .content{grid-template-columns:1fr;padding:14px 12px;}
+      .tbl-wrap{display:none;}
+      .mob-users{display:block;}
+    }
   </style>
 </head>
 <body>
@@ -106,56 +127,78 @@ const users = await getUsers();
         <div class="card-title">ผู้ใช้งานทั้งหมด</div>
         <div class="card-count">{users.length} บัญชี</div>
       </div>
-      <table>
-        <thead><tr>
-          <th>Username</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>สถานะ</th><th>จัดการ</th>
-        </tr></thead>
-        <tbody>
-          {users.map((u: any) => (
-            <tr>
-              <td class="mono">{u.username}</td>
-              <td class="strong">{u.full_name}</td>
-              <td><span class={`badge badge-${u.role}`}>{u.role === 'superadmin' ? 'Super Admin' : 'Admin'}</span></td>
-              <td><span class={`badge badge-${u.is_active ? 'on' : 'off'}`}>{u.is_active ? 'ใช้งาน' : 'ปิดใช้'}</span></td>
-              <td>
-                {u.username !== 'superadmin' && (
-                  <form method="POST" style="display:inline;">
-                    <input type="hidden" name="action" value="toggle" />
-                    <input type="hidden" name="user_id" value={u.id} />
-                    <input type="hidden" name="is_active" value={String(u.is_active)} />
-                    <button type="submit" class="toggle-btn">
-                      {u.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
-                    </button>
-                  </form>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <!-- Desktop table -->
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Username</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>สถานะ</th><th>จัดการ</th>
+          </tr></thead>
+          <tbody>
+            {users.map((u: any) => (
+              <tr>
+                <td class="mono">{u.username}</td>
+                <td class="strong">{u.full_name}</td>
+                <td><span class={`badge badge-${u.role}`}>{u.role==='superadmin'?'Super Admin':'Admin'}</span></td>
+                <td><span class={`badge badge-${u.is_active?'on':'off'}`}>{u.is_active?'ใช้งาน':'ปิดใช้'}</span></td>
+                <td>
+                  {u.username !== 'superadmin' && (
+                    <form method="POST" style="display:inline;">
+                      <input type="hidden" name="action" value="toggle"/>
+                      <input type="hidden" name="user_id" value={u.id}/>
+                      <input type="hidden" name="is_active" value={String(u.is_active)}/>
+                      <button type="submit" class="toggle-btn">{u.is_active?'ปิดใช้งาน':'เปิดใช้งาน'}</button>
+                    </form>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <!-- Mobile list -->
+      <div class="mob-users">
+        {users.map((u: any) => (
+          <div class="mob-user-item">
+            <div class="mob-user-info">
+              <div class="mob-user-name">{u.full_name}</div>
+              <div class="mob-user-meta">{u.username}</div>
+            </div>
+            <span class={`badge badge-${u.role}`} style="margin-right:6px;">{u.role==='superadmin'?'Super':'Admin'}</span>
+            <span class={`badge badge-${u.is_active?'on':'off'}`} style="margin-right:8px;">{u.is_active?'ใช้':'ปิด'}</span>
+            {u.username !== 'superadmin' && (
+              <form method="POST">
+                <input type="hidden" name="action" value="toggle"/>
+                <input type="hidden" name="user_id" value={u.id}/>
+                <input type="hidden" name="is_active" value={String(u.is_active)}/>
+                <button type="submit" class="toggle-btn">{u.is_active?'ปิด':'เปิด'}</button>
+              </form>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
 
-    <!-- Add user -->
+    <!-- Add user form -->
     <div class="card">
       <div class="card-head"><div class="card-title">เพิ่มผู้ใช้ใหม่</div></div>
       <div class="card-body">
         {success && <div class="alert alert-ok">{success}</div>}
         {error && <div class="alert alert-err">{error}</div>}
         <form method="POST">
-          <input type="hidden" name="action" value="create" />
+          <input type="hidden" name="action" value="create"/>
           <div class="field">
             <label>Username <span>*</span></label>
-            <input type="text" name="username" placeholder="เช่น staff01" autocomplete="off" required />
+            <input type="text" name="username" placeholder="เช่น staff01" autocomplete="off" autocapitalize="none" required/>
           </div>
           <div class="field">
             <label>ชื่อ-นามสกุล <span>*</span></label>
-            <input type="text" name="full_name" placeholder="ชื่อที่แสดงในระบบ" required />
+            <input type="text" name="full_name" placeholder="ชื่อที่แสดงในระบบ" required/>
           </div>
           <div class="field">
             <label>รหัสผ่าน <span>*</span></label>
-            <input type="password" name="password" placeholder="อย่างน้อย 8 ตัวอักษร" required minlength="8" autocomplete="new-password" />
+            <input type="password" name="password" placeholder="อย่างน้อย 8 ตัวอักษร" required minlength="8" autocomplete="new-password"/>
           </div>
-          <div class="hint">ใช้ตัวอักษร ตัวเลข และสัญลักษณ์ผสมกันเพื่อความปลอดภัย</div>
+          <div class="hint">ใช้ตัวอักษร ตัวเลข และสัญลักษณ์ผสมกัน</div>
           <div class="field">
             <label>สิทธิ์การใช้งาน <span>*</span></label>
             <select name="role">
@@ -166,7 +209,7 @@ const users = await getUsers();
           <button type="submit" class="btn-submit">เพิ่มผู้ใช้</button>
         </form>
         <div class="role-info">
-          <strong>Admin</strong>กรอกข้อมูลได้ บันทึก Draft ได้ แต่ไม่สามารถออกเอกสารได้
+          <strong>Admin</strong>บันทึก Draft ได้ แต่ไม่สามารถออกเอกสารได้
           <strong style="margin-top:8px;">Super Admin</strong>สิทธิ์เต็ม: ออกเอกสาร, จัดการผู้ใช้, ยกเลิกเอกสาร
         </div>
       </div>
