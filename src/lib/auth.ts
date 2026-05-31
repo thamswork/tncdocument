@@ -1,5 +1,4 @@
 import { supabaseAdmin } from './supabase';
-import bcrypt from 'bcrypt-edge';
 
 export interface TNCUser {
   id: string;
@@ -11,6 +10,18 @@ export interface TNCUser {
 export const SESSION_COOKIE = 'tnc_docs_session';
 const SESSION_DURATION = 60 * 60 * 8;
 
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const passwordHash = await hashPassword(password);
+  return passwordHash === hash;
+}
+
 export async function loginUser(username: string, password: string): Promise<TNCUser | null> {
   const { data: user, error } = await supabaseAdmin
     .from('tnc_users')
@@ -19,7 +30,7 @@ export async function loginUser(username: string, password: string): Promise<TNC
     .eq('is_active', true)
     .single();
   if (error || !user) return null;
-  const valid = await bcrypt.compare(password, user.password_hash);
+  const valid = await verifyPassword(password, user.password_hash);
   if (!valid) return null;
   return { id: user.id, username: user.username, full_name: user.full_name, role: user.role };
 }
@@ -49,10 +60,6 @@ export async function getSessionUser(token: string | undefined): Promise<TNCUser
 
 export async function destroySession(token: string): Promise<void> {
   await supabaseAdmin.from('tnc_sessions').delete().eq('token', token);
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
 }
 
 export async function getUsers() {
