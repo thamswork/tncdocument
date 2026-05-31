@@ -1,10 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// In Cloudflare Workers, env vars from wrangler.toml [vars] are available via import.meta.env at build time
-// but we need to handle runtime access too
-const supabaseUrl = (globalThis as any).SUPABASE_URL || import.meta.env.SUPABASE_URL || '';
-const supabaseServiceKey = (globalThis as any).SUPABASE_SERVICE_ROLE_KEY || import.meta.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabaseAnonKey = (globalThis as any).PUBLIC_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = 'https://mcelqinrwenlsxsyoqxs.supabase.co'\;
+const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZWxxaW5yd2VubHN4c3lvcXhzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDEyNTM0NCwiZXhwIjoyMDk1NzAxMzQ0fQ.9Xc4q4n7ppMOBjlnuhU4efJK0831Uqkx9j79zCGqBvo';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZWxxaW5yd2VubHN4c3lvcXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUzNDQsImV4cCI6MjA5NTcwMTM0NH0.1Yswl1yQDzoMgjGV9I44kLL54u_7IpyLobelHxxlT-c';
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
