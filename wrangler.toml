@@ -3,6 +3,11 @@ name = "tncdocuments"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+[vars]
+SUPABASE_URL = "https://mcelqinrwenlsxsyoqxs.supabase.co"
+PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZWxxaW5yd2VubHN4c3lvcXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjUzNDQsImV4cCI6MjA5NTcwMTM0NH0.1Yswl1yQDzoMgjGV9I44kLL54u_7IpyLobelHxxlT-c"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZWxxaW5yd2VubHN4c3lvcXhzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDEyNTM0NCwiZXhwIjoyMDk1NzAxMzQ0fQ.9Xc4q4n7ppMOBjlnuhU4efJK0831Uqkx9j79zCGqBvo"
+
 [[kv_namespaces]]
 binding = "SESSION"
 id = "c7326379c4254f1c8d208de1402c3988"
