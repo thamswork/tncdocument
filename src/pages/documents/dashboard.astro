@@ -154,19 +154,20 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
       .content{padding:16px;}
       .stats{grid-template-columns:1fr 1fr;}
       .stat-card{padding:14px 16px;}
+      .stat-card:first-child{grid-column:1/-1;}
       .stat-n{font-size:26px;}
       .table-toolbar{flex-direction:column;align-items:stretch;gap:8px;padding:12px 14px;}
       .search-inp{width:100%!important;}
       .filters{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
       .tbl td{padding:12px 10px;font-size:12px;}
-      .tbl thead th{padding:8px 10px;}
+      .tbl thead th{padding:8px 10px;font-size:9px;}
       .tbl th:nth-child(7),.tbl td:nth-child(7){display:none;}
       .result-count{padding:6px 14px;}
-      /* Hide keyboard hint on mobile */
       .kbd-hint{display:none;}
     }
     @media(max-width:480px){
       .stats{grid-template-columns:1fr;}
+      .stat-card:first-child{grid-column:auto;}
       .tbl th:nth-child(2),.tbl td:nth-child(2){display:none;}
       .tbl th:nth-child(6),.tbl td:nth-child(6){display:none;}
     }

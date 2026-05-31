@@ -176,18 +176,20 @@ if (Astro.request.method === 'POST') {
       .rside{position:static;height:auto;border-left:none;border-top:1px solid var(--border);padding:16px;}
       .act-btns{margin-top:12px;}
       .meta-grid{grid-template-columns:1fr;}
-      .topbar{padding:0 14px;gap:8px;}
-      .tb-title{font-size:13px;}
-      .btn{padding:6px 10px;font-size:10.5px;}
-      .editor{padding:14px 14px;}
-      .boq-body{padding:10px 10px;}
+      .topbar{padding:0 12px;gap:6px;height:auto;min-height:52px;flex-wrap:nowrap;}
+      .tb-title{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;}
+      .tb-status{display:none;}
+      .btn{padding:7px 10px;font-size:10px;white-space:nowrap;}
+      .editor{padding:12px;}
+      .boq-body{padding:10px;}
       .itbl{min-width:480px;}
-      .w-code{display:none;}/* hide code col on mobile */
+      .w-code{display:none;}
+      .card-bd{padding:12px 14px;}
     }
     @media(max-width:480px){
-      .meta-grid{grid-template-columns:1fr;}
       .fg2{grid-template-columns:1fr;}
-      .topbar .tb-status{display:none;}
+      /* On very small screens hide DRAFT button - keep Preview and Save */
+      .btn-ol.draft-btn{display:none;}
     }
   </style>
 </head>
@@ -197,7 +199,7 @@ if (Astro.request.method === 'POST') {
   <a href="/documents/dashboard" class="back">← กลับ</a>
   <div class="tb-title">สร้างเอกสารใหม่</div>
   <div class="tb-status"><span class="sdot" id="sDot"></span><span id="sTxt">ยังไม่ได้บันทึก</span></div>
-  <button class="btn btn-ol" onclick="window.saveDraft()">DRAFT</button>
+  <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">DRAFT</button>
   <button class="btn btn-gold" onclick="window.savePreview()">PREVIEW PDF</button>
   <button class="btn btn-solid" onclick="window.saveOpen()">บันทึก + เปิด</button>
 </div>
