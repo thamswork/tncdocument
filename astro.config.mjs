@@ -6,6 +6,6 @@ export default defineConfig({
   adapter: cloudflare({
     imageService: "passthrough",
     platformProxy: { enabled: false },
-    session: false,
+    sessionKVBindingName: undefined,
   }),
 });
