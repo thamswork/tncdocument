@@ -1,21 +1,16 @@
 ---
 import { getDocument, logAction, publishDocument } from '../../../lib/documents';
-import { SESSION_COOKIE } from '../../../lib/auth';
 const user = Astro.locals.user;
 const { id } = Astro.params;
 const doc = await getDocument(id!);
 if (!doc) return Astro.redirect('/documents/dashboard');
 
-// Handle actions
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = form.get('action') as string;
   if (action === 'publish' && user.role === 'superadmin') {
     await publishDocument(id!, user.id);
     return Astro.redirect(`/documents/${id}`);
-  }
-  if (action === 'log_view') {
-    await logAction(id!, 'view', user.id);
   }
 }
 
@@ -39,156 +34,138 @@ doc.categories.forEach((cat: any) => {
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="robots" content="noindex, nofollow" />
-  <title>{doc.document_number} — TNC Documents</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>{doc.document_number} — TNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#F8F7F4;--white:#FFFFFF;--border:#E2DFD8;--border2:#EDE9E3;
-      --text:#1A1814;--text2:#6B6860;--text3:#AEABA4;
-      --gold:#C9A96E;--gold-bg:#FAF5EC;
-      --green:#2D7A4F;--green-bg:#EDF7F0;--green-border:#C5E8D2;
-      --red:#B94040;--red-bg:#FEF2F2;
+      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
+      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
+      --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
+      --green:#2D7A4F;--grbg:#EDF7F0;--grborder:#C5E8D2;
+      --red:#B94040;
     }
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
 
-    /* Topbar */
-    .topbar{
-      background:var(--white);border-bottom:1px solid var(--border);
-      padding:0 40px;height:60px;
-      display:flex;align-items:center;gap:14px;
-      position:sticky;top:0;z-index:20;
-    }
-    .back{
-      font-size:12.5px;color:var(--text2);text-decoration:none;
-      padding:6px 12px;border:1px solid var(--border);border-radius:4px;flex-shrink:0;
-    }
-    .back:hover{border-color:var(--text);color:var(--text);}
-    .topbar-doc-num{font-size:13px;font-weight:700;font-family:monospace;letter-spacing:.04em;}
-    .topbar-customer{font-size:13px;color:var(--text2);}
-    .topbar-actions{margin-left:auto;display:flex;gap:8px;align-items:center;}
-    .btn{
-      padding:8px 16px;border-radius:4px;font-size:12px;font-weight:700;
-      font-family:inherit;cursor:pointer;border:none;
-      letter-spacing:.06em;text-transform:uppercase;
-      text-decoration:none;display:inline-flex;align-items:center;gap:6px;
-      transition:all .15s;white-space:nowrap;
-    }
-    .btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border);}
-    .btn-outline:hover{border-color:var(--text);color:var(--text);}
-    .btn-solid{background:var(--text);color:var(--bg);}
-    .btn-solid:hover{opacity:.85;}
+    /* ── Topbar ── */
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 20px;height:54px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;}
+    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 12px;border:1px solid var(--border);border-radius:5px;white-space:nowrap;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+    .back:active{background:var(--bg);}
+    .tb-docnum{font-size:13px;font-weight:700;font-family:monospace;white-space:nowrap;}
+    .tb-cust{font-size:12px;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .tb-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+    .btn{padding:7px 13px;border-radius:5px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:none;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all .15s;white-space:nowrap;-webkit-tap-highlight-color:transparent;min-height:38px;}
+    .btn-ol{background:transparent;color:var(--t2);border:1px solid var(--border);}
+    .btn-ol:active{background:var(--bg);}
     .btn-green{background:var(--green);color:#fff;}
-    .btn-green:hover{opacity:.9;}
-    .btn-gold{background:var(--gold);color:#fff;}
-    .btn-gold:hover{opacity:.9;}
+    .btn-green:active{opacity:.85;}
 
-    /* Status badge */
-    .status-pill{
-      display:inline-flex;align-items:center;gap:6px;
-      padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:600;
-    }
-    .status-dot{width:7px;height:7px;border-radius:50%;}
-    .pill-draft{background:var(--bg);color:var(--text3);border:1px solid var(--border);}
-    .pill-draft .status-dot{background:var(--text3);}
-    .pill-published{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
-    .pill-published .status-dot{background:var(--green);}
+    /* Status pill */
+    .spill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;}
+    .sdot{width:6px;height:6px;border-radius:50%;}
+    .spill-draft{background:var(--bg);color:var(--t3);border:1px solid var(--border);}
+    .spill-draft .sdot{background:var(--t3);}
+    .spill-pub{background:var(--grbg);color:var(--green);border:1px solid var(--grborder);}
+    .spill-pub .sdot{background:var(--green);}
 
-    /* Layout */
-    .layout{display:grid;grid-template-columns:1fr 280px;gap:0;min-height:calc(100vh - 60px);}
-    .main-content{padding:32px 40px;border-right:1px solid var(--border);}
-    .side-panel{padding:24px;background:var(--white);}
+    /* ── Layout ── */
+    .layout{display:grid;grid-template-columns:1fr 260px;min-height:calc(100dvh - 54px);}
+    .main{padding:24px 24px;border-right:1px solid var(--border);min-width:0;}
+    .aside{padding:20px;background:var(--white);}
 
     /* Info cards */
-    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
-    .info-card{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:18px 20px;}
-    .info-card-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;}
-    .info-card-value{font-size:14px;font-weight:600;color:var(--text);}
-    .info-card-sub{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5;}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+    .icard{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
+    .icard-lbl{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:6px;}
+    .icard-val{font-size:14px;font-weight:600;}
+    .icard-sub{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.6;}
 
-    /* Categories */
-    .cat-section{margin-bottom:20px;}
-    .cat-title{
-      display:flex;align-items:center;gap:10px;
-      padding:10px 16px;background:var(--text);color:var(--bg);
-      border-radius:4px 4px 0 0;font-size:13px;font-weight:600;
-    }
-    .cat-num-badge{
-      background:rgba(255,255,255,.15);
-      padding:2px 8px;border-radius:3px;font-size:10.5px;
-    }
-    .cat-subtotal{margin-left:auto;font-size:12px;opacity:.8;}
-    .items-table-wrap{background:var(--white);border:1px solid var(--border);border-top:none;border-radius:0 0 4px 4px;overflow:hidden;}
-    table{width:100%;border-collapse:collapse;}
-    thead th{
-      padding:8px 12px;background:var(--bg);font-size:9.5px;font-weight:700;
-      color:var(--text3);text-transform:uppercase;letter-spacing:.1em;
-      text-align:left;border-bottom:1px solid var(--border);
-    }
-    thead th.right{text-align:right;}
-    tbody tr{border-bottom:1px solid var(--border2);}
+    /* Category sections */
+    .cat-sec{margin-bottom:16px;}
+    .cat-hd{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--text);color:var(--bg);border-radius:5px 5px 0 0;font-size:13px;font-weight:600;}
+    .cat-badge{background:rgba(255,255,255,.15);padding:2px 8px;border-radius:3px;font-size:10px;}
+    .cat-total{margin-left:auto;font-size:12px;opacity:.8;}
+    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--white);border:1px solid var(--border);border-top:none;border-radius:0 0 5px 5px;}
+    table{width:100%;border-collapse:collapse;min-width:480px;}
+    thead th{padding:8px 10px;background:var(--bg);font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.09em;text-align:left;border-bottom:1px solid var(--border);}
+    thead th.r{text-align:right;}
+    thead th.c{text-align:center;}
+    tbody tr{border-bottom:1px solid var(--b2);}
     tbody tr:last-child{border-bottom:none;}
-    tbody tr.subtotal-row{background:var(--bg);}
-    td{padding:9px 12px;font-size:12.5px;color:var(--text2);}
-    td.center{text-align:center;}
-    td.right{text-align:right;font-weight:600;color:var(--text);}
-    td.num{font-family:monospace;font-size:11.5px;color:var(--text3);}
+    tbody tr.sub-row{background:var(--bg);}
+    td{padding:9px 10px;font-size:12.5px;color:var(--t2);}
+    td.r{text-align:right;font-weight:600;color:var(--text);}
+    td.c{text-align:center;}
+    td.mono{font-family:monospace;font-size:11px;color:var(--t3);}
     td.desc{color:var(--text);}
-    td.subtotal-label{text-align:right;font-weight:700;color:var(--text2);font-size:12px;}
-    td.subtotal-val{text-align:right;font-weight:700;color:var(--text);font-size:12.5px;}
-    .no-items{padding:24px;text-align:center;color:var(--text3);font-size:13px;}
+    td.sub-lbl{text-align:right;font-weight:700;color:var(--t2);font-size:11.5px;}
+    td.sub-val{text-align:right;font-weight:700;color:var(--text);}
+    .no-items{padding:24px;text-align:center;color:var(--t3);font-size:13px;}
 
-    /* Summary panel */
-    .panel-title{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;}
-    .sum-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);}
+    /* Notes */
+    .notes-box{margin-top:14px;background:var(--white);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
+    .notes-lbl{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
+    .notes-txt{font-size:13px;color:var(--t2);white-space:pre-line;line-height:1.7;}
+
+    /* ── Aside panel ── */
+    .panel-sec{margin-bottom:20px;}
+    .panel-title{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:12px;}
+    .sum-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--b2);}
     .sum-row:last-child{border-bottom:none;}
     .sum-row.total{border-top:2px solid var(--text);border-bottom:none;padding-top:10px;margin-top:4px;}
-    .sum-label{font-size:12.5px;color:var(--text2);}
-    .sum-val{font-size:12.5px;font-weight:600;color:var(--text);}
-    .sum-val.big{font-size:22px;font-weight:300;letter-spacing:-.02em;}
-    .panel-divider{border:none;border-top:1px solid var(--border2);margin:20px 0;}
+    .sum-lbl{font-size:12.5px;color:var(--t2);}
+    .sum-val{font-size:12.5px;font-weight:600;}
+    .sum-val.big{font-size:20px;font-weight:300;letter-spacing:-.02em;}
+    .divider{border:none;border-top:1px solid var(--b2);margin:16px 0;}
     .action-list{display:flex;flex-direction:column;gap:8px;}
-    .action-item{
-      display:flex;align-items:center;gap:10px;padding:12px 14px;
-      background:var(--bg);border:1px solid var(--border);border-radius:5px;
-      text-decoration:none;cursor:pointer;transition:border-color .15s;
+    .aitem{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;text-decoration:none;cursor:pointer;transition:border-color .15s;width:100%;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent;}
+    .aitem:hover,.aitem:active{border-color:var(--text);}
+    .aicon{width:30px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;font-weight:700;}
+    .aicon-pdf{background:#FEF2F2;color:var(--red);}
+    .aicon-edit{background:var(--gbg);color:var(--gold);}
+    .aicon-pub{background:var(--grbg);color:var(--green);}
+    .atext-title{font-size:13px;font-weight:600;color:var(--text);}
+    .atext-sub{font-size:11px;color:var(--t3);margin-top:1px;}
+    .warn-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:5px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:12px;}
+    .warn-box strong{display:block;margin-bottom:2px;}
+    .meta-info{font-size:11.5px;color:var(--t3);line-height:1.8;}
+
+    /* ── Mobile ── */
+    @media(max-width:768px){
+      .topbar{padding:0 14px;gap:8px;}
+      .tb-cust{display:none;}
+      .tb-actions .spill{display:none;}
+      .layout{grid-template-columns:1fr;display:block;}
+      .main{padding:14px 12px;border-right:none;}
+      .aside{border-top:1px solid var(--border);padding:16px 12px;}
+      .info-grid{grid-template-columns:1fr;}
+      .icard{padding:14px 16px;}
+      /* Stack aside summary above actions on mobile */
+      .mob-summary{display:block;}
     }
-    .action-item:hover{border-color:var(--text);}
-    .action-icon{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-    .action-icon.pdf{background:#FEF2F2;color:var(--red);}
-    .action-icon.edit{background:var(--gold-bg);color:var(--gold);}
-    .action-icon.publish{background:var(--green-bg);color:var(--green);}
-    .action-text{flex:1;}
-    .action-text-title{font-size:13px;font-weight:600;color:var(--text);}
-    .action-text-sub{font-size:11.5px;color:var(--text3);margin-top:1px;}
-    .warning-box{
-      background:#FFFBEB;border:1px solid #FDE68A;border-radius:5px;
-      padding:12px 14px;font-size:12px;color:#92400E;margin-bottom:16px;
+    @media(max-width:480px){
+      .btn{padding:6px 10px;font-size:10.5px;}
+      .tb-docnum{font-size:12px;}
     }
-    .warning-box strong{display:block;margin-bottom:3px;}
-    .meta-info{font-size:11.5px;color:var(--text3);line-height:1.7;}
   </style>
 </head>
 <body>
-  <!-- Topbar -->
   <div class="topbar">
     <a href="/documents/dashboard" class="back">← กลับ</a>
-    <div class="topbar-doc-num">{doc.document_number}</div>
-    <div class="topbar-customer">— {doc.customers?.company_name}</div>
-    <div class="topbar-actions">
-      <span class={`status-pill pill-${doc.status}`}>
-        <span class="status-dot"></span>
+    <div class="tb-docnum">{doc.document_number}</div>
+    <div class="tb-cust">— {doc.customers?.company_name}</div>
+    <div class="tb-actions">
+      <span class={`spill spill-${doc.status === 'published' ? 'pub' : 'draft'}`}>
+        <span class="sdot"></span>
         {doc.status === 'draft' ? 'Draft' : 'Published'}
       </span>
-      <a href={`/documents/${id}/print`} target="_blank" class="btn btn-outline">
-        Preview PDF
-      </a>
+      <a href={`/documents/${id}/print`} target="_blank" class="btn btn-ol">PDF</a>
       {doc.status === 'draft' && user.role === 'superadmin' && (
         <form method="POST" style="display:inline;">
-          <input type="hidden" name="action" value="publish" />
+          <input type="hidden" name="action" value="publish"/>
           <button type="submit" class="btn btn-green"
             onclick="return confirm('ออกเอกสารนี้? จะไม่สามารถแก้ไขได้หลังจากนี้')">
             ออกเอกสาร
@@ -199,80 +176,78 @@ doc.categories.forEach((cat: any) => {
   </div>
 
   <div class="layout">
-    <!-- Main content -->
-    <div class="main-content">
-
+    <div class="main">
       <!-- Info cards -->
       <div class="info-grid">
-        <div class="info-card">
-          <div class="info-card-label">ลูกค้า</div>
-          <div class="info-card-value">{doc.customers?.company_name}</div>
-          <div class="info-card-sub">
+        <div class="icard">
+          <div class="icard-lbl">ลูกค้า</div>
+          <div class="icard-val">{doc.customers?.company_name}</div>
+          <div class="icard-sub">
             {doc.customers?.customer_code}<br/>
             {doc.customers?.address}
           </div>
         </div>
-        <div class="info-card">
-          <div class="info-card-label">ข้อมูลเอกสาร</div>
-          <div class="info-card-value">{doc.document_types?.name_th}</div>
-          <div class="info-card-sub">
+        <div class="icard">
+          <div class="icard-lbl">ข้อมูลเอกสาร</div>
+          <div class="icard-val">{doc.document_types?.name_th}</div>
+          <div class="icard-sub">
             วันที่ออก: {thaiDate(doc.issue_date)}<br/>
-            {doc.due_date ? `วันครบกำหนด: ${thaiDate(doc.due_date)}` : ''}<br/>
+            {doc.due_date ? `วันครบกำหนด: ${thaiDate(doc.due_date)}` : ''}
             {doc.reference_po ? `P/O: ${doc.reference_po}` : ''}
           </div>
         </div>
         {doc.payment_condition && (
-          <div class="info-card" style="grid-column:span 2;">
-            <div class="info-card-label">เงื่อนไขการชำระเงิน</div>
-            <div class="info-card-sub" style="white-space:pre-line;">{doc.payment_condition}</div>
+          <div class="icard" style="grid-column:span 2;">
+            <div class="icard-lbl">เงื่อนไขการชำระเงิน</div>
+            <div class="icard-sub" style="white-space:pre-line;">{doc.payment_condition}</div>
           </div>
         )}
       </div>
 
-      <!-- Line Items by Category -->
-      {doc.categories.length === 0 && doc.items.length === 0 ? (
+      <!-- Line items -->
+      {doc.categories.length === 0 ? (
         <div class="no-items">ยังไม่มีรายการงานในเอกสารนี้</div>
       ) : (
         doc.categories.map((cat: any) => {
           const items = itemsByCategory[cat.id] || [];
-          const catTotal = items.filter((i: any) => !i.is_subtotal_row).reduce((s: number, i: any) => s + Number(i.amount||0), 0);
+          const catTotal = items.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
           return (
-            <div class="cat-section">
-              <div class="cat-title">
-                <span class="cat-num-badge">หมวด {cat.category_number}</span>
+            <div class="cat-sec">
+              <div class="cat-hd">
+                <span class="cat-badge">หมวด {cat.category_number}</span>
                 {cat.name_th}
-                <span class="cat-subtotal">฿{money(catTotal)}</span>
+                <span class="cat-total">฿{money(catTotal)}</span>
               </div>
-              <div class="items-table-wrap">
+              <div class="tbl-wrap">
                 <table>
                   <thead>
                     <tr>
-                      <th style="width:48px;">ลำดับ</th>
-                      <th style="width:52px;">รหัส</th>
+                      <th style="width:40px;">#</th>
+                      <th style="width:48px;">รหัส</th>
                       <th>รายการ</th>
-                      <th class="right" style="width:60px;">จำนวน</th>
-                      <th class="center" style="width:52px;">หน่วย</th>
-                      <th class="right" style="width:90px;">หน่วยละ</th>
-                      <th class="right" style="width:100px;">จำนวนเงิน</th>
+                      <th class="r" style="width:56px;">จำนวน</th>
+                      <th class="c" style="width:48px;">หน่วย</th>
+                      <th class="r" style="width:84px;">หน่วยละ</th>
+                      <th class="r" style="width:96px;">จำนวนเงิน</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item: any) => {
                       if (item.is_subtotal_row) return (
-                        <tr class="subtotal-row">
-                          <td colspan="6" class="subtotal-label">{item.description_th}</td>
-                          <td class="subtotal-val">฿{money(item.amount)}</td>
+                        <tr class="sub-row">
+                          <td colspan="6" class="sub-lbl">{item.description_th}</td>
+                          <td class="sub-val">฿{money(item.amount)}</td>
                         </tr>
                       );
                       return (
                         <tr>
-                          <td class="num">{item.item_number}</td>
-                          <td class="num center">{item.item_code || ''}</td>
+                          <td class="mono">{item.item_number}</td>
+                          <td class="mono c">{item.item_code||''}</td>
                           <td class="desc">{item.description_th}</td>
-                          <td class="right">{item.quantity > 0 ? item.quantity : '—'}</td>
-                          <td class="center">{item.unit_th}</td>
-                          <td class="right">{item.unit_price > 0 ? money(item.unit_price) : '—'}</td>
-                          <td class="right">{item.amount > 0 ? money(item.amount) : '—'}</td>
+                          <td class="r">{item.quantity>0?item.quantity:'—'}</td>
+                          <td class="c">{item.unit_th}</td>
+                          <td class="r">{item.unit_price>0?money(item.unit_price):'—'}</td>
+                          <td class="r">{item.amount>0?money(item.amount):'—'}</td>
                         </tr>
                       );
                     })}
@@ -284,86 +259,82 @@ doc.categories.forEach((cat: any) => {
         })
       )}
 
-      {/* Notes */}
       {doc.notes && (
-        <div style="margin-top:16px;background:var(--white);border:1px solid var(--border);border-radius:6px;padding:16px 20px;">
-          <div style="font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">หมายเหตุ</div>
-          <div style="font-size:13px;color:var(--text2);white-space:pre-line;line-height:1.7;">{doc.notes}</div>
+        <div class="notes-box">
+          <div class="notes-lbl">หมายเหตุ</div>
+          <div class="notes-txt">{doc.notes}</div>
         </div>
       )}
     </div>
 
-    <!-- Side panel -->
-    <div class="side-panel">
+    <!-- Aside -->
+    <div class="aside">
       <!-- Summary -->
-      <div class="panel-title">สรุปราคา</div>
-      <div>
-        <div class="sum-row"><span class="sum-label">รวมจำนวนเงิน</span><span class="sum-val">฿{money(doc.subtotal)}</span></div>
-        {doc.discount_design > 0 && <div class="sum-row"><span class="sum-label">ส่วนลดค่าแบบ</span><span class="sum-val">-฿{money(doc.discount_design)}</span></div>}
-        {doc.discount_trade > 0 && <div class="sum-row"><span class="sum-label">ส่วนลดการค้า</span><span class="sum-val">-฿{money(doc.discount_trade)}</span></div>}
-        <div class="sum-row"><span class="sum-label">ราคาก่อน VAT</span><span class="sum-val">฿{money(doc.price_before_vat)}</span></div>
-        <div class="sum-row"><span class="sum-label">VAT 7%</span><span class="sum-val">฿{money(doc.vat_amount)}</span></div>
+      <div class="panel-sec">
+        <div class="panel-title">สรุปราคา</div>
+        <div class="sum-row"><span class="sum-lbl">รวมจำนวนเงิน</span><span class="sum-val">฿{money(doc.subtotal)}</span></div>
+        {doc.discount_design>0 && <div class="sum-row"><span class="sum-lbl">ส่วนลดค่าแบบ</span><span class="sum-val">-฿{money(doc.discount_design)}</span></div>}
+        {doc.discount_trade>0 && <div class="sum-row"><span class="sum-lbl">ส่วนลดการค้า</span><span class="sum-val">-฿{money(doc.discount_trade)}</span></div>}
+        <div class="sum-row"><span class="sum-lbl">ราคาก่อน VAT</span><span class="sum-val">฿{money(doc.price_before_vat)}</span></div>
+        <div class="sum-row"><span class="sum-lbl">VAT 7%</span><span class="sum-val">฿{money(doc.vat_amount)}</span></div>
         <div class="sum-row total">
-          <span class="sum-label" style="font-weight:700;font-size:13px;">ยอดรวมทั้งสิ้น</span>
+          <span class="sum-lbl" style="font-weight:700;font-size:13px;">ยอดรวมทั้งสิ้น</span>
           <span class="sum-val big">฿{money(doc.total_amount)}</span>
         </div>
       </div>
 
-      <hr class="panel-divider" />
+      <hr class="divider"/>
 
       <!-- Actions -->
-      <div class="panel-title">การดำเนินการ</div>
-
-      {doc.status === 'draft' && (
-        <div class="warning-box">
-          <strong>เอกสารนี้เป็น Draft</strong>
-          ยังไม่ได้ออกเอกสารอย่างเป็นทางการ
-        </div>
-      )}
-
-      <div class="action-list">
-        <a href={`/documents/${id}/print`} target="_blank" class="action-item">
-          <div class="action-icon pdf">PDF</div>
-          <div class="action-text">
-            <div class="action-text-title">Preview & พิมพ์</div>
-            <div class="action-text-sub">เปิดหน้า PDF สำหรับพิมพ์</div>
+      <div class="panel-sec">
+        <div class="panel-title">การดำเนินการ</div>
+        {doc.status==='draft' && (
+          <div class="warn-box">
+            <strong>เอกสารนี้เป็น Draft</strong>
+            ยังไม่ได้ออกเอกสารอย่างเป็นทางการ
           </div>
-        </a>
-
-        {doc.status === 'draft' && (
-          <a href={`/documents/${id}/edit`} class="action-item">
-            <div class="action-icon edit">แก้</div>
-            <div class="action-text">
-              <div class="action-text-title">แก้ไขเอกสาร</div>
-              <div class="action-text-sub">แก้ไขรายการและข้อมูล</div>
+        )}
+        <div class="action-list">
+          <a href={`/documents/${id}/print`} target="_blank" class="aitem">
+            <div class="aicon aicon-pdf">PDF</div>
+            <div>
+              <div class="atext-title">Preview & พิมพ์</div>
+              <div class="atext-sub">เปิดหน้า PDF</div>
             </div>
           </a>
-        )}
-
-        {doc.status === 'draft' && user.role === 'superadmin' && (
-          <form method="POST">
-            <input type="hidden" name="action" value="publish" />
-            <button type="submit" class="action-item" style="width:100%;text-align:left;background:var(--green-bg);border-color:var(--green-border);"
-              onclick="return confirm('ออกเอกสารนี้? จะไม่สามารถแก้ไขได้หลังจากนี้')">
-              <div class="action-icon publish">OK</div>
-              <div class="action-text">
-                <div class="action-text-title" style="color:var(--green);">ออกเอกสาร</div>
-                <div class="action-text-sub">เปลี่ยนสถานะเป็น Published</div>
+          {doc.status==='draft' && (
+            <a href={`/documents/${id}/edit`} class="aitem">
+              <div class="aicon aicon-edit">✎</div>
+              <div>
+                <div class="atext-title">แก้ไขเอกสาร</div>
+                <div class="atext-sub">แก้ไขรายการและข้อมูล</div>
               </div>
-            </button>
-          </form>
-        )}
+            </a>
+          )}
+          {doc.status==='draft' && user.role==='superadmin' && (
+            <form method="POST">
+              <input type="hidden" name="action" value="publish"/>
+              <button type="submit" class="aitem" style="background:var(--grbg);border-color:var(--grborder);"
+                onclick="return confirm('ออกเอกสารนี้? จะไม่สามารถแก้ไขได้หลังจากนี้')">
+                <div class="aicon aicon-pub">✓</div>
+                <div>
+                  <div class="atext-title" style="color:var(--green);">ออกเอกสาร</div>
+                  <div class="atext-sub">เปลี่ยนสถานะเป็น Published</div>
+                </div>
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
-      <hr class="panel-divider" />
+      <hr class="divider"/>
 
-      <!-- Meta -->
       <div class="panel-title">ข้อมูลเพิ่มเติม</div>
       <div class="meta-info">
-        สร้างโดย: {doc.tnc_users?.full_name || '—'}<br/>
+        สร้างโดย: {doc.tnc_users?.full_name||'—'}<br/>
         ประเภท: {doc.document_types?.name_th}<br/>
-        ภาษา: {doc.language === 'th' ? 'ภาษาไทย' : doc.language === 'en' ? 'English' : 'ไทย + EN'}<br/>
-        ID: <span style="font-family:monospace;font-size:10.5px;">{id?.substring(0,8)}...</span>
+        ภาษา: {doc.language==='th'?'ภาษาไทย':doc.language==='en'?'English':'ไทย + EN'}<br/>
+        ID: <span style="font-family:monospace;font-size:10px;">{id?.substring(0,8)}...</span>
       </div>
     </div>
   </div>
