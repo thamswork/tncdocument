@@ -10,7 +10,7 @@ export interface TNCUser {
 export const SESSION_COOKIE = 'tnc_docs_session';
 const SESSION_DURATION = 60 * 60 * 8;
 
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hash = await crypto.subtle.digest('SHA-256', data);
