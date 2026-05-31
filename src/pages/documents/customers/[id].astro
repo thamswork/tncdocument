@@ -34,61 +34,82 @@ if (Astro.request.method === 'POST') {
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="robots" content="noindex, nofollow" />
-  <title>แก้ไขลูกค้า — TNC Documents</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>แก้ไขลูกค้า — TNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#F8F7F4;--white:#fff;--border:#E2DFD8;--text:#1A1814;--text2:#6B6860;--text3:#AEABA4;--red:#B94040;--green:#2D7A4F;--green-bg:#EDF7F0;--green-border:#C5E8D2;}
+    :root{--bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;--text:#1A1814;--t2:#6B6860;--t3:#AEABA4;--red:#B94040;--green:#2D7A4F;--gbg:#EDF7F0;--gborder:#C5E8D2;}
     body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 40px;height:60px;display:flex;align-items:center;gap:14px;position:sticky;top:0;}
-    .back{font-size:12.5px;color:var(--text2);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:4px;}
-    .back:hover{border-color:var(--text);color:var(--text);}
-    .topbar-title{font-size:15px;font-weight:600;flex:1;}
-    .content{padding:32px 40px;max-width:700px;}
-    .card{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:32px;}
-    .card-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #EDE9E3;}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 12px;border:1px solid var(--border);border-radius:5px;white-space:nowrap;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+    .back:active{background:var(--bg);}
+    .topbar-title{font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+    .content{padding:20px 16px;max-width:680px;margin:0 auto;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:24px;}
+
+    .card-title{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--b2);}
+
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}
     .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
     .fg.full{grid-column:span 2;}
-    label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
+
+    label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t2);}
     label span{color:var(--red);margin-left:2px;}
-    input,textarea{padding:10px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:13.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;}
-    input:focus,textarea:focus{border-color:var(--text);}
-    textarea{resize:vertical;min-height:72px;}
-    .alert-ok{background:var(--green-bg);border:1px solid var(--green-border);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--green);margin-bottom:20px;}
-    .alert-err{background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;padding:12px 14px;font-size:13px;color:var(--red);margin-bottom:20px;}
-    .actions{display:flex;gap:12px;margin-top:24px;align-items:center;}
-    .btn-submit{padding:11px 24px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:12.5px;font-weight:700;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;}
-    .btn-submit:hover{opacity:.85;}
-    .cancel{font-size:13px;color:var(--text2);text-decoration:none;}
-    .cancel:hover{color:var(--text);}
+
+    input,textarea{padding:11px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:100%;-webkit-appearance:none;appearance:none;}
+    input:focus,textarea:focus{border-color:var(--text);background:var(--white);}
+    textarea{resize:vertical;min-height:80px;line-height:1.6;}
+
+    .alert-ok{background:var(--gbg);border:1px solid var(--gborder);border-radius:5px;padding:12px 14px;font-size:13px;color:var(--green);margin-bottom:18px;}
+    .alert-err{background:#FEF2F2;border:1px solid #FECACA;border-radius:5px;padding:12px 14px;font-size:13px;color:var(--red);margin-bottom:18px;}
+
+    .actions{display:flex;gap:12px;margin-top:20px;align-items:center;}
+    .btn-submit{padding:13px 24px;background:var(--text);color:var(--bg);border:none;border-radius:5px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;-webkit-tap-highlight-color:transparent;min-height:48px;}
+    .btn-submit:active{opacity:.85;}
+    .cancel{font-size:13px;color:var(--t2);text-decoration:none;padding:8px;}
+    .cancel:active{color:var(--text);}
+
+    @media(max-width:600px){
+      .topbar{padding:0 14px;}
+      .topbar-title{font-size:13px;}
+      .content{padding:14px 12px;}
+      .card{padding:18px 16px;}
+      .grid{grid-template-columns:1fr;}
+      .fg.full{grid-column:auto;}
+      .actions{flex-direction:column;align-items:stretch;}
+      .btn-submit{width:100%;text-align:center;}
+      .cancel{text-align:center;}
+    }
   </style>
 </head>
 <body>
   <div class="topbar">
     <a href="/documents/customers" class="back">← กลับ</a>
-    <div class="topbar-title">แก้ไขข้อมูลลูกค้า: {customer.company_name}</div>
+    <div class="topbar-title">แก้ไข: {customer.company_name}</div>
   </div>
   <div class="content">
     <div class="card">
       <div class="card-title">ข้อมูลลูกค้า</div>
-      {success && <div class="alert-ok">{success}</div>}
-      {error && <div class="alert-err">{error}</div>}
+      {success && <div class="alert-ok">✓ {success}</div>}
+      {error && <div class="alert-err">⚠ {error}</div>}
       <form method="POST">
         <div class="grid">
           <div class="fg">
             <label>รหัสลูกค้า <span>*</span></label>
-            <input type="text" name="customer_code" value={customer.customer_code} required />
+            <input type="text" name="customer_code" value={customer.customer_code} required/>
           </div>
           <div class="fg">
             <label>ชื่อผู้ติดต่อ</label>
-            <input type="text" name="contact_name" value={customer.contact_name || ''} />
+            <input type="text" name="contact_name" value={customer.contact_name || ''}/>
           </div>
           <div class="fg full">
             <label>ชื่อบริษัท / ลูกค้า <span>*</span></label>
-            <input type="text" name="company_name" value={customer.company_name} required />
+            <input type="text" name="company_name" value={customer.company_name} required/>
           </div>
           <div class="fg full">
             <label>ที่อยู่</label>
@@ -96,19 +117,19 @@ if (Astro.request.method === 'POST') {
           </div>
           <div class="fg">
             <label>โทรศัพท์</label>
-            <input type="text" name="phone" value={customer.phone || ''} />
+            <input type="tel" name="phone" value={customer.phone || ''}/>
           </div>
           <div class="fg">
             <label>แฟกซ์</label>
-            <input type="text" name="fax" value={customer.fax || ''} />
+            <input type="tel" name="fax" value={customer.fax || ''}/>
           </div>
           <div class="fg">
             <label>เลขประจำตัวผู้เสียภาษี</label>
-            <input type="text" name="tax_id" value={customer.tax_id || ''} />
+            <input type="text" name="tax_id" value={customer.tax_id || ''}/>
           </div>
           <div class="fg">
             <label>อีเมล</label>
-            <input type="email" name="email" value={customer.email || ''} />
+            <input type="email" name="email" value={customer.email || ''} autocapitalize="none"/>
           </div>
           <div class="fg full">
             <label>หมายเหตุ</label>
