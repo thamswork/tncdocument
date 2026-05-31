@@ -10,15 +10,13 @@ const pendingAmt = documents
   .filter((d: any) => d.status === 'draft')
   .reduce((s: number, d: any) => s + (Number(d.total_amount)||0), 0);
 const pendingFmt = pendingAmt.toLocaleString('th-TH', {minimumFractionDigits:0, maximumFractionDigits:0});
-
-// Get unique document types for filter
 const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).filter(Boolean))];
 ---
 <!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
   <title>Dashboard — TNC Build Studio</title>
@@ -30,186 +28,155 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
       --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
       --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
       --green:#2D7A4F;--red:#B94040;--blue:#2D5A9E;
-      --sidebar:220px;
+      --sb:220px;
     }
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+    html{height:100%;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100%;display:flex;flex-direction:row;}
 
     /* ── Sidebar ── */
-    .sidebar{width:var(--sidebar);background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:40;}
+    .sidebar{width:var(--sb);background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100%;height:100dvh;z-index:200;transition:transform .25s cubic-bezier(.4,0,.2,1);}
     .sb-brand{padding:20px 20px 16px;border-bottom:1px solid var(--b2);}
-    .sb-brand-name{font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--text);}
+    .sb-brand-name{font-size:13px;font-weight:700;letter-spacing:.04em;}
     .sb-brand-sub{font-size:10px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;margin-top:1px;}
     .sb-user{padding:14px 20px;border-bottom:1px solid var(--b2);}
-    .sb-user-name{font-size:12.5px;font-weight:600;color:var(--text);}
+    .sb-user-name{font-size:12.5px;font-weight:600;}
     .sb-user-role{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-top:1px;}
-    .sb-nav{padding:12px 0;flex:1;}
+    .sb-nav{padding:12px 0;flex:1;overflow-y:auto;}
     .sb-section{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);padding:8px 20px 4px;}
-    .sb-link{display:flex;align-items:center;gap:10px;padding:8px 20px;font-size:12.5px;color:var(--t2);text-decoration:none;transition:all .15s;border-left:2px solid transparent;}
-    .sb-link:hover{background:var(--bg);color:var(--text);}
+    .sb-link{display:flex;align-items:center;gap:10px;padding:11px 20px;font-size:13px;color:var(--t2);text-decoration:none;transition:background .12s;border-left:2px solid transparent;-webkit-tap-highlight-color:transparent;}
+    .sb-link:hover,.sb-link:active{background:var(--bg);color:var(--text);}
     .sb-link.active{background:var(--gbg);color:var(--text);font-weight:600;border-left-color:var(--gold);}
-    .sb-icon{font-size:14px;width:16px;text-align:center;flex-shrink:0;}
+    .sb-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
     .sb-bottom{padding:16px 20px;border-top:1px solid var(--b2);}
-    .sb-logout{width:100%;padding:8px 12px;background:transparent;border:1px solid var(--border);border-radius:4px;font-size:11.5px;font-family:inherit;color:var(--t2);cursor:pointer;transition:all .15s;text-align:center;}
+    .sb-logout{width:100%;padding:10px 12px;background:transparent;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;color:var(--t2);cursor:pointer;transition:all .15s;text-align:center;-webkit-tap-highlight-color:transparent;}
     .sb-logout:hover{border-color:var(--red);color:var(--red);}
 
+    /* ── Overlay ── */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:190;-webkit-tap-highlight-color:transparent;}
+    .overlay.show{display:block;}
+
     /* ── Main ── */
-    .main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-width:0;}
+    .main{margin-left:var(--sb);flex:1;display:flex;flex-direction:column;min-width:0;min-height:100dvh;}
 
     /* ── Topbar ── */
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:52px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:30;}
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:8px;margin:-8px;flex-direction:column;justify-content:center;gap:5px;-webkit-tap-highlight-color:transparent;}
+    .hamburger span{display:block;width:22px;height:2px;background:var(--text);border-radius:2px;transition:transform .2s,opacity .2s;}
     .tb-title{font-size:15px;font-weight:700;flex:1;}
-    .btn{padding:8px 16px;border-radius:4px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:none;letter-spacing:.05em;text-transform:uppercase;transition:all .15s;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+    .btn{padding:9px 16px;border-radius:5px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;border:none;letter-spacing:.04em;text-transform:uppercase;transition:all .15s;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:6px;-webkit-tap-highlight-color:transparent;min-height:40px;}
     .btn-solid{background:var(--text);color:var(--bg);}
-    .btn-solid:hover{opacity:.85;}
+    .btn-solid:active{opacity:.8;}
     .btn-ol{background:transparent;border:1px solid var(--border);color:var(--t2);}
-    .btn-ol:hover{border-color:var(--text);color:var(--text);}
+    .btn-ol:active{background:var(--bg);}
 
     /* ── Content ── */
-    .content{padding:24px 28px;display:flex;flex-direction:column;gap:20px;}
+    .content{padding:24px;display:flex;flex-direction:column;gap:20px;flex:1;}
 
     /* ── Stats ── */
     .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-    .stat-card{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:18px 20px;cursor:pointer;transition:all .2s;}
-    .stat-card:hover{border-color:var(--text);transform:translateY(-1px);}
+    .stat-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:18px 20px;cursor:pointer;transition:border-color .15s,transform .15s;-webkit-tap-highlight-color:transparent;}
+    .stat-card:active{transform:scale(.98);}
     .stat-card.active{background:var(--gbg);border-color:var(--gold);}
-    .stat-n{font-size:32px;font-weight:300;letter-spacing:-.03em;color:var(--text);line-height:1;}
+    .stat-n{font-size:32px;font-weight:300;letter-spacing:-.03em;line-height:1;}
     .stat-n.gold{color:var(--gold);}
-    .stat-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-top:6px;}
+    .stat-label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);margin-top:6px;}
     .stat-sub{font-size:11px;color:var(--t3);margin-top:2px;}
-    .stat-pending{font-size:10.5px;color:var(--gold);margin-top:5px;font-weight:600;letter-spacing:.01em;opacity:.85;}
+    .stat-pending{font-size:11px;color:var(--gold);margin-top:5px;font-weight:600;}
 
-    /* ── Table section ── */
-    .table-card{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+    /* ── Table card ── */
+    .table-card{background:var(--white);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
     .table-toolbar{padding:14px 18px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-    .tb-info{flex:1;}
+    .tb-info{flex:1;min-width:120px;}
     .tb-info-title{font-size:13px;font-weight:600;}
     .tb-info-sub{font-size:11px;color:var(--t3);margin-top:1px;}
 
     /* Search */
     .search-wrap{position:relative;}
     .search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:13px;pointer-events:none;}
-    .search-inp{padding:7px 10px 7px 30px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:12.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:220px;}
-    .search-inp:focus{border-color:var(--text);width:260px;}
+    .search-inp{padding:8px 10px 8px 32px;background:var(--bg);border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:200px;}
+    .search-inp:focus{border-color:var(--text);}
     .search-inp::placeholder{color:var(--t3);}
 
-    /* Filter pills */
-    .filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-    .filter-pill{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--t2);transition:all .15s;letter-spacing:.03em;}
-    .filter-pill:hover{border-color:var(--text);color:var(--text);}
+    /* Filters */
+    .filters{display:flex;gap:6px;align-items:center;}
+    .filter-pill{padding:6px 14px;border-radius:20px;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--t2);transition:all .12s;white-space:nowrap;-webkit-tap-highlight-color:transparent;min-height:36px;}
+    .filter-pill:active{opacity:.7;}
     .filter-pill.active{background:var(--text);border-color:var(--text);color:var(--bg);}
     .filter-pill.draft.active{background:#6B5B2E;border-color:#6B5B2E;color:#fff;}
     .filter-pill.published.active{background:var(--green);border-color:var(--green);color:#fff;}
 
-    /* Sort indicator */
-    .sort-btn{background:transparent;border:none;cursor:pointer;color:var(--t3);font-size:11px;padding:0;font-family:inherit;transition:color .15s;display:flex;align-items:center;gap:3px;white-space:nowrap;}
-    .sort-btn:hover,.sort-btn.asc,.sort-btn.desc{color:var(--text);}
-
     /* Table */
-    .tbl{width:100%;border-collapse:collapse;}
-    .tbl thead th{padding:9px 14px;font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.09em;text-align:left;border-bottom:1px solid var(--b2);background:var(--bg);white-space:nowrap;user-select:none;}
+    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .tbl{width:100%;border-collapse:collapse;min-width:600px;}
+    .tbl thead th{padding:10px 14px;font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.09em;text-align:left;border-bottom:1px solid var(--b2);background:var(--bg);white-space:nowrap;cursor:pointer;user-select:none;}
     .tbl thead th.num{text-align:right;}
-    .tbl tbody tr{border-bottom:1px solid var(--b2);cursor:pointer;transition:background .1s;}
+    .tbl tbody tr{border-bottom:1px solid var(--b2);cursor:pointer;transition:background .1s;-webkit-tap-highlight-color:transparent;}
     .tbl tbody tr:last-child{border-bottom:none;}
-    .tbl tbody tr:hover{background:var(--gbg);}
+    .tbl tbody tr:hover,.tbl tbody tr:active{background:var(--gbg);}
     .tbl tbody tr.hidden{display:none;}
-    .tbl td{padding:11px 14px;font-size:12.5px;vertical-align:middle;}
+    .tbl td{padding:13px 14px;font-size:13px;vertical-align:middle;}
     .tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}
 
-    /* Doc number */
-    .doc-num{font-weight:700;color:var(--text);font-size:13px;letter-spacing:.01em;}
-
-    /* Type badge */
-    .badge{display:inline-flex;padding:2px 8px;border-radius:3px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+    .doc-num{font-weight:700;font-size:13px;letter-spacing:.01em;}
+    .badge{display:inline-flex;padding:3px 8px;border-radius:4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
     .badge-SV{background:#EBF0FA;color:#2D5A9E;}
     .badge-IV{background:#EBF5EE;color:#2D7A4F;}
     .badge-TX{background:#F5EBEB;color:#B94040;}
     .badge-BQ{background:var(--gbg);color:#8B6914;}
     .badge-default{background:var(--b2);color:var(--t2);}
 
-    /* Status badge */
-    .status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;}
-    .sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
+    .status{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;}
+    .sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
     .status-draft .sdot{background:var(--t3);}
     .status-draft{color:var(--t2);}
     .status-published .sdot{background:var(--green);}
     .status-published{color:var(--green);}
 
-    /* Amount */
-    .amt{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
-    .amt-sub{font-size:10.5px;color:var(--t3);margin-top:1px;}
+    .amt{font-weight:600;font-variant-numeric:tabular-nums;}
+    .open-btn{color:var(--t3);font-size:12px;text-decoration:none;padding:6px 10px;border-radius:4px;transition:all .15s;white-space:nowrap;display:inline-block;-webkit-tap-highlight-color:transparent;}
+    .open-btn:hover,.open-btn:active{color:var(--text);background:var(--b2);}
 
-    /* Open link */
-    .open-btn{color:var(--t3);font-size:12px;text-decoration:none;padding:4px 8px;border-radius:3px;transition:all .15s;white-space:nowrap;}
-    .open-btn:hover{color:var(--text);background:var(--b2);}
-
-    /* Empty state */
-    .empty-row td{padding:40px;text-align:center;color:var(--t3);font-size:13px;}
-    .empty-row-title{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:4px;}
-
-    /* Result count */
+    .empty-row td{padding:48px 20px;text-align:center;color:var(--t3);}
+    .empty-row-title{font-size:14px;font-weight:600;color:var(--t2);margin-bottom:4px;}
     .result-count{font-size:11px;color:var(--t3);padding:8px 18px;border-top:1px solid var(--b2);text-align:right;}
-
-    /* Keyboard shortcut hint */
     .kbd{display:inline-block;background:var(--b2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:9.5px;color:var(--t2);font-family:monospace;}
 
-    /* Toast */
-    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:999;background:var(--text);color:var(--bg);padding:10px 18px;border-radius:4px;font-size:12.5px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;}
-    .toast.show{opacity:1;}
-
     /* ── Mobile ── */
-    .mob-bar{display:none;position:fixed;top:0;left:0;right:0;height:52px;background:var(--white);border-bottom:1px solid var(--border);z-index:60;align-items:center;padding:0 16px;gap:12px;}
-    .mob-bar-title{font-size:14px;font-weight:700;flex:1;}
-    .hamburger{background:none;border:none;cursor:pointer;padding:8px;display:flex;flex-direction:column;gap:4px;}
-    .hamburger span{display:block;width:20px;height:2px;background:var(--text);border-radius:2px;transition:all .2s;}
-    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:45;}
-    .sidebar-overlay.open{display:block;}
-
     @media(max-width:768px){
       body{display:block;}
-      .sidebar{transform:translateX(-100%);transition:transform .25s;z-index:50;}
+      .sidebar{transform:translateX(-100%);}
       .sidebar.open{transform:translateX(0);}
       .main{margin-left:0;}
-      .mob-bar{display:flex;}
-      .topbar{top:52px;padding:0 16px;gap:8px;flex-wrap:wrap;height:auto;min-height:52px;padding-top:8px;padding-bottom:8px;}
+      .hamburger{display:flex;}
+      .topbar{padding:0 16px;gap:8px;}
       .tb-title{font-size:14px;}
-      .btn{padding:7px 12px;font-size:10.5px;}
-      .content{padding:14px 16px;gap:14px;}
-      .stats{grid-template-columns:1fr 1fr;gap:10px;}
+      .btn{padding:8px 12px;font-size:11px;}
+      .content{padding:16px;}
+      .stats{grid-template-columns:1fr 1fr;}
       .stat-card{padding:14px 16px;}
       .stat-n{font-size:26px;}
       .table-toolbar{flex-direction:column;align-items:stretch;gap:8px;padding:12px 14px;}
       .search-inp{width:100%!important;}
-      .search-inp:focus{width:100%!important;}
-      .filters{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;}
-      .tbl thead th{font-size:8.5px;padding:6px 8px;}
-      .tbl td{font-size:11.5px;padding:10px 8px;}
-      .doc-num{font-size:12px;}
-      /* Hide less important columns on mobile */
-      .tbl th:nth-child(7),.tbl td:nth-child(7){display:none;}/* issuer */
+      .filters{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
+      .tbl td{padding:12px 10px;font-size:12px;}
+      .tbl thead th{padding:8px 10px;}
+      .tbl th:nth-child(7),.tbl td:nth-child(7){display:none;}
       .result-count{padding:6px 14px;}
+      /* Hide keyboard hint on mobile */
+      .kbd-hint{display:none;}
     }
-
     @media(max-width:480px){
       .stats{grid-template-columns:1fr;}
-      .tbl th:nth-child(6),.tbl td:nth-child(6){display:none;}/* status on tiny screens */
-      .tbl th:nth-child(2),.tbl td:nth-child(2){display:none;}/* type badge */
+      .tbl th:nth-child(2),.tbl td:nth-child(2){display:none;}
+      .tbl th:nth-child(6),.tbl td:nth-child(6){display:none;}
     }
   </style>
 </head>
 <body>
 
-<!-- Mobile top bar -->
-<div class="mob-bar">
-  <button class="hamburger" onclick="toggleSidebar()" aria-label="เมนู">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="mob-bar-title">TNC BUILD STUDIO</div>
-  <a href="/documents/new" class="btn btn-solid" style="font-size:10px;padding:6px 10px;">+ สร้าง</a>
-</div>
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<div class="overlay" id="overlay"></div>
 
-<!-- Sidebar -->
-<nav class="sidebar">
+<nav class="sidebar" id="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">TNC BUILD STUDIO</div>
     <div class="sb-brand-sub">ระบบเอกสาร</div>
@@ -233,167 +200,146 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
   </div>
 </nav>
 
-<!-- Main -->
 <div class="main">
   <div class="topbar">
+    <button class="hamburger" id="hamburger" aria-label="เมนู">
+      <span></span><span></span><span></span>
+    </button>
     <div class="tb-title">ภาพรวมเอกสาร</div>
-    <span style="font-size:11px;color:var(--t3);">กด <span class="kbd">/</span> เพื่อค้นหา</span>
-    <a href="/documents/customers/new" class="btn btn-ol">+ เพิ่มลูกค้าใหม่</a>
-    <a href="/documents/new" class="btn btn-solid">+ สร้างเอกสารใหม่</a>
+    <span class="kbd-hint" style="font-size:11px;color:var(--t3);">กด <span class="kbd">/</span> ค้นหา</span>
+    <a href="/documents/customers/new" class="btn btn-ol">+ ลูกค้าใหม่</a>
+    <a href="/documents/new" class="btn btn-solid">+ สร้างเอกสาร</a>
   </div>
 
   <div class="content">
-
-    <!-- Stats -->
     <div class="stats">
-      <div class="stat-card active" id="stat-all" onclick="filterStatus('')">
+      <div class="stat-card active" id="stat-all" onclick="window.filterStatus('')">
         <div class="stat-n gold">{total}</div>
-        <div class="stat-label">เอกสารทั้งหมด</div>
+        <div class="stat-label">ทั้งหมด</div>
         <div class="stat-sub">ในระบบ</div>
       </div>
-      <div class="stat-card" id="stat-draft" onclick="filterStatus('draft')">
+      <div class="stat-card" id="stat-draft" onclick="window.filterStatus('draft')">
         <div class="stat-n">{drafts}</div>
         <div class="stat-label">DRAFT</div>
         <div class="stat-sub">รอดำเนินการ</div>
         {pendingAmt > 0 && <div class="stat-pending">฿{pendingFmt} รอยืนยัน</div>}
       </div>
-      <div class="stat-card" id="stat-published" onclick="filterStatus('published')">
+      <div class="stat-card" id="stat-published" onclick="window.filterStatus('published')">
         <div class="stat-n">{published}</div>
         <div class="stat-label">PUBLISHED</div>
         <div class="stat-sub">ออกเอกสารแล้ว</div>
       </div>
     </div>
 
-    <!-- Document table -->
     <div class="table-card">
       <div class="table-toolbar">
         <div class="tb-info">
           <div class="tb-info-title">เอกสารทั้งหมด</div>
-          <div class="tb-info-sub">คลิกที่แถวเพื่อเปิดเอกสาร</div>
+          <div class="tb-info-sub">แตะที่แถวเพื่อเปิดเอกสาร</div>
         </div>
-
-        <!-- Search -->
         <div class="search-wrap">
           <span class="search-ico">🔍</span>
           <input type="text" class="search-inp" id="searchInp"
-            placeholder="ค้นหาเอกสาร ลูกค้า..."
-            oninput="doSearch(this.value)"
+            placeholder="ค้นหา..."
+            oninput="window.doSearch(this.value)"
             autocomplete="off"/>
         </div>
-
-        <!-- Type filters -->
         <div class="filters" id="typeFilters">
-          <button class="filter-pill active" data-type="" onclick="filterType(this, '')">ทั้งหมด</button>
+          <button class="filter-pill active" data-type="" onclick="window.filterType(this,'')">ทั้งหมด</button>
           {docTypes.map((code: any) => (
-            <button class={`filter-pill`} data-type={code} onclick={`filterType(this,'${code}')`}>{code}</button>
+            <button class="filter-pill" data-type={code} onclick={`window.filterType(this,'${code}')`}>{code}</button>
           ))}
         </div>
-
-        <!-- Status filter -->
         <div class="filters" id="statusFilters">
-          <button class="filter-pill active" data-status="" onclick="filterStatus('')">ทุกสถานะ</button>
-          <button class="filter-pill draft" data-status="draft" onclick="filterStatus('draft')">Draft</button>
-          <button class="filter-pill published" data-status="published" onclick="filterStatus('published')">Published</button>
+          <button class="filter-pill active" data-status="" onclick="window.filterStatus('')">ทุกสถานะ</button>
+          <button class="filter-pill draft" data-status="draft" onclick="window.filterStatus('draft')">Draft</button>
+          <button class="filter-pill published" data-status="published" onclick="window.filterStatus('published')">Published</button>
         </div>
       </div>
 
-      <table class="tbl" id="docTable">
-        <thead>
-          <tr>
-            <th onclick="sortBy('num')" style="cursor:pointer;">เลขที่เอกสาร <span id="sort-num"></span></th>
-            <th>ประเภท</th>
-            <th onclick="sortBy('cust')" style="cursor:pointer;">ชื่อลูกค้า <span id="sort-cust"></span></th>
-            <th onclick="sortBy('date')" style="cursor:pointer;">วันที่ออก <span id="sort-date">↓</span></th>
-            <th class="num" onclick="sortBy('amt')" style="cursor:pointer;">ยอดรวม (บาท) <span id="sort-amt"></span></th>
-            <th>สถานะ</th>
-            <th>ผู้สร้าง</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="docTbody">
-          {documents.map((doc: any) => {
-            const typeCode = doc.document_types?.code || '';
-            const custName = doc.customers?.company_name || '-';
-            const issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '-';
-            const amt = Number(doc.total_amount||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
-            const rawAmt = Number(doc.total_amount||0);
-            const issuedBy = doc.tnc_users?.full_name || '-';
-            return (
-              <tr
-                onclick={`window.location.href='/documents/${doc.id}'`}
-                data-num={doc.document_number}
-                data-cust={custName}
-                data-type={typeCode}
-                data-status={doc.status}
-                data-date={doc.issue_date||''}
-                data-amt={rawAmt}
-              >
-                <td><span class="doc-num">{doc.document_number}</span></td>
-                <td><span class={`badge badge-${typeCode||'default'}`}>{doc.document_types?.name_th || typeCode}</span></td>
-                <td>{custName}</td>
-                <td>{issueDate}</td>
-                <td class="num"><span class="amt">{amt}</span></td>
-                <td>
-                  <span class={`status status-${doc.status}`}>
-                    <span class="sdot"></span>
-                    {doc.status === 'draft' ? 'Draft' : 'Published'}
-                  </span>
-                </td>
-                <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
-                <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
+      <div class="tbl-wrap">
+        <table class="tbl" id="docTable">
+          <thead>
+            <tr>
+              <th onclick="window.sortBy('num')">เลขที่เอกสาร <span id="sort-num"></span></th>
+              <th>ประเภท</th>
+              <th onclick="window.sortBy('cust')">ชื่อลูกค้า <span id="sort-cust"></span></th>
+              <th onclick="window.sortBy('date')">วันที่ออก <span id="sort-date">↓</span></th>
+              <th class="num" onclick="window.sortBy('amt')">ยอดรวม (บาท) <span id="sort-amt"></span></th>
+              <th>สถานะ</th>
+              <th>ผู้สร้าง</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="docTbody">
+            {documents.map((doc: any) => {
+              const typeCode = doc.document_types?.code || '';
+              const custName = doc.customers?.company_name || '-';
+              const issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '-';
+              const amt = Number(doc.total_amount||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+              const rawAmt = Number(doc.total_amount||0);
+              const issuedBy = doc.tnc_users?.full_name || '-';
+              return (
+                <tr onclick={`window.location.href='/documents/${doc.id}'`}
+                  data-num={doc.document_number}
+                  data-cust={custName}
+                  data-type={typeCode}
+                  data-status={doc.status}
+                  data-date={doc.issue_date||''}
+                  data-amt={rawAmt}>
+                  <td><span class="doc-num">{doc.document_number}</span></td>
+                  <td><span class={`badge badge-${typeCode||'default'}`}>{doc.document_types?.name_th || typeCode}</span></td>
+                  <td>{custName}</td>
+                  <td>{issueDate}</td>
+                  <td class="num"><span class="amt">{amt}</span></td>
+                  <td><span class={`status status-${doc.status}`}><span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}</span></td>
+                  <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
+                  <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       <div class="result-count" id="resultCount"></div>
     </div>
-
   </div>
 </div>
 
-<div id="toast" class="toast"></div>
-
 <script is:inline>
+// ── Sidebar toggle (must be on window scope) ──
+window.toggleSidebar = function() {
+  var sb = document.getElementById('sidebar');
+  var ov = document.getElementById('overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+};
+document.getElementById('hamburger').addEventListener('click', window.toggleSidebar);
+document.getElementById('overlay').addEventListener('click', window.toggleSidebar);
+document.querySelectorAll('.sb-link').forEach(function(l){
+  l.addEventListener('click', function(){
+    if(window.innerWidth <= 768) window.toggleSidebar();
+  });
+});
+
+// ── Table logic ──
 (function(){
-  var searchVal = '';
-  var typeVal = '';
-  var statusVal = '';
-  var sortCol = 'date';
-  var sortDir = 'desc';
+  var searchVal='', typeVal='', statusVal='', sortCol='date', sortDir='desc';
 
-  function getRows() {
-    return Array.from(document.querySelectorAll('#docTbody tr'));
-  }
-
-  function applyFilters() {
+  function applyFilters(){
     var rows = Array.from(document.querySelectorAll('#docTbody tr[data-num]'));
     var q = searchVal.toLowerCase().trim();
     var visible = 0;
-
-    rows.forEach(function(row) {
-      var num    = (row.dataset.num||'').toLowerCase();
-      var cust   = (row.dataset.cust||'').toLowerCase();
-      var type   = (row.dataset.type||'').toLowerCase();
-      var status = row.dataset.status||'';
-
-      var matchSearch = !q || num.includes(q) || cust.includes(q) || type.includes(q);
-      var matchType   = !typeVal || row.dataset.type === typeVal;
-      var matchStatus = !statusVal || status === statusVal;
-
-      if (matchSearch && matchType && matchStatus) {
-        row.classList.remove('hidden');
-        visible++;
-      } else {
-        row.classList.add('hidden');
-      }
+    rows.forEach(function(row){
+      var match = (!q || (row.dataset.num||'').toLowerCase().includes(q) || (row.dataset.cust||'').toLowerCase().includes(q) || (row.dataset.type||'').toLowerCase().includes(q))
+        && (!typeVal || row.dataset.type === typeVal)
+        && (!statusVal || row.dataset.status === statusVal);
+      row.classList.toggle('hidden', !match);
+      if(match) visible++;
     });
-
-    // Empty state
     var empty = document.getElementById('emptyRow');
-    if (!visible) {
-      if (!empty) {
+    if(!visible){
+      if(!empty){
         empty = document.createElement('tr');
         empty.id = 'emptyRow';
         empty.className = 'empty-row';
@@ -402,110 +348,65 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
       }
       empty.style.display = '';
     } else {
-      if (empty) empty.style.display = 'none';
+      if(empty) empty.style.display = 'none';
     }
-
-    var total = Array.from(document.querySelectorAll('#docTbody tr[data-num]')).length;
-    document.getElementById('resultCount').textContent = visible === total
-      ? 'แสดง '+total+' รายการ'
-      : 'แสดง '+visible+' จาก '+total+' รายการ';
+    var total = rows.length;
+    document.getElementById('resultCount').textContent = visible === total ? 'แสดง '+total+' รายการ' : 'แสดง '+visible+' จาก '+total+' รายการ';
   }
 
-  function sortRows() {
+  function sortRows(){
     var tbody = document.getElementById('docTbody');
     var rows = Array.from(tbody.querySelectorAll('tr[data-num]'));
-    rows.sort(function(a, b) {
-      var va, vb;
-      if (sortCol === 'amt') {
-        va = parseFloat(a.dataset.amt)||0;
-        vb = parseFloat(b.dataset.amt)||0;
-        return sortDir === 'asc' ? va-vb : vb-va;
-      } else if (sortCol === 'date') {
-        va = a.dataset.date||'';
-        vb = b.dataset.date||'';
-      } else if (sortCol === 'num') {
-        va = a.dataset.num||'';
-        vb = b.dataset.num||'';
-      } else if (sortCol === 'cust') {
-        va = a.dataset.cust||'';
-        vb = b.dataset.cust||'';
-      }
-      if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb,'th') : vb.localeCompare(va,'th');
-      return 0;
+    rows.sort(function(a,b){
+      if(sortCol==='amt'){ var d=(parseFloat(a.dataset.amt)||0)-(parseFloat(b.dataset.amt)||0); return sortDir==='asc'?d:-d; }
+      var va='', vb='';
+      if(sortCol==='date'){va=a.dataset.date||'';vb=b.dataset.date||'';}
+      else if(sortCol==='num'){va=a.dataset.num||'';vb=b.dataset.num||'';}
+      else if(sortCol==='cust'){va=a.dataset.cust||'';vb=b.dataset.cust||'';}
+      return sortDir==='asc'?va.localeCompare(vb,'th'):vb.localeCompare(va,'th');
     });
-    rows.forEach(function(r){ tbody.appendChild(r); });
-    // Update sort indicators
+    rows.forEach(function(r){tbody.appendChild(r);});
     ['num','cust','date','amt'].forEach(function(c){
-      var el = document.getElementById('sort-'+c);
-      if (!el) return;
-      if (c === sortCol) { el.textContent = sortDir === 'asc' ? '↑' : '↓'; el.style.color = 'var(--text)'; }
-      else { el.textContent = ''; }
+      var el=document.getElementById('sort-'+c);
+      if(!el) return;
+      el.textContent = c===sortCol?(sortDir==='asc'?'↑':'↓'):'';
     });
   }
 
-  window.doSearch = function(v) {
-    searchVal = v;
-    applyFilters();
-  };
+  window.doSearch = function(v){ searchVal=v; applyFilters(); };
 
-  window.filterType = function(el, type) {
-    typeVal = type;
-    document.querySelectorAll('#typeFilters .filter-pill').forEach(function(b){ b.classList.remove('active'); });
+  window.filterType = function(el, type){
+    typeVal=type;
+    document.querySelectorAll('#typeFilters .filter-pill').forEach(function(b){b.classList.remove('active');});
     el.classList.add('active');
     applyFilters();
   };
 
-  window.filterStatus = function(status) {
-    statusVal = status;
-    // Update stat cards
+  window.filterStatus = function(status){
+    statusVal=status;
     ['all','draft','published'].forEach(function(s){
-      var el = document.getElementById('stat-'+s);
-      if (el) el.classList.toggle('active', (s === 'all' && !status) || s === status);
+      var el=document.getElementById('stat-'+s);
+      if(el) el.classList.toggle('active',(s==='all'&&!status)||s===status);
     });
-    // Update status filter pills
     document.querySelectorAll('#statusFilters .filter-pill').forEach(function(b){
-      b.classList.toggle('active', (b.dataset.status||'') === status);
+      b.classList.toggle('active',(b.dataset.status||'')===status);
     });
     applyFilters();
   };
 
-  window.sortBy = function(col) {
-    if (sortCol === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
-    else { sortCol = col; sortDir = col === 'amt' ? 'desc' : 'asc'; }
-    sortRows();
-    applyFilters();
+  window.sortBy = function(col){
+    if(sortCol===col){sortDir=sortDir==='asc'?'desc':'asc';}
+    else{sortCol=col;sortDir=col==='amt'?'desc':'asc';}
+    sortRows(); applyFilters();
   };
 
-  // Keyboard shortcut: / focuses search
-  document.addEventListener('keydown', function(e) {
-    if (e.key === '/' && document.activeElement !== document.getElementById('searchInp')) {
-      e.preventDefault();
-      document.getElementById('searchInp').focus();
-      document.getElementById('searchInp').select();
-    }
-    if (e.key === 'Escape') {
-      var inp = document.getElementById('searchInp');
-      inp.value = '';
-      inp.blur();
-      window.doSearch('');
-    }
+  document.addEventListener('keydown', function(e){
+    var inp=document.getElementById('searchInp');
+    if(e.key==='/'&&document.activeElement!==inp){e.preventDefault();inp.focus();inp.select();}
+    if(e.key==='Escape'){inp.value='';inp.blur();window.doSearch('');}
   });
 
-  // Mobile sidebar
-  function toggleSidebar() {
-    document.querySelector('.sidebar').classList.toggle('open');
-    document.getElementById('sidebarOverlay').classList.toggle('open');
-  }
-  // Close sidebar on nav link click (mobile)
-  document.querySelectorAll('.sb-link').forEach(function(l){
-    l.addEventListener('click', function(){
-      if(window.innerWidth <= 768) toggleSidebar();
-    });
-  });
-
-  // Init
-  sortRows();
-  applyFilters();
+  sortRows(); applyFilters();
 })();
 </script>
 </body>
