@@ -11,7 +11,8 @@
     "preview": "astro preview",
     "astro": "astro",
     "cms": "npx decap-server",
-    "dev:cms": "concurrently \"npm run dev\" \"npm run cms\""
+    "dev:cms": "concurrently \"npm run dev\" \"npm run cms\"",
+    "postinstall": "node patch-adapter.cjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.0.0",
