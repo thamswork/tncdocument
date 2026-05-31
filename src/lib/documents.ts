@@ -59,7 +59,7 @@ export function calculateTotals(items: any[], discountDesign: number, discountTr
   const priceBeforeVat = subtotal - discountDesign - discountTrade;
   const vatAmount = priceBeforeVat * 0.07;
   const totalAmount = priceBeforeVat + vatAmount;
-  return { subtotal, priceBeforeVat, vatAmount, totalAmount };
+  return { subtotal, price_before_vat: priceBeforeVat, vat_amount: vatAmount, total_amount: totalAmount };
 }
 
 export async function saveDocument(docData: any, categories: any[], items: any[], userId: string) {
