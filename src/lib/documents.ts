@@ -90,7 +90,7 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
 
 async function saveDocumentDetails(documentId: string, categories: any[], items: any[]) {
   if (categories.length > 0) {
-    const cats = categories.map((c, i) => ({ ...c, document_id: documentId, sort_order: i }));
+    const cats = categories.map((c, i) => ({ temp_id: c.temp_id, category_number: c.category_number, name_th: c.name_th, sort_order: i, document_id: documentId }));
     const { data: savedCats } = await supabaseAdmin.from('document_categories').insert(cats).select();
     if (savedCats && items.length > 0) {
       const catMap: Record<string, string> = {};
