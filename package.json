@@ -14,7 +14,7 @@
     "dev:cms": "concurrently \"npm run dev\" \"npm run cms\""
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^13.6.0",
+    "@astrojs/cloudflare": "^13.0.0",
     "@astrojs/react": "^5.0.3",
     "@astrojs/sitemap": "^3.7.2",
     "@tailwindcss/vite": "^4.2.2",
