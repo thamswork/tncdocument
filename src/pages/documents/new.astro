@@ -19,7 +19,8 @@ if (Astro.request.method === 'POST') {
 <html lang="th">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="robots" content="noindex,nofollow"/>
   <title>สร้างเอกสารใหม่ — TNC</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -168,6 +169,26 @@ if (Astro.request.method === 'POST') {
     .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;display:none;}
     .toast.loading .spin{display:block;}
     @keyframes sp{to{transform:rotate(360deg)}}
+
+    /* ── Mobile ── */
+    @media(max-width:768px){
+      .main{grid-template-columns:1fr;}
+      .rside{position:static;height:auto;border-left:none;border-top:1px solid var(--border);padding:16px;}
+      .act-btns{margin-top:12px;}
+      .meta-grid{grid-template-columns:1fr;}
+      .topbar{padding:0 14px;gap:8px;}
+      .tb-title{font-size:13px;}
+      .btn{padding:6px 10px;font-size:10.5px;}
+      .editor{padding:14px 14px;}
+      .boq-body{padding:10px 10px;}
+      .itbl{min-width:480px;}
+      .w-code{display:none;}/* hide code col on mobile */
+    }
+    @media(max-width:480px){
+      .meta-grid{grid-template-columns:1fr;}
+      .fg2{grid-template-columns:1fr;}
+      .topbar .tb-status{display:none;}
+    }
   </style>
 </head>
 <body>
