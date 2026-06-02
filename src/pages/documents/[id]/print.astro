@@ -186,7 +186,9 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
 
 <div class="page-wrap">
 <div class="doc">
-<div class="doc-inner">
+
+{/* ===== PAGE 1 ===== */}
+<div class="page">
   {doc.status==='draft' && <div class="wm">DRAFT</div>}
 
   <!-- Header -->
@@ -285,6 +287,11 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
       })}
     </tbody>
   </table>
+
+</div>{/* end page 1 */}
+
+{/* ===== PAGE N (continuation) — rendered by browser page-break ===== */}
+{/* Items overflow naturally via print page-break */}
 
   <!-- Totals -->
   <div class="totals-wrap">
