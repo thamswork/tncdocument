@@ -52,7 +52,7 @@ const LOGO = 'https://res.cloudinary.com/dynjnftnu/image/upload/v1780149765/LOGO
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#BFC5CE;}
+html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#e8e8e8;}
 /* toolbar */
 .toolbar{position:fixed;top:0;left:0;right:0;z-index:100;background:#0D1B2A;height:50px;padding:0 24px;display:flex;align-items:center;gap:12px;}
 .tb-t{color:#ccc;font-size:13px;flex:1;}
@@ -62,7 +62,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 /* screen wrapper */
 .wrap{padding:66px 0 48px;display:flex;flex-direction:column;align-items:center;gap:0;}
 /* the document - single continuous block, browser handles page breaks on print */
-.sheet{width:210mm;background:#fff;box-shadow:0 2px 24px rgba(0,0,0,.22);padding:16mm 18mm 14mm;font-size:9.5pt;color:#0D1B2A;position:relative;}
+.sheet{width:210mm;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.3);padding:14mm 14mm 12mm;font-size:9pt;color:#0D1B2A;position:relative;}
 .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);font-size:100px;font-weight:900;color:rgba(0,0,0,.04);pointer-events:none;user-select:none;white-space:nowrap;}
 /* page break line on screen */
 .sheet{background-image:repeating-linear-gradient(to bottom,transparent calc(297mm - 2px),#BFC5CE calc(297mm - 2px),#BFC5CE 297mm,transparent 297mm);}
@@ -130,12 +130,12 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   html,body{background:#fff;}
   .toolbar{display:none!important;}
   .wrap{padding:0;}
-  .sheet{box-shadow:none;padding:12mm 14mm 10mm;background-image:none;}
+  .sheet{box-shadow:none;padding:0;background-image:none;width:100%;}
   .items thead{display:table-header-group;}
   .row-cat{page-break-after:avoid;}
   .items tbody tr{page-break-inside:avoid;}
   .tot-wrap,.bank-wrap,.sig-row,.baht-words{page-break-inside:avoid;}
-  @page{size:A4 portrait;margin:0;}
+  @page{size:A4 portrait;margin:10mm 12mm;}
 }
 
 .rpt-hdr{display:none;}
