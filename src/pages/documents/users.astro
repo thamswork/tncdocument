@@ -52,173 +52,189 @@ const users = await getUsers();
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>จัดการผู้ใช้ — TNC</title>
+  <title>จัดการผู้ใช้งาน — TNC</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;--text:#1A1814;--t2:#6B6860;--t3:#AEABA4;--gold:#C9A96E;--gbg:#FAF5EC;--green:#2D7A4F;--red:#B94040;}
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
-    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 12px;border:1px solid var(--border);border-radius:5px;-webkit-tap-highlight-color:transparent;}
-    .topbar-title{font-size:15px;font-weight:700;}
-    .content{padding:20px 16px;display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;max-width:1000px;}
-    .card{background:var(--white);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-    .card-head{padding:14px 18px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:8px;}
-    .card-title{font-size:14px;font-weight:600;flex:1;}
-    .card-count{font-size:12px;color:var(--t3);}
-    .card-body{padding:20px;}
-
-    /* Users table - desktop */
-    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-    table{width:100%;border-collapse:collapse;min-width:380px;}
-    thead th{padding:9px 14px;text-align:left;font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;background:var(--bg);border-bottom:1px solid var(--border);}
-    tbody tr{border-bottom:1px solid var(--b2);}
-    tbody tr:last-child{border-bottom:none;}
-    td{padding:12px 14px;font-size:13px;color:var(--t2);}
-    td.strong{color:var(--text);font-weight:600;}
-    td.mono{font-family:monospace;font-size:12px;color:var(--text);}
-
-    /* Mobile user rows */
-    .mob-users{display:none;}
-    .mob-user-item{padding:14px 16px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:12px;}
-    .mob-user-item:last-child{border-bottom:none;}
-    .mob-user-info{flex:1;min-width:0;}
-    .mob-user-name{font-size:13px;font-weight:600;color:var(--text);}
-    .mob-user-meta{font-size:11.5px;color:var(--t3);margin-top:2px;font-family:monospace;}
-
-    .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:4px;font-size:10.5px;font-weight:700;}
-    .badge-superadmin{background:var(--gbg);color:#8B6F3E;border:1px solid #E8D5A8;}
-    .badge-admin{background:var(--bg);color:var(--t3);border:1px solid var(--border);}
-    .badge-on{background:#EDF7F0;color:var(--green);border:1px solid #C5E8D2;}
-    .badge-off{background:#FEF2F2;color:var(--red);border:1px solid #FECACA;}
-
-    .toggle-btn{padding:6px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--t2);-webkit-tap-highlight-color:transparent;min-height:34px;}
-    .toggle-btn:active{background:var(--bg);}
-
+    :root{
+      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
+      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
+      --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
+      --green:#2D7A4F;--grbg:#EDF7F0;--grborder:#C5E8D2;
+      --red:#B94040;--redbg:#FEF2F2;
+    }
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+    /* Topbar */
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;}
+    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 14px;border:1px solid var(--border);border-radius:6px;transition:all .15s;}
+    .back:hover{border-color:var(--text);color:var(--text);}
+    .topbar-title{font-size:16px;font-weight:700;}
+    .topbar-sub{font-size:12px;color:var(--t3);margin-left:4px;}
+    /* Layout */
+    .layout{display:grid;grid-template-columns:1fr 380px;gap:24px;padding:28px;max-width:1100px;margin:0 auto;align-items:start;}
+    /* Card */
+    .card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+    .card-hd{padding:18px 22px;border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;}
+    .card-hd-left{}
+    .card-title{font-size:14px;font-weight:700;}
+    .card-sub{font-size:11.5px;color:var(--t3);margin-top:2px;}
+    .card-count{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--t2);}
+    /* User list */
+    .user-list{padding:8px 0;}
+    .user-row{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--b2);transition:background .1s;}
+    .user-row:last-child{border-bottom:none;}
+    .user-row:hover{background:var(--bg);}
+    .user-avatar{width:38px;height:38px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;letter-spacing:0;}
+    .user-avatar.gold{background:linear-gradient(135deg,#C9A96E,#a8824f);}
+    .user-info{flex:1;min-width:0;}
+    .user-name{font-size:13.5px;font-weight:600;color:var(--text);}
+    .user-username{font-size:11.5px;color:var(--t3);font-family:monospace;margin-top:1px;}
+    .user-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.02em;}
+    .badge-superadmin{background:var(--gbg);color:#8B6F3E;border:1px solid var(--gborder);}
+    .badge-admin{background:var(--bg);color:var(--t2);border:1px solid var(--border);}
+    .badge-on{background:var(--grbg);color:var(--green);border:1px solid var(--grborder);}
+    .badge-off{background:var(--redbg);color:var(--red);border:1px solid #FECACA;}
+    /* Toggle */
+    .toggle-btn{padding:6px 14px;font-size:11.5px;font-family:inherit;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--t2);transition:all .15s;white-space:nowrap;}
+    .toggle-btn:hover{border-color:var(--text);color:var(--text);}
     /* Form */
-    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
-    .field label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t2);}
-    .field label span{color:var(--red);margin-left:2px;}
-    .field input,.field select{padding:11px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none;}
-    .field input:focus,.field select:focus{border-color:var(--text);background:var(--white);}
-    .hint{font-size:11.5px;color:var(--t3);margin-top:-10px;margin-bottom:12px;}
-    .alert{border-radius:5px;padding:11px 14px;font-size:13px;margin-bottom:14px;}
-    .alert-ok{background:#EDF7F0;border:1px solid #C5E8D2;color:var(--green);}
-    .alert-err{background:#FEF2F2;border:1px solid #FECACA;color:var(--red);}
-    .btn-submit{width:100%;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:5px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;-webkit-tap-highlight-color:transparent;min-height:48px;}
-    .btn-submit:active{opacity:.85;}
-    .role-info{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--t2);margin-top:14px;line-height:1.8;}
-    .role-info strong{color:var(--text);display:block;}
-
+    .card-body{padding:22px;}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+    .field label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
+    .field label span{color:var(--red);}
+    .inp{padding:11px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-size:13.5px;font-family:inherit;color:var(--text);outline:none;transition:all .2s;width:100%;}
+    .inp:focus{border-color:var(--text);background:var(--white);}
+    .inp::placeholder{color:var(--t3);}
+    .inp-select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23AEABA4' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
+    .hint{font-size:11px;color:var(--t3);margin-top:-10px;margin-bottom:14px;line-height:1.6;}
+    /* Secret code field - special styling */
+    .secret-field{background:var(--gbg);border:1.5px solid var(--gborder);border-radius:8px;padding:14px 16px;margin-bottom:16px;}
+    .secret-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B6F3E;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+    .secret-label::before{content:"🔐";}
+    .secret-inp{padding:11px 14px;background:var(--white);border:1.5px solid var(--gborder);border-radius:6px;font-size:13.5px;font-family:monospace;color:var(--text);outline:none;transition:all .2s;width:100%;letter-spacing:.08em;}
+    .secret-inp:focus{border-color:var(--gold);}
+    .secret-hint{font-size:11px;color:#8B6F3E;margin-top:6px;opacity:.8;}
+    /* Divider */
+    .divider{border:none;border-top:1px solid var(--b2);margin:18px 0;}
+    /* Alert */
+    .alert{border-radius:7px;padding:12px 16px;font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+    .alert-ok{background:var(--grbg);border:1px solid var(--grborder);color:var(--green);}
+    .alert-err{background:var(--redbg);border:1px solid #FECACA;color:var(--red);}
+    /* Submit */
+    .btn-submit{width:100%;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:7px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:opacity .15s;margin-top:4px;}
+    .btn-submit:hover{opacity:.88;}
+    /* Role info */
+    .role-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
+    .role-card{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:12px 14px;}
+    .role-card-title{font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;}
+    .role-card-desc{font-size:11px;color:var(--t3);line-height:1.6;}
+    .role-card.gold{background:var(--gbg);border-color:var(--gborder);}
+    .role-card.gold .role-card-title{color:#8B6F3E;}
+    /* Mobile */
     @media(max-width:768px){
+      .layout{grid-template-columns:1fr;padding:14px;}
       .topbar{padding:0 16px;}
-      .content{grid-template-columns:1fr;padding:14px 12px;}
-      .tbl-wrap{display:none;}
-      .mob-users{display:block;}
     }
   </style>
 </head>
 <body>
   <div class="topbar">
     <a href="/documents/dashboard" class="back">← กลับ</a>
-    <div class="topbar-title">จัดการผู้ใช้งาน</div>
+    <div>
+      <div class="topbar-title">จัดการผู้ใช้งาน</div>
+    </div>
   </div>
-  <div class="content">
-    <!-- Users list -->
+
+  <div class="layout">
+    <!-- Users List -->
     <div class="card">
-      <div class="card-head">
-        <div class="card-title">ผู้ใช้งานทั้งหมด</div>
+      <div class="card-hd">
+        <div class="card-hd-left">
+          <div class="card-title">ผู้ใช้งานในระบบ</div>
+          <div class="card-sub">สมาชิกทั้งหมดที่มีสิทธิ์เข้าถึง</div>
+        </div>
         <div class="card-count">{users.length} บัญชี</div>
       </div>
-      <!-- Desktop table -->
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr>
-            <th>Username</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>สถานะ</th><th>จัดการ</th>
-          </tr></thead>
-          <tbody>
-            {users.map((u: any) => (
-              <tr>
-                <td class="mono">{u.username}</td>
-                <td class="strong">{u.full_name}</td>
-                <td><span class={`badge badge-${u.role}`}>{u.role==='superadmin'?'Super Admin':'Admin'}</span></td>
-                <td><span class={`badge badge-${u.is_active?'on':'off'}`}>{u.is_active?'ใช้งาน':'ปิดใช้'}</span></td>
-                <td>
-                  {u.username !== 'superadmin' && (
-                    <form method="POST" style="display:inline;">
-                      <input type="hidden" name="action" value="toggle"/>
-                      <input type="hidden" name="user_id" value={u.id}/>
-                      <input type="hidden" name="is_active" value={String(u.is_active)}/>
-                      <button type="submit" class="toggle-btn">{u.is_active?'ปิดใช้งาน':'เปิดใช้งาน'}</button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <!-- Mobile list -->
-      <div class="mob-users">
+      <div class="user-list">
         {users.map((u: any) => (
-          <div class="mob-user-item">
-            <div class="mob-user-info">
-              <div class="mob-user-name">{u.full_name}</div>
-              <div class="mob-user-meta">{u.username}</div>
+          <div class="user-row">
+            <div class={`user-avatar${u.role==='superadmin'?' gold':''}`}>
+              {u.full_name.charAt(0).toUpperCase()}
             </div>
-            <span class={`badge badge-${u.role}`} style="margin-right:6px;">{u.role==='superadmin'?'Super':'Admin'}</span>
-            <span class={`badge badge-${u.is_active?'on':'off'}`} style="margin-right:8px;">{u.is_active?'ใช้':'ปิด'}</span>
-            {u.username !== 'superadmin' && (
-              <form method="POST">
-                <input type="hidden" name="action" value="toggle"/>
-                <input type="hidden" name="user_id" value={u.id}/>
-                <input type="hidden" name="is_active" value={String(u.is_active)}/>
-                <button type="submit" class="toggle-btn">{u.is_active?'ปิด':'เปิด'}</button>
-              </form>
-            )}
+            <div class="user-info">
+              <div class="user-name">{u.full_name}</div>
+              <div class="user-username">@{u.username}</div>
+            </div>
+            <div class="user-meta">
+              <span class={`badge badge-${u.role}`}>{u.role==='superadmin'?'Super Admin':'Admin'}</span>
+              <span class={`badge badge-${u.is_active?'on':'off'}`}>{u.is_active?'ใช้งาน':'ปิดใช้'}</span>
+              {u.username !== 'superadmin' && (
+                <form method="POST" style="display:inline;">
+                  <input type="hidden" name="action" value="toggle"/>
+                  <input type="hidden" name="user_id" value={u.id}/>
+                  <input type="hidden" name="is_active" value={String(u.is_active)}/>
+                  <button type="submit" class="toggle-btn">{u.is_active?'ปิด':'เปิด'}</button>
+                </form>
+              )}
+            </div>
           </div>
         ))}
       </div>
     </div>
 
-    <!-- Add user form -->
+    <!-- Add User Form -->
     <div class="card">
-      <div class="card-head"><div class="card-title">เพิ่มผู้ใช้ใหม่</div></div>
+      <div class="card-hd">
+        <div class="card-hd-left">
+          <div class="card-title">เพิ่มผู้ใช้ใหม่</div>
+          <div class="card-sub">เฉพาะ Superadmin เท่านั้น</div>
+        </div>
+        <span style="font-size:18px;">👤</span>
+      </div>
       <div class="card-body">
-        {success && <div class="alert alert-ok">{success}</div>}
-        {error && <div class="alert alert-err">{error}</div>}
+        {success && <div class="alert alert-ok">✓ {success}</div>}
+        {error && <div class="alert alert-err">✕ {error}</div>}
         <form method="POST">
           <input type="hidden" name="action" value="create"/>
           <div class="field">
             <label>Username <span>*</span></label>
-            <input type="text" name="username" placeholder="เช่น staff01" autocomplete="off" autocapitalize="none" required/>
+            <input class="inp" type="text" name="username" placeholder="เช่น staff01" autocomplete="off" autocapitalize="none" required/>
           </div>
           <div class="field">
             <label>ชื่อ-นามสกุล <span>*</span></label>
-            <input type="text" name="full_name" placeholder="ชื่อที่แสดงในระบบ" required/>
+            <input class="inp" type="text" name="full_name" placeholder="ชื่อที่แสดงในระบบ" required/>
           </div>
           <div class="field">
             <label>รหัสผ่าน <span>*</span></label>
-            <input type="password" name="password" placeholder="อย่างน้อย 8 ตัวอักษร" required minlength="8" autocomplete="new-password"/>
+            <input class="inp" type="password" name="password" placeholder="อย่างน้อย 8 ตัวอักษร" required minlength="8" autocomplete="new-password"/>
           </div>
           <div class="hint">ใช้ตัวอักษร ตัวเลข และสัญลักษณ์ผสมกัน</div>
           <div class="field">
             <label>สิทธิ์การใช้งาน <span>*</span></label>
-            <select name="role">
-              <option value="admin">Admin</option>
-              <option value="superadmin">Super Admin</option>
+            <select class="inp inp-select" name="role">
+              <option value="admin">Admin — บันทึก Draft</option>
+              <option value="superadmin">Super Admin — สิทธิ์เต็ม</option>
             </select>
           </div>
-          <div class="field">
-            <label>รหัสลับ Superadmin <span>*</span></label>
-            <input type="password" name="secret_code" placeholder="กรอกรหัสลับเพื่อยืนยัน" required autocomplete="off"/>
+          <hr class="divider"/>
+          <div class="secret-field">
+            <div class="secret-label">รหัสลับ Superadmin</div>
+            <input class="secret-inp" type="password" name="secret_code" placeholder="••••••••••" required autocomplete="off"/>
+            <div class="secret-hint">ต้องใช้รหัสลับจาก Superadmin เพื่อยืนยันการสร้างบัญชี</div>
           </div>
-          <div class="hint">ต้องใช้รหัสลับจาก Superadmin เท่านั้น</div>
-          <button type="submit" class="btn-submit">เพิ่มผู้ใช้</button>
+          <button type="submit" class="btn-submit">+ เพิ่มผู้ใช้งาน</button>
         </form>
-        <div class="role-info">
-          <strong>Admin</strong>บันทึก Draft ได้ แต่ไม่สามารถออกเอกสารได้
-          <strong style="margin-top:8px;">Super Admin</strong>สิทธิ์เต็ม: ออกเอกสาร, จัดการผู้ใช้, ยกเลิกเอกสาร
+        <div class="role-cards">
+          <div class="role-card">
+            <div class="role-card-title">Admin</div>
+            <div class="role-card-desc">บันทึก Draft ได้ แต่ไม่สามารถออกเอกสารได้</div>
+          </div>
+          <div class="role-card gold">
+            <div class="role-card-title">Super Admin</div>
+            <div class="role-card-desc">ออกเอกสาร จัดการผู้ใช้ ลบเอกสารได้</div>
+          </div>
         </div>
       </div>
     </div>
