@@ -63,7 +63,39 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .wrap{padding:66px 0 48px;display:flex;flex-direction:column;align-items:center;gap:0;}
 /* the document - single continuous block, browser handles page breaks on print */
 .sheet{width:210mm;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.3);padding:12mm 12mm 10mm;font-size:9pt;color:#0D1B2A;position:relative;}
-.wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);font-size:100px;font-weight:900;color:rgba(0,0,0,.04);pointer-events:none;user-select:none;white-space:nowrap;}
+.wm{
+  position:fixed;
+  top:0;left:0;width:100%;height:100%;
+  pointer-events:none;user-select:none;
+  z-index:9999;
+  background-image:repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 80px,
+    rgba(0,0,0,0) 80px,
+    rgba(0,0,0,0) 160px
+  );
+  overflow:hidden;
+}
+.wm::before{
+  content:"TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO • TNC 18 BUILD STUDIO •";
+  position:absolute;
+  top:-50%;left:-50%;
+  width:200%;height:200%;
+  font-size:11px;
+  font-weight:700;
+  color:rgba(0,0,0,.07);
+  letter-spacing:.15em;
+  word-spacing:1.5em;
+  transform:rotate(-35deg);
+  line-height:3.5em;
+  white-space:pre-wrap;
+  font-family:'Sarabun',sans-serif;
+}
+@media print{
+  .wm{position:fixed;top:0;left:0;width:210mm;height:297mm;}
+  .wm::before{font-size:10px;color:rgba(0,0,0,.08);}
+}
 /* page break line on screen */
 
 /* header */
