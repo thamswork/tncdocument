@@ -4,7 +4,7 @@ const user = Astro.locals.user;
 const { id } = Astro.params;
 const doc = await getDocument(id!);
 if (!doc) return Astro.redirect('/documents/dashboard');
-if (doc.status === 'published') return Astro.redirect(`/documents/${id}`);
+if (doc.status === 'published' && user.role !== 'superadmin') return Astro.redirect(`/documents/${id}`);
 
 const documentTypes = await getDocumentTypes();
 const customers = await getCustomers();
