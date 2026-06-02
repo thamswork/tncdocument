@@ -63,7 +63,7 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
 .t-back{background:transparent;color:#888;border:1px solid #444;margin-right:6px;}
 .t-print{background:#112D5E;color:#fff;}
 
-/* Screen: show as A4 card */
+/* Screen: show as continuous scroll but with A4 page markers */
 .page-wrap{padding:66px 0 40px;display:flex;flex-direction:column;align-items:center;gap:0;}
 .doc{
   width:210mm;
@@ -72,6 +72,14 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
   font-size:9pt;
   color:#0D1B2A;
   font-family:'Sarabun',sans-serif;
+  /* Show A4 page boundaries as horizontal rules every 297mm */
+  background-image:repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent calc(297mm - 1px),
+    #CDD3DC calc(297mm - 1px),
+    #CDD3DC 297mm
+  );
 }
 .doc-inner{padding:14mm 15mm 12mm;position:relative;}
 .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-20deg);font-size:110px;font-weight:900;color:rgba(0,0,0,.05);pointer-events:none;user-select:none;white-space:nowrap;}
@@ -113,8 +121,8 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
 .sub-lbl{text-align:right!important;padding-right:12px!important;color:#333;}
 
 /* Totals */
-.totals-wrap{display:flex;justify-content:flex-end;margin-bottom:8px;}
-.totals-tbl{border-collapse:collapse;min-width:240px;}
+.totals-wrap{display:table;width:100%;margin-bottom:8px;}
+.totals-tbl{display:table;margin-left:auto;border-collapse:collapse;min-width:240px;}
 .totals-tbl td{padding:3px 10px;font-size:8.5pt;border-bottom:1px solid #eee;}
 .tl2{color:#555;padding-right:20px;}
 .tv{text-align:right;font-weight:600;white-space:nowrap;}
