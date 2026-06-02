@@ -138,32 +138,10 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   @page{size:A4 portrait;margin:0;}
 }
 
-/* Repeated page header for print pages 2+ */
-.rpt-hdr {
-  display: none;
-  position: running(repeatHeader);
-}
-@media print {
-  @page { 
-    size: A4 portrait; 
-    margin: 12mm 14mm 10mm;
-    @top-center { content: element(repeatHeader); }
-  }
-  .rpt-hdr {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1.5px solid #112D5E;
-    padding-bottom: 6px;
-    margin-bottom: 8px;
-    font-size: 8pt;
-    width: 100%;
-  }
-  .rpt-hdr img { height: 20px; }
-  .rpt-hdr-r { text-align: right; font-size: 7.5pt; color: #555; }
-  .rpt-hdr-num { font-weight: 700; color: #0D1B2A; }
-  .sheet { box-shadow: none; padding: 0; background: #fff; }
-  .sheet-inner { padding: 0; }
+.rpt-hdr{display:none;}
+@media print{
+  @page{size:A4 portrait;margin:10mm;}
+  .sheet{box-shadow:none;padding:0;background:#fff;}
 }
 </style>
 </head>
