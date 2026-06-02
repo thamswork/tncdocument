@@ -35,7 +35,7 @@ if (Astro.request.method === 'POST') {
     body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 
     /* Topbar */
-    .topbar{position:sticky;top:0;z-index:100;background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;gap:10px;}
+    .topbar{position:sticky;top:0;z-index:100;background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;gap:12px;}
     .back{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 11px;border:1px solid var(--border);border-radius:4px;transition:all .15s;}
     .back:hover{border-color:var(--text);color:var(--text);}
     .tb-title{font-size:14px;font-weight:600;flex:1;}
@@ -58,19 +58,19 @@ if (Astro.request.method === 'POST') {
     .meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
 
     /* Cards */
-    .card{background:var(--white);border:1px solid var(--border);border-radius:6px;display:flex;flex-direction:column;position:relative;}
-    .card-hd{padding:11px 16px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:8px;border-radius:6px 6px 0 0;background:var(--white);}
-    .step-n{width:20px;height:20px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex-shrink:0;}
-    .card-title{font-size:12.5px;font-weight:600;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;position:relative;}
+    .card-hd{padding:13px 18px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:10px;border-radius:8px 8px 0 0;background:var(--white);}
+    .step-n{width:22px;height:22px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+    .card-title{font-size:13px;font-weight:700;}
     .card-sub{font-size:11px;color:var(--t3);margin-left:auto;text-decoration:none;}
-    .card-bd{padding:14px 16px;flex:1;}
+    .card-bd{padding:16px 18px;flex:1;}
 
     /* Form fields */
     .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
     .fg:last-child{margin-bottom:0;}
     .fg2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-    .lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);}
-    .inp{padding:8px 11px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:100%;}
+    .lbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);}
+    .inp{padding:10px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:100%;}
     .inp:focus{border-color:var(--text);}
     .inp::placeholder{color:var(--t3);}
     textarea.inp{resize:vertical;min-height:64px;line-height:1.6;}
@@ -101,7 +101,7 @@ if (Astro.request.method === 'POST') {
     .preset:hover{border-color:var(--t2);color:var(--t2);}
 
     /* BOQ card */
-    .boq-card{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+    .boq-card{background:var(--white);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
     .boq-hd{padding:12px 16px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:8px;}
     .boq-title{font-size:13px;font-weight:600;flex:1;}
     .boq-cnt{font-size:11.5px;color:var(--t2);}
@@ -145,7 +145,7 @@ if (Astro.request.method === 'POST') {
     .boq-empty-sub{font-size:12px;color:var(--t3);margin-bottom:14px;}
 
     /* Right sidebar */
-    .rside{background:var(--white);border-left:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;}
+    .rside{background:var(--white);border-left:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:16px;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;}
     .sb-lbl{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:9px;}
     .sum-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--b2);}
     .sum-row:last-child{border-bottom:none;}
@@ -197,7 +197,7 @@ if (Astro.request.method === 'POST') {
 
 <div class="topbar">
   <a href="/documents/dashboard" class="back">← กลับ</a>
-  <div class="tb-title">สร้างเอกสารใหม่</div>
+  <div class="tb-title">สร้างเอกสารใหม่<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">กรอกข้อมูลและ BOQ</span></div>
   <div class="tb-status"><span class="sdot" id="sDot"></span><span id="sTxt">ยังไม่ได้บันทึก</span></div>
   <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">DRAFT</button>
   <button class="btn btn-gold" onclick="window.savePreview()">PREVIEW PDF</button>
@@ -213,7 +213,7 @@ if (Astro.request.method === 'POST') {
     <div class="card">
       <div class="card-hd">
         <div class="step-n">1</div>
-        <div class="card-title">ประเภทเอกสาร</div>
+        <div class="card-title">ประเภทเอกสาร</div><div style="font-size:11px;color:var(--t3);margin-left:auto;">ขั้นตอนที่ 1</div>
       </div>
       <div class="card-bd">
         <div class="fg">
@@ -228,7 +228,7 @@ if (Astro.request.method === 'POST') {
             <input type="date" class="inp" id="issueDate"/>
           </div>
           <div class="fg">
-            <div class="lbl">วันครบกำหนด</div>
+            <div class="lbl">ราคามีผลถึง / กำหนดชำระ</div>
             <input type="date" class="inp" id="dueDate"/>
           </div>
         </div>
@@ -243,7 +243,7 @@ if (Astro.request.method === 'POST') {
     <div class="card" style="overflow:visible;">
       <div class="card-hd">
         <div class="step-n">2</div>
-        <div class="card-title">ลูกค้า</div>
+        <div class="card-title">ข้อมูลลูกค้า</div><div style="font-size:11px;color:var(--t3);margin-left:auto;">ขั้นตอนที่ 2</div>
         <a href="/documents/customers/new" class="card-sub">+ เพิ่มใหม่</a>
       </div>
       <div class="card-bd" style="overflow:visible;">
@@ -269,7 +269,7 @@ if (Astro.request.method === 'POST') {
     <div class="card">
       <div class="card-hd">
         <div class="step-n">3</div>
-        <div class="card-title">เงื่อนไขชำระเงิน</div>
+        <div class="card-title">เงื่อนไขชำระเงิน</div><div style="font-size:11px;color:var(--t3);margin-left:auto;">ขั้นตอนที่ 3</div>
       </div>
       <div class="card-bd">
         <textarea class="inp" id="payCond" style="min-height:80px;"
@@ -288,7 +288,7 @@ if (Astro.request.method === 'POST') {
   <div class="boq-card">
     <div class="boq-hd">
       <div class="step-n">4</div>
-      <div class="boq-title">รายการงาน (BOQ)</div>
+      <div class="boq-title">รายการงาน (BOQ)<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">ขั้นตอนที่ 4</span></div>
       <div class="boq-cnt" id="boqCnt">ยังไม่มีรายการ</div>
       <button class="btn btn-ol" style="font-size:11px;padding:5px 13px;margin-left:8px;" onclick="window.addCat()">+ เพิ่มหมวดงาน</button>
     </div>
@@ -302,7 +302,7 @@ if (Astro.request.method === 'POST') {
 <!-- Right Sidebar -->
 <div class="rside">
   <div>
-    <div class="sb-lbl">สรุปราคา</div>
+    <div class="sb-lbl" style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);border-bottom:1px solid var(--b2);padding-bottom:10px;margin-bottom:4px;">สรุปราคา</div>
     <div class="sum-row"><span class="sl">รวมจำนวนเงิน</span><span class="sv" id="rSub">฿0.00</span></div>
     <div class="disc-field">
       <div class="disc-lbl">ส่วนลดค่าแบบ (บาท)</div>
