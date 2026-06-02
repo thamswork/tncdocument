@@ -65,7 +65,6 @@ export function calculateTotals(items: any[], discountDesign: number, discountTr
 export async function saveDocument(docData: any, categories: any[], items: any[], userId: string) {
   const isNew = !docData.id;
   const totals = calculateTotals(items, docData.discount_design || 0, docData.discount_trade || 0);
-
   if (isNew) {
     const { data: docType } = await supabaseAdmin.from('document_types').select('prefix').eq('id', docData.document_type_id).single();
     const docNumber = await generateDocumentNumber(docData.document_type_id, docType?.prefix || 'DOC');
@@ -99,8 +98,7 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
         ...item, document_id: documentId,
         category_id: item.temp_category_id ? catMap[item.temp_category_id] : null,
         amount: (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
-        sort_order: i,
-        temp_category_id: undefined,
+        sort_order: i, temp_category_id: undefined,
       }));
       await supabaseAdmin.from('document_items').insert(mappedItems);
     }
@@ -112,6 +110,15 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
     }));
     await supabaseAdmin.from('document_items').insert(mappedItems);
   }
+}
+
+export async function deleteDocument(id: string, userId: string) {
+  await logAction(id, 'deleted', userId).catch(() => {});
+  await supabaseAdmin.from('document_items').delete().eq('document_id', id);
+  await supabaseAdmin.from('document_categories').delete().eq('document_id', id);
+  await supabaseAdmin.from('export_logs').delete().eq('document_id', id);
+  const { error } = await supabaseAdmin.from('documents').delete().eq('id', id);
+  return { error };
 }
 
 export async function logAction(documentId: string, action: string, userId: string, notes?: string) {
