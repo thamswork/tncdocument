@@ -6,7 +6,6 @@ const doc = await getDocument(id!);
 if (!doc) return Astro.redirect('/documents/dashboard');
 Astro.response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 await logAction(id!, 'pdf_exported', user.id);
-
 function thaiDate(s: string) {
   if (!s) return '—';
   const d = new Date(s);
@@ -36,12 +35,10 @@ function bahtText(amount: number): string {
   r+='บาท';r+=satang>0?grp(satang)+'สตางค์':'ถ้วน';
   return r;
 }
-
 const itemsByCategory: Record<string,any[]> = {};
 doc.categories.forEach((cat: any) => {
   itemsByCategory[cat.id] = doc.items.filter((i: any) => i.category_id === cat.id);
 });
-
 const isQuotation = ['SV','QT','QUOTATION'].includes(doc.document_types?.code);
 const isInvoice = ['IV','IN','INVOICE'].includes(doc.document_types?.code);
 const LOGO = 'https://res.cloudinary.com/dynjnftnu/image/upload/v1780149765/LOGO_TNC-03_0_liopw3.png';
@@ -51,303 +48,236 @@ const LOGO = 'https://res.cloudinary.com/dynjnftnu/image/upload/v1780149765/LOGO
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>{doc.document_number} — {doc.customers?.company_name}</title>
+<title>{doc.document_number}</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{font-family:'Sarabun',sans-serif;background:#BFC5CE;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .toolbar{position:fixed;top:0;left:0;right:0;z-index:100;background:#0D1B2A;height:50px;padding:0 24px;display:flex;align-items:center;gap:12px;}
 .tb-t{color:#ccc;font-size:13px;flex:1;}
 .tbtn{padding:7px 16px;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;text-decoration:none;display:inline-block;}
 .t-back{background:transparent;color:#888;border:1px solid #444;margin-right:6px;}
 .t-print{background:#112D5E;color:#fff;}
-
-/* Screen: show as continuous scroll but with A4 page markers */
-.page-wrap{padding:66px 0 40px;display:flex;flex-direction:column;align-items:center;gap:0;}
-.doc{
-  width:210mm;
-  background:#fff;
-  box-shadow:0 4px 28px rgba(0,0,0,.22);
-  font-size:9.5pt;
-  color:#0D1B2A;
-  font-family:'Sarabun',sans-serif;
-  /* Show A4 page boundaries as horizontal rules every 297mm */
-  background-image:repeating-linear-gradient(
-    to bottom,
-    transparent,
-    transparent calc(297mm - 1px),
-    #CDD3DC calc(297mm - 1px),
-    #CDD3DC 297mm
-  );
-}
-.doc-inner{padding:14mm 15mm 12mm;position:relative;overflow:hidden;}
-.wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-20deg);font-size:110px;font-weight:900;color:rgba(0,0,0,.05);pointer-events:none;user-select:none;white-space:nowrap;}
-
-/* Header */
-.hdr{display:table;width:100%;border-collapse:collapse;padding-bottom:10px;margin-bottom:12px;border-bottom:2.5px solid #112D5E;}
-.hdr-left{display:table-cell;vertical-align:top;width:60%;}
-.logo-img{width:180px;height:auto;display:block;margin-bottom:8px;}
-.co-legal{font-size:8pt;font-weight:700;color:#0D1B2A;margin-bottom:2px;}
-.co-addr{font-size:7.5pt;color:#444;line-height:1.7;}
-.co-tax{font-size:7.5pt;color:#333;font-weight:600;margin-top:2px;}
-.hdr-right{display:table-cell;vertical-align:top;width:40%;text-align:right;}
-.doctype-th{font-size:22pt;font-weight:700;color:#0D1B2A;display:block;line-height:1.05;}
-.doctype-bar{background:#112D5E;color:#fff;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:inline-block;padding:3px 10px;margin-top:4px;}
-.draft-badge{display:inline-block;margin-top:8px;border:3px solid #C0392B;color:#C0392B;padding:3px 14px;font-size:12pt;font-weight:800;letter-spacing:.16em;transform:rotate(-8deg);border-radius:3px;}
-
-/* Info grid */
-.info-grid{width:100%;border-collapse:collapse;border:1.5px solid #112D5E;margin-bottom:14px;font-size:9pt;}
-.info-grid td{padding:5px 10px;border:1px solid #ccc;vertical-align:top;line-height:1.7;}
+.pages{padding:66px 0 48px;display:flex;flex-direction:column;align-items:center;gap:16px;}
+.page{width:210mm;min-height:297mm;background:#fff;box-shadow:0 2px 20px rgba(0,0,0,.25);padding:16mm 18mm 14mm;font-size:10pt;color:#0D1B2A;position:relative;}
+/* watermark */
+.wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);font-size:100px;font-weight:900;color:rgba(0,0,0,.04);pointer-events:none;user-select:none;white-space:nowrap;z-index:0;}
+/* ---- HEADER ---- */
+.hdr{display:table;width:100%;border-collapse:collapse;padding-bottom:12px;margin-bottom:14px;border-bottom:3px solid #112D5E;}
+.hdr-l{display:table-cell;vertical-align:middle;width:58%;}
+.hdr-r{display:table-cell;vertical-align:top;width:42%;text-align:right;}
+.logo{width:190px;height:auto;display:block;margin-bottom:8px;}
+.co-name{font-size:9pt;font-weight:700;color:#0D1B2A;margin-bottom:3px;}
+.co-addr{font-size:8pt;color:#555;line-height:1.8;}
+.co-tax{font-size:8pt;color:#333;font-weight:600;margin-top:3px;}
+.doc-type{font-size:24pt;font-weight:700;color:#0D1B2A;display:block;line-height:1;}
+.doc-bar{background:#112D5E;color:#fff;font-size:7.5pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:inline-block;padding:3px 12px;margin-top:5px;}
+.draft-stamp{display:inline-block;margin-top:10px;border:3px solid #C0392B;color:#C0392B;padding:3px 14px;font-size:13pt;font-weight:900;letter-spacing:.18em;transform:rotate(-8deg);border-radius:3px;}
+/* ---- MINI HEADER (page 2+) ---- */
+.mini-hdr{display:table;width:100%;border-collapse:collapse;padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid #112D5E;}
+.mini-l{display:table-cell;vertical-align:middle;width:50%;}
+.mini-r{display:table-cell;vertical-align:middle;width:50%;text-align:right;}
+.mini-logo{height:30px;width:auto;}
+.mini-info{font-size:8pt;color:#555;line-height:1.6;}
+.mini-docnum{font-weight:700;color:#0D1B2A;font-size:9pt;}
+.cont-label{font-size:8pt;color:#888;text-align:right;margin-bottom:6px;}
+/* ---- INFO GRID ---- */
+.info-tbl{width:100%;border-collapse:collapse;border:2px solid #112D5E;margin-bottom:14px;font-size:9pt;}
+.info-tbl td{padding:5px 10px;border:1px solid #ccc;vertical-align:top;line-height:1.7;}
 .lbl{font-weight:700;color:#0D1B2A;white-space:nowrap;}
 .val{color:#222;}
 .mono{font-family:monospace;letter-spacing:.03em;}
-.pay{white-space:pre-line;line-height:1.7;margin-top:3px;font-size:8pt;}
-.valid-until{font-size:8pt;color:#B94040;font-weight:700;margin-top:4px;}
-
-/* Items */
-.items{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:9pt;}
+.pay{white-space:pre-line;line-height:1.7;margin-top:3px;font-size:8.5pt;}
+.valid-until{font-size:8.5pt;color:#B94040;font-weight:700;margin-top:4px;}
+/* ---- ITEMS ---- */
+.items{width:100%;border-collapse:collapse;font-size:9pt;}
 .items th{background:#112D5E;color:#fff;padding:6px 8px;border:1px solid #0D1B2A;font-size:8pt;font-weight:600;text-align:center;white-space:nowrap;}
 .items th.tl{text-align:left;}
 .items td{padding:4px 8px;border:1px solid #ddd;vertical-align:middle;line-height:1.6;}
-.items .tc{text-align:center;}
-.items .tr{text-align:right;}
-.items .tw{font-weight:600;}
-.row-cat td{background:#112D5E;color:#fff;font-weight:700;font-size:9.5pt;padding:6px 8px;border-color:#222;}
-.row-subcat td{background:#E8EDF5;color:#0D1B2A;font-weight:700;font-size:8.5pt;padding:4px 8px;border-color:#bbb;}
+.tc{text-align:center;}
+.tr{text-align:right;}
+.tw{font-weight:600;}
+.row-cat td{background:#112D5E;color:#fff;font-weight:700;font-size:10pt;padding:5px 8px;border-color:#0D1B2A;}
+.row-subcat td{background:#E8EDF5;color:#0D1B2A;font-weight:700;padding:4px 8px;border-color:#bbb;}
 .row-item td{background:#fff;}
-.row-item:nth-child(even) td{background:#fafafa;}
-.row-sub td{background:#f0f0f0;font-weight:700;}
-.sub-lbl{text-align:right!important;padding-right:12px!important;color:#333;}
-
-/* Totals */
-.totals-wrap{display:table;width:100%;margin-bottom:8px;}
-.totals-tbl{display:table;margin-left:auto;border-collapse:collapse;min-width:240px;}
-.totals-tbl td{padding:3px 10px;font-size:8.5pt;border-bottom:1px solid #eee;}
-.tl2{color:#555;padding-right:20px;}
-.tv{text-align:right;font-weight:600;white-space:nowrap;}
-.grand td{border-top:2px solid #112D5E;border-bottom:none;font-weight:700;font-size:10.5pt;padding-top:6px;color:#0D1B2A;}
-.amt-words{text-align:center;font-size:8pt;color:#555;border:1px solid #ddd;padding:5px 10px;background:#fafafa;margin-bottom:10px;}
-
-/* Notes */
-.notes{border-left:3px solid #112D5E;padding:7px 11px;margin-bottom:10px;background:#F5F8FF;width:100%;overflow:hidden;}
-.notes strong{display:block;font-size:8.5pt;font-weight:700;margin-bottom:3px;color:#0D1B2A;}
-.notes p{font-size:8pt;color:#555;white-space:pre-line;line-height:1.7;}
-
-/* Signatures */
-.sig-note{text-align:center;font-size:7.5pt;color:#999;padding:6px 0;border-top:1px solid #e0e0e0;margin-top:10px;margin-bottom:8px;}
+.row-item:nth-child(even) td{background:#f9f9f9;}
+.row-sub td{background:#efefef;font-weight:700;}
+.sub-lbl{text-align:right!important;padding-right:14px!important;color:#444;}
+/* ---- TOTALS ---- */
+.totals-outer{display:table;width:100%;margin:12px 0 8px;}
+.totals-tbl{display:table;margin-left:auto;border-collapse:collapse;min-width:260px;}
+.totals-tbl td{padding:3px 10px;font-size:9pt;border-bottom:1px solid #eee;}
+.tt-l{color:#555;padding-right:24px;}
+.tt-r{text-align:right;font-weight:600;white-space:nowrap;}
+.grand td{border-top:2px solid #112D5E;border-bottom:none;font-weight:700;font-size:11pt;padding-top:7px;color:#0D1B2A;}
+/* ---- BAHT WORDS ---- */
+.baht-words{text-align:center;font-size:8.5pt;color:#555;border:1px solid #ddd;padding:5px 12px;background:#fafafa;margin-bottom:12px;}
+/* ---- NOTES ---- */
+.notes{border-left:3px solid #112D5E;padding:8px 12px;margin-bottom:12px;background:#F5F8FF;width:100%;}
+.notes strong{display:block;font-size:9pt;font-weight:700;margin-bottom:3px;color:#0D1B2A;}
+.notes p{font-size:8.5pt;color:#555;white-space:pre-line;line-height:1.7;}
+/* ---- SIGNATURES ---- */
+.sig-note{text-align:center;font-size:8pt;color:#999;padding:6px 0;border-top:1px solid #e0e0e0;margin:10px 0 8px;}
 .sig-row{display:table;width:100%;table-layout:fixed;}
-.sig-cell{display:table-cell;text-align:center;padding:0 20px;width:50%;}
-.sig-line{border-top:1px solid #bbb;margin:28px 8px 6px;}
-.sig-lbl{font-size:7pt;color:#999;line-height:1.9;}
-
-/* Banking */
-.bank-section{margin-top:14px;padding-top:12px;border-top:2px solid #112D5E;}
-.bank-box{border:1.5px solid #112D5E;border-radius:3px;padding:10px 14px;background:#F0F4FF;}
-.bank-title{font-size:9pt;font-weight:700;color:#0D1B2A;margin-bottom:7px;border-bottom:1px solid #c0c8e0;padding-bottom:5px;}
+.sig-cell{display:table-cell;text-align:center;padding:0 24px;width:50%;}
+.sig-line{border-top:1px solid #bbb;margin:30px 8px 7px;}
+.sig-lbl{font-size:7.5pt;color:#999;line-height:2;}
+/* ---- BANK ---- */
+.bank-wrap{margin-top:14px;padding-top:12px;border-top:2px solid #112D5E;}
+.bank-box{border:1.5px solid #112D5E;border-radius:3px;padding:10px 14px;background:#EEF3FF;}
+.bank-title{font-size:9.5pt;font-weight:700;color:#0D1B2A;margin-bottom:7px;border-bottom:1px solid #c0c8e0;padding-bottom:5px;}
 .bank-cols{display:table;width:100%;table-layout:fixed;}
-.bank-col{display:table-cell;width:50%;vertical-align:top;font-size:8pt;line-height:1.9;}
-.bank-lbl{color:#666;font-size:7.5pt;}
+.bank-col{display:table-cell;width:50%;vertical-align:top;font-size:8.5pt;line-height:2;}
+.bank-lbl{color:#666;}
 .bank-val{color:#0D1B2A;font-weight:600;}
 .bank-acc{font-size:11pt;font-weight:700;color:#112D5E;letter-spacing:.06em;}
-
-/* Print */
+/* ---- PRINT ---- */
 @media print{
   html,body{background:#fff;}
   .toolbar{display:none!important;}
-  .page-wrap{padding:0;}
-  .doc{width:210mm;box-shadow:none;}
-  .doc-inner{padding:10mm 12mm 10mm;}
-  .wm{position:fixed;}
-  /* Page header repeated on every print page */
-  thead{display:table-header-group;}
-  tfoot{display:table-footer-group;}
-  .items tbody tr{page-break-inside:avoid;}
-  .row-cat{page-break-after:avoid;}
-  .totals-wrap{page-break-inside:avoid;}
-  .bank-section{page-break-inside:avoid;}
-  .sig-row{page-break-inside:avoid;}
-  .amt-words{page-break-inside:avoid;}
-  @page{size:A4 portrait;margin:12mm 14mm 12mm;}
+  .pages{padding:0;gap:0;background:#fff;}
+  .page{box-shadow:none;page-break-after:always;break-after:page;padding:12mm 14mm 10mm;}
+  .page:last-child{page-break-after:auto;break-after:auto;}
+  @page{size:A4 portrait;margin:0;}
 }
 </style>
 </head>
 <body>
-
 <div class="toolbar">
-  <div class="tb-t">
-    <strong style="color:#fff;">{doc.document_number}</strong>
-    <span style="color:#555;margin:0 8px;">—</span>
-    <span style="color:#888;font-size:12px;">{doc.customers?.company_name}</span>
-  </div>
+  <div class="tb-t"><strong style="color:#fff;">{doc.document_number}</strong><span style="color:#555;margin:0 8px;">—</span><span style="color:#888;font-size:12px;">{doc.customers?.company_name}</span></div>
   <a href={`/documents/${id}`} class="tbtn t-back">← กลับ</a>
   <button class="tbtn t-print" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
 </div>
-
-<div class="page-wrap">
-<div class="doc">
-
-{/* ===== PAGE 1 ===== */}
-<div class="page">
-  {doc.status==='draft' && <div class="wm">DRAFT</div>}
-
-  <!-- Header -->
-  <div class="hdr">
-    <div class="hdr-left">
-      <img class="logo-img" src={LOGO} alt="TNC"/>
-      <div class="co-legal">ห้างหุ้นส่วนจำกัด ธนชัย 2018 (สำนักงานใหญ่)</div>
-      <div class="co-addr">54/6 หมู่ 8 ตำบลบางแก้ว อำเภอบางพลี จังหวัดสมุทรปราการ 10540<br/>โทรศัพท์ 02-XXX-XXXX &emsp; อีเมล: thanachai2018@gmail.com</div>
-      <div class="co-tax">เลขประจำตัวผู้เสียภาษีอากร 0113561003884</div>
-    </div>
-    <div class="hdr-right">
-      <span class="doctype-th">{doc.document_types?.name_th}</span>
-      <span class="doctype-bar">{doc.document_types?.name_en || doc.document_types?.code}</span>
-      {doc.status==='draft' && <div style="margin-top:6px;"><div class="draft-badge">DRAFT</div></div>}
-    </div>
-  </div>
-
-  <!-- Customer info -->
-  <table class="info-grid">
-    <tr>
-      <td style="width:50%"><span class="lbl">รหัสลูกค้า: </span><span class="val mono">{doc.customers?.customer_code}</span></td>
-      <td style="width:50%"><span class="lbl">วันที่ / Date: </span><span class="val">{thaiDate(doc.issue_date)}</span></td>
-    </tr>
-    <tr>
-      <td colspan="2"><span class="lbl">ชื่อลูกค้า: </span><span class="val">{doc.customers?.company_name}</span></td>
-    </tr>
-    <tr>
-      <td><span class="lbl">ที่อยู่: </span><span class="val">{doc.customers?.address||'—'}</span></td>
-      <td>
-        <div><span class="lbl">เลขที่เอกสาร / No: </span><span class="val mono">{doc.document_number}</span></div>
-        {doc.reference_po && <div><span class="lbl">P/O: </span><span class="val mono">{doc.reference_po}</span></div>}
-        {isInvoice && doc.due_date && <div><span class="lbl">กำหนดชำระ / Due: </span><span class="val">{thaiDate(doc.due_date)}</span></div>}
-        {doc.payment_condition && <div style="margin-top:3px;"><div class="lbl">เงื่อนไขการชำระเงิน:</div><div class="pay">{doc.payment_condition}</div></div>}
-        {isQuotation && doc.due_date && <div class="valid-until">⚠ ราคานี้มีผลถึง: {thaiDate(doc.due_date)}</div>}
-      </td>
-    </tr>
-    <tr>
-      <td><span class="lbl">โทรศัพท์: </span><span class="val">{doc.customers?.phone||'—'}</span></td>
-      <td><span class="lbl">เลขประจำตัวผู้เสียภาษี: </span><span class="val mono">{doc.customers?.tax_id||'—'}</span></td>
-    </tr>
-  </table>
-
-  <!-- Items table — thead repeats on every print page automatically -->
-  <table class="items">
-    <thead>
-      <tr>
-        <th style="width:32px;">ลำดับ</th>
-        <th style="width:40px;">รหัส</th>
-        <th class="tl">รายการ</th>
-        <th style="width:48px;">จำนวน</th>
-        <th style="width:40px;">หน่วย</th>
-        <th style="width:80px;">หน่วยละ</th>
-        <th style="width:88px;">จำนวนเงิน</th>
-      </tr>
-    </thead>
-    <tbody>
-      {doc.categories.map((cat: any) => {
-        const items = itemsByCategory[cat.id] || [];
-        const catTotal = items.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
-        return (
-          <Fragment>
-            <tr class="row-cat">
-              <td colspan="6">{cat.category_number}. {cat.name_th}</td>
-              <td class="tr">{fmt(catTotal)}</td>
-            </tr>
-            {items.map((item: any) => {
-              if (item.is_subtotal_row) return (
-                <tr class="row-sub">
-                  <td colspan="6" class="sub-lbl">{item.description_th}</td>
-                  <td class="tr tw">{fmt(item.amount)}</td>
-                </tr>
-              );
-              const dots = (item.item_number||'').split('.').length - 1;
-              const isSubCat = dots === 1 && !item.quantity && !item.unit_price;
-              if (isSubCat) return (
-                <tr class="row-subcat">
-                  <td>{item.item_number}</td>
-                  <td>{item.item_code||''}</td>
-                  <td colspan="5">{item.description_th}</td>
-                </tr>
-              );
-              return (
-                <tr class="row-item">
-                  <td class="tc">{item.item_number||''}</td>
-                  <td class="tc">{item.item_code||''}</td>
-                  <td style={dots>=2?'padding-left:18px;':''}>{item.description_th}</td>
-                  <td class="tr">{item.quantity>0?Number(item.quantity).toLocaleString('th-TH'):'—'}</td>
-                  <td class="tc">{item.unit_th||''}</td>
-                  <td class="tr">{item.unit_price>0?fmt(item.unit_price):'—'}</td>
-                  <td class="tr tw">{item.amount>0?fmt(item.amount):'—'}</td>
-                </tr>
-              );
-            })}
-          </Fragment>
-        );
-      })}
-    </tbody>
-  </table>
-
-</div>{/* end page 1 */}
-
-{/* ===== PAGE N (continuation) — rendered by browser page-break ===== */}
-{/* Items overflow naturally via print page-break */}
-
-  <!-- Totals -->
-  <div class="totals-wrap">
-    <table class="totals-tbl">
-      <tr><td class="tl2">รวมจำนวนเงิน</td><td class="tv">{fmt(doc.subtotal)} บาท</td></tr>
-      {doc.discount_design>0 && <tr><td class="tl2">ส่วนลดค่าแบบ</td><td class="tv">- {fmt(doc.discount_design)} บาท</td></tr>}
-      {doc.discount_trade>0 && <tr><td class="tl2">ส่วนลดการค้า</td><td class="tv">- {fmt(doc.discount_trade)} บาท</td></tr>}
-      <tr><td class="tl2">ราคาสินค้า/บริการ</td><td class="tv">{fmt(doc.price_before_vat)} บาท</td></tr>
-      <tr><td class="tl2">ภาษีมูลค่าเพิ่ม 7%</td><td class="tv">{fmt(doc.vat_amount)} บาท</td></tr>
-      <tr class="grand"><td class="tl2">จำนวนเงินรวมทั้งสิ้น</td><td class="tv">{fmt(doc.total_amount)} บาท</td></tr>
-    </table>
-  </div>
-  <div class="amt-words">จำนวนเงินเป็นตัวหนังสือ: {bahtText(doc.total_amount)}</div>
-
-  {doc.notes && (
-    <div class="notes">
-      <strong>หมายเหตุ / Remarks</strong>
-      <p>{doc.notes}</p>
-    </div>
-  )}
-
-  <!-- Signatures -->
-  <div class="sig-note">ห้างหุ้นส่วนจำกัด ธนชัย 2018 หวังว่าจะได้รับการพิจารณาจากท่าน</div>
-  <div class="sig-row">
-    <div class="sig-cell">
-      <div class="sig-line"></div>
-      <div class="sig-lbl">ลงชื่อผู้เสนอราคา ........................................<br/>วันที่ ......../......../........</div>
-    </div>
-    <div class="sig-cell">
-      <div class="sig-line"></div>
-      <div class="sig-lbl">ลงชื่อผู้สั่งซื้อ ........................................<br/>วันที่ ......../......../........</div>
-    </div>
-  </div>
-
-  <!-- Banking -->
-  <div class="bank-section">
-    <div class="bank-box">
-      <div class="bank-title">ข้อมูลการชำระเงิน / Payment Information</div>
-      <div class="bank-cols">
-        <div class="bank-col">
-          <div><span class="bank-lbl">ธนาคาร / Bank: </span><span class="bank-val">ธนาคารกสิกรไทย (Kasikorn Bank)</span></div>
-          <div><span class="bank-lbl">สาขา / Branch: </span><span class="bank-val">เมกา บางนา 2 (Mega Bangna 2)</span></div>
-          <div><span class="bank-lbl">Swift Code: </span><span class="bank-val">KASITHBK</span></div>
-          <div><span class="bank-lbl">รหัสธนาคาร: </span><span class="bank-val">004</span></div>
-        </div>
-        <div class="bank-col">
-          <div><span class="bank-lbl">ประเภทบัญชี: </span><span class="bank-val">ออมทรัพย์ (Saving)</span></div>
-          <div><span class="bank-lbl">ชื่อบัญชี: </span><span class="bank-val">ห้างหุ้นส่วนจำกัด ธนชัย 2018</span></div>
-          <div style="margin-top:2px;"><span class="bank-lbl">เลขที่บัญชี: </span><span class="bank-acc">051-1-72646-8</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
+<div class="pages" id="pages">
+  <!-- Rendered by JS below -->
 </div>
-</div>
-</div>
+<script is:inline define:vars={{
+  D:{num:doc.document_number,issue:doc.issue_date,due:doc.due_date,status:doc.status,po:doc.reference_po,paycond:doc.payment_condition,notes:doc.notes,sub:doc.subtotal,dd:doc.discount_design,dt:doc.discount_trade,pbv:doc.price_before_vat,vat:doc.vat_amount,total:doc.total_amount},
+  CU:{name:doc.customers?.company_name,code:doc.customers?.customer_code,addr:doc.customers?.address,phone:doc.customers?.phone,fax:doc.customers?.fax,tax:doc.customers?.tax_id},
+  TY:{th:doc.document_types?.name_th,en:doc.document_types?.name_en,code:doc.document_types?.code},
+  CATS:doc.categories,ITEMS:doc.items,isQ:isQuotation,isI:isInvoice,
+  LOGO:'https://res.cloudinary.com/dynjnftnu/image/upload/v1780149765/LOGO_TNC-03_0_liopw3.png'
+}}>
+(function(){
+  function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function f(n){return Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function td(s){if(!s)return'—';var d=new Date(s),m=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];return d.getDate()+' '+m[d.getMonth()]+' '+(d.getFullYear()+543);}
+  function baht(n){
+    var ones=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'],tens=['','สิบ','ยี่สิบ','สามสิบ','สี่สิบ','ห้าสิบ','หกสิบ','เจ็ดสิบ','แปดสิบ','เก้าสิบ'];
+    function g(n){if(n===0)return'';if(n<10)return ones[n];if(n<100)return tens[Math.floor(n/10)]+(n%10?ones[n%10]:'');return ones[Math.floor(n/100)]+'ร้อย'+g(n%100);}
+    var c=Math.round(n*100),b=Math.floor(c/100),s=c%100;if(b===0&&s===0)return'ศูนย์บาทถ้วน';
+    var r='';if(b>=1000000)r+=g(Math.floor(b/1000000))+'ล้าน';if(b%1000000>=100000)r+=g(Math.floor((b%1000000)/100000))+'แสน';if(b%100000>=10000)r+=g(Math.floor((b%100000)/10000))+'หมื่น';if(b%10000>=1000)r+=g(Math.floor((b%10000)/1000))+'พัน';if(b%1000>=100)r+=g(Math.floor((b%1000)/100))+'ร้อย';if(b%100>0)r+=g(b%100);
+    r+='บาท';r+=s>0?g(s)+'สตางค์':'ถ้วน';return r;
+  }
+
+  // Build flat rows
+  var rows=[];
+  CATS.forEach(function(cat){
+    var ci=ITEMS.filter(function(i){return i.category_id===cat.id;});
+    var ct=ci.filter(function(i){return!i.is_subtotal_row;}).reduce(function(s,i){return s+Number(i.amount||0);},0);
+    rows.push({t:'cat',cat:cat,ct:ct});
+    ci.forEach(function(item){
+      var dots=(item.item_number||'').split('.').length-1;
+      var isSub=item.is_subtotal_row;
+      var isSC=!isSub&&dots===1&&!item.quantity&&!item.unit_price;
+      rows.push({t:isSub?'sub':isSC?'sc':'item',item:item});
+    });
+  });
+
+  function rowHtml(row){
+    if(row.t==='cat')return'<tr class="row-cat"><td colspan="6">'+e(row.cat.category_number)+'. '+e(row.cat.name_th)+'</td><td class="tr">'+f(row.ct)+'</td></tr>';
+    if(row.t==='sub')return'<tr class="row-sub"><td colspan="6" class="sub-lbl">'+e(row.item.description_th)+'</td><td class="tr tw">'+f(row.item.amount)+'</td></tr>';
+    if(row.t==='sc')return'<tr class="row-subcat"><td>'+e(row.item.item_number||'')+'</td><td>'+e(row.item.item_code||'')+'</td><td colspan="5">'+e(row.item.description_th)+'</td></tr>';
+    var dots=(row.item.item_number||'').split('.').length-1;
+    return'<tr class="row-item"><td class="tc">'+e(row.item.item_number||'')+'</td><td class="tc">'+e(row.item.item_code||'')+'</td><td'+(dots>=2?' style="padding-left:18px;"':'')+'>'+e(row.item.description_th)+'</td><td class="tr">'+(row.item.quantity>0?Number(row.item.quantity).toLocaleString('th-TH'):'—')+'</td><td class="tc">'+e(row.item.unit_th||'')+'</td><td class="tr">'+(row.item.unit_price>0?f(row.item.unit_price):'—')+'</td><td class="tr tw">'+(row.item.amount>0?f(row.item.amount):'—')+'</td></tr>';
+  }
+
+  var THEAD='<table class="items"><thead><tr><th style="width:34px;">ลำดับ</th><th style="width:42px;">รหัส</th><th class="tl">รายการ</th><th style="width:52px;">จำนวน</th><th style="width:44px;">หน่วย</th><th style="width:86px;">หน่วยละ</th><th style="width:94px;">จำนวนเงิน</th></tr></thead><tbody>';
+
+  function mainHeader(){
+    return'<div class="hdr"><div class="hdr-l"><img class="logo" src="'+LOGO+'" alt="TNC"/><div class="co-name">ห้างหุ้นส่วนจำกัด ธนชัย 2018 (สำนักงานใหญ่)</div><div class="co-addr">54/6 หมู่ 8 ตำบลบางแก้ว อำเภอบางพลี จังหวัดสมุทรปราการ 10540<br/>โทรศัพท์ 02-XXX-XXXX &emsp; อีเมล: thanachai2018@gmail.com</div><div class="co-tax">เลขประจำตัวผู้เสียภาษีอากร 0113561003884</div></div><div class="hdr-r"><span class="doc-type">'+e(TY.th)+'</span><span class="doc-bar">'+e(TY.en||TY.code)+'</span>'+(D.status==='draft'?'<div><div class="draft-stamp">DRAFT</div></div>':'')+'</div></div>';
+  }
+
+  function miniHeader(pgNum,total){
+    return'<div class="mini-hdr"><div class="mini-l"><img class="mini-logo" src="'+LOGO+'" alt="TNC"/></div><div class="mini-r"><div class="mini-docnum">'+e(D.num)+'</div><div class="mini-info">'+e(CU.name)+' | '+e(TY.th)+' | '+td(D.issue)+'</div></div></div><div class="cont-label">(ต่อ) หน้า '+pgNum+' / '+total+'</div>';
+  }
+
+  function infoGrid(){
+    return'<table class="info-tbl"><tr><td style="width:50%"><span class="lbl">รหัสลูกค้า: </span><span class="val mono">'+e(CU.code)+'</span></td><td style="width:50%"><span class="lbl">วันที่ / Date: </span><span class="val">'+td(D.issue)+'</span></td></tr><tr><td colspan="2"><span class="lbl">ชื่อลูกค้า: </span><span class="val">'+e(CU.name)+'</span></td></tr><tr><td><span class="lbl">ที่อยู่: </span><span class="val">'+e(CU.addr||'—')+'</span></td><td><div><span class="lbl">เลขที่เอกสาร / No: </span><span class="val mono">'+e(D.num)+'</span></div>'+(D.po?'<div><span class="lbl">P/O: </span><span class="val mono">'+e(D.po)+'</span></div>':'')+(isI&&D.due?'<div><span class="lbl">กำหนดชำระ: </span><span class="val">'+td(D.due)+'</span></div>':'')+(D.paycond?'<div style="margin-top:4px;"><div class="lbl">เงื่อนไขการชำระเงิน:</div><div class="pay">'+e(D.paycond)+'</div></div>':'')+(isQ&&D.due?'<div class="valid-until">⚠ ราคานี้มีผลถึง: '+td(D.due)+'</div>':'')+'</td></tr><tr><td><span class="lbl">โทรศัพท์: </span><span class="val">'+e(CU.phone||'—')+'</span></td><td><span class="lbl">เลขประจำตัวผู้เสียภาษี: </span><span class="val mono">'+e(CU.tax||'—')+'</span></td></tr></table>';
+  }
+
+  function totalsHtml(){
+    return'<div class="totals-outer"><table class="totals-tbl"><tr><td class="tt-l">รวมจำนวนเงิน</td><td class="tt-r">'+f(D.sub)+' บาท</td></tr>'+(D.dd>0?'<tr><td class="tt-l">ส่วนลดค่าแบบ</td><td class="tt-r">- '+f(D.dd)+' บาท</td></tr>':'')+(D.dt>0?'<tr><td class="tt-l">ส่วนลดการค้า</td><td class="tt-r">- '+f(D.dt)+' บาท</td></tr>':'')+'<tr><td class="tt-l">ราคาก่อน VAT</td><td class="tt-r">'+f(D.pbv)+' บาท</td></tr><tr><td class="tt-l">ภาษีมูลค่าเพิ่ม 7%</td><td class="tt-r">'+f(D.vat)+' บาท</td></tr><tr class="grand"><td class="tt-l">จำนวนเงินรวมทั้งสิ้น</td><td class="tt-r">'+f(D.total)+' บาท</td></tr></table></div><div class="baht-words">จำนวนเงินเป็นตัวหนังสือ: '+baht(D.total)+'</div>';
+  }
+
+  function sigHtml(){
+    return'<div class="sig-note">ห้างหุ้นส่วนจำกัด ธนชัย 2018 หวังว่าจะได้รับการพิจารณาจากท่าน</div><div class="sig-row"><div class="sig-cell"><div class="sig-line"></div><div class="sig-lbl">ลงชื่อผู้เสนอราคา ........................................<br/>วันที่ ......../......../........</div></div><div class="sig-cell"><div class="sig-line"></div><div class="sig-lbl">ลงชื่อผู้สั่งซื้อ ........................................<br/>วันที่ ......../......../........</div></div></div>';
+  }
+
+  function bankHtml(){
+    return'<div class="bank-wrap"><div class="bank-box"><div class="bank-title">ข้อมูลการชำระเงิน / Payment Information</div><div class="bank-cols"><div class="bank-col"><div><span class="bank-lbl">ธนาคาร / Bank: </span><span class="bank-val">ธนาคารกสิกรไทย (Kasikorn Bank)</span></div><div><span class="bank-lbl">สาขา / Branch: </span><span class="bank-val">เมกา บางนา 2 (Mega Bangna 2)</span></div><div><span class="bank-lbl">Swift: </span><span class="bank-val">KASITHBK</span></div><div><span class="bank-lbl">รหัสธนาคาร: </span><span class="bank-val">004</span></div></div><div class="bank-col"><div><span class="bank-lbl">ประเภท: </span><span class="bank-val">ออมทรัพย์ (Saving)</span></div><div><span class="bank-lbl">ชื่อบัญชี: </span><span class="bank-val">ห้างหุ้นส่วนจำกัด ธนชัย 2018</span></div><div><span class="bank-lbl">เลขที่บัญชี: </span><span class="bank-acc">051-1-72646-8</span></div></div></div></div></div>';
+  }
+
+  // Measure heights using hidden div
+  var ruler=document.createElement('div');
+  ruler.style.cssText='position:fixed;top:-9999px;left:0;width:174mm;font-family:Sarabun,sans-serif;font-size:10pt;visibility:hidden;';
+  document.body.appendChild(ruler);
+  function mm(el){ruler.innerHTML=el;return ruler.getBoundingClientRect().height*(25.4/96);}
+
+  var PAGE_H=297, PAD_V=30; // 16+14 top+bottom
+  var AVAIL=PAGE_H-PAD_V;
+
+  var hdrH=mm(mainHeader());
+  var igH=mm(infoGrid());
+  var theadH=mm(THEAD+'</tbody></table>');
+  var miniH=mm(miniHeader(2,99));
+  var totH=mm(totalsHtml());
+  var sigH=mm(sigHtml());
+  var bankH=mm(bankHtml());
+  var notesH=D.notes?mm('<div class="notes"><strong>หมายเหตุ</strong><p>'+e(D.notes)+'</p></div>'):0;
+  var bottomH=totH+sigH+bankH+notesH+6;
+
+  rows.forEach(function(row){ruler.innerHTML='<table class="items"><tbody>'+rowHtml(row)+'</tbody></table>';row.h=ruler.getBoundingClientRect().height*(25.4/96);});
+  document.body.removeChild(ruler);
+
+  // Paginate
+  var pages=[],pg={first:true,rows:[],used:hdrH+igH+theadH+4};
+  rows.forEach(function(row,ri){
+    var avail=pg.first?AVAIL:AVAIL-miniH-4-theadH;
+    var last=ri===rows.length-1;
+    var need=row.h+(last?bottomH:0);
+    if(pg.used+row.h>avail){pages.push(pg);pg={first:false,rows:[],used:miniH+4+theadH};}
+    pg.rows.push(row);pg.used+=row.h;
+  });
+  pages.push(pg);
+  // If last page has no room for bottom block
+  var lp=pages[pages.length-1];
+  var lavail=lp.first?AVAIL:AVAIL-miniH-4-theadH;
+  if(lp.used+bottomH>lavail)pages.push({first:false,rows:[],used:miniH+4});
+  var total=pages.length;
+
+  var html='';
+  pages.forEach(function(pg,pi){
+    var isLast=pi===pages.length-1;
+    html+='<div class="page">';
+    if(D.status==='draft')html+='<div class="wm">DRAFT</div>';
+    if(pg.first){html+=mainHeader();html+=infoGrid();}
+    else{html+=miniHeader(pi+1,total);}
+    if(pg.rows.length>0){
+      html+=THEAD;
+      pg.rows.forEach(function(r){html+=rowHtml(r);});
+      html+='</tbody></table>';
+    }
+    if(isLast){
+      html+=totalsHtml();
+      if(D.notes)html+='<div class="notes"><strong>หมายเหตุ / Remarks</strong><p>'+e(D.notes)+'</p></div>';
+      html+=sigHtml();
+      html+=bankHtml();
+    }
+    html+='</div>';
+  });
+  document.getElementById('pages').innerHTML=html;
+})();
+</script>
 </body>
 </html>
