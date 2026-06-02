@@ -62,11 +62,11 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
 .tbtn{padding:7px 16px;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;text-decoration:none;display:inline-block;}
 .t-back{background:transparent;color:#888;border:1px solid #444;margin-right:6px;}
 .t-print{background:#112D5E;color:#fff;}
-.page-wrap{padding-top:66px;padding-bottom:48px;text-align:center;}
+.page-wrap{padding-top:66px;padding-bottom:48px;text-align:center;} .doc{page-break-after:always;}
 .doc{
   display:inline-block;
   width:210mm;
-  min-height:297mm;
+  height:auto;min-height:297mm;
   text-align:left;
   background:#fff;
   box-shadow:0 6px 40px rgba(0,0,0,.22);
@@ -77,7 +77,7 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
   font-size:9pt;
   line-height:1.6;
   color:#0D1B2A;
-  min-height:297mm;
+  height:auto;min-height:297mm;
   display:flex;
   flex-direction:column;
 }
@@ -145,7 +145,7 @@ html,body{font-family:'Sarabun',sans-serif;background:#CDD3DC;-webkit-print-colo
   .doc{width:210mm;min-height:297mm;display:block;box-shadow:none;}
   .doc-inner{padding:10mm 12mm 10mm;min-height:297mm;}
   .wm{position:fixed;}
-  @page{size:A4 portrait;margin:0;}
+  @page{size:A4 portrait;margin:0;} html,body{height:auto;} .doc{page-break-after:always;} .items tbody tr{page-break-inside:avoid;} .row-cat{page-break-after:avoid;} .bank-section{page-break-inside:avoid;} .sig-row{page-break-inside:avoid;} .totals-wrap{page-break-inside:avoid;} .amt-words{page-break-inside:avoid;}
 }
 </style>
 </head>
