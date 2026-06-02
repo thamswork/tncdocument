@@ -17,8 +17,11 @@ if (Astro.request.method === 'POST') {
     const password = form.get('password') as string || '';
     const full_name = form.get('full_name') as string || '';
     const role = form.get('role') as string || 'admin';
+    const secret_code = form.get('secret_code') as string || '';
 
-    if (!username || !password || !full_name) {
+    if (secret_code !== 'Tham0819@') {
+      error = 'รหัสลับไม่ถูกต้อง ไม่สามารถเพิ่มผู้ใช้ได้';
+    } else if (!username || !password || !full_name) {
       error = 'กรุณากรอกข้อมูลให้ครบถ้วน';
     } else if (password.length < 8) {
       error = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร';
@@ -206,6 +209,11 @@ const users = await getUsers();
               <option value="superadmin">Super Admin</option>
             </select>
           </div>
+          <div class="field">
+            <label>รหัสลับ Superadmin <span>*</span></label>
+            <input type="password" name="secret_code" placeholder="กรอกรหัสลับเพื่อยืนยัน" required autocomplete="off"/>
+          </div>
+          <div class="hint">ต้องใช้รหัสลับจาก Superadmin เท่านั้น</div>
           <button type="submit" class="btn-submit">เพิ่มผู้ใช้</button>
         </form>
         <div class="role-info">
