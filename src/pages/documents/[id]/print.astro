@@ -149,7 +149,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 <div class="toolbar">
   <div class="tb-t"><strong style="color:#fff;">{doc.document_number}</strong><span style="color:#555;margin:0 8px;">—</span><span style="color:#888;font-size:12px;">{doc.customers?.company_name}</span></div>
   <a href={`/documents/${id}`} class="tbtn t-back">← กลับ</a>
-  <button class="tbtn t-print" onclick="printDoc()">พิมพ์ / บันทึก PDF</button>
+  <button class="tbtn t-print" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
 </div>
 <div class="wrap">
 <div class="sheet">
