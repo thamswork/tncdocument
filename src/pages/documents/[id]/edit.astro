@@ -14,7 +14,7 @@ if (Astro.request.method === 'POST') {
     const body = await Astro.request.json();
     body.document.id = id;
     const skipBOQ = body.skipBOQ === true;
-    const result = await saveDocument(body.document, skipBOQ ? [] : body.categories, skipBOQ ? [] : body.items, user.id, skipBOQ);
+    const result = await saveDocument(body.document, body.categories || [], body.items || [], user.id, skipBOQ);
     if (result.error) return new Response(JSON.stringify({ error: result.error.message }), { status: 400 });
     return new Response(JSON.stringify({ id: result.document.id, document_number: result.document.document_number }), { status: 200 });
   } catch (e: any) {
