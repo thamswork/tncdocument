@@ -100,7 +100,7 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
       const mappedItems = items.map((item, i) => ({
         ...item, document_id: documentId,
         category_id: item.temp_category_id ? catMap[item.temp_category_id] : null,
-        amount: (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+        amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
         sort_order: i, temp_category_id: undefined,
       }));
       await supabaseAdmin.from('document_items').insert(mappedItems);
@@ -108,7 +108,7 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
   } else if (items.length > 0) {
     const mappedItems = items.map((item, i) => ({
       ...item, document_id: documentId,
-      amount: (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+      amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
       sort_order: i,
     }));
     await supabaseAdmin.from('document_items').insert(mappedItems);
