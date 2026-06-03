@@ -550,7 +550,7 @@ const existingItems = doc.items || [];
     render();
   };
   window.removeItem = function(tid,iid) { markBOQModified(); ibc[tid]=(ibc[tid]||[]).filter(function(i){ return i.id!==iid; }); render(); window.recalc(); };
-  window.updItem = function(tid,iid,f,v) {
+  window.updItem = function(tid,iid,f,v) { markBOQModified();
     var item=(ibc[tid]||[]).find(function(i){ return i.id===iid; });
     if(!item) return;
     item[f]=v;
@@ -629,9 +629,23 @@ const existingItems = doc.items || [];
 
   window.confirmSave = function() {
     var payCond = document.getElementById('payCond').value;
+    var totText = document.getElementById('rTot').textContent;
+    var subText = document.getElementById('rSub').textContent;
     var summary = '<strong>ยืนยันการบันทึกการเปลี่ยนแปลง</strong><br/><br/>'
-      + 'เงื่อนไขชำระเงิน: ' + (payCond ? payCond.substring(0,50) : '—')
-      + (boqModified ? '<br/><br/>BOQ: มีการเปลี่ยนแปลงรายการงาน' : '<br/><br/>BOQ: คงเดิม ไม่มีการเปลี่ยนแปลง');
+      + '<b>เงื่อนไขชำระเงิน:</b> ' + (payCond ? payCond.substring(0,60) : '—') + '<br/><br/>';
+    if (boqModified) {
+      var all = [].concat.apply([], cats.map(function(c){ return ibc[c.tid]||[]; }));
+      var nonSub = all.filter(function(i){ return !i.sub; });
+      summary += '<b>BOQ เปลี่ยนแปลง:</b><br/>'
+        + cats.map(function(cat){
+            var items = (ibc[cat.tid]||[]).filter(function(i){ return !i.sub; });
+            return '• ' + (cat.name||'หมวด '+cat.num) + ' (' + items.length + ' รายการ)';
+          }).join('<br/>') + '<br/>'
+        + 'ยอดรวม BOQ: ' + subText + '<br/>'
+        + 'ยอดสุทธิรวม VAT: ' + totText;
+    } else {
+      summary += 'BOQ: คงเดิม ไม่มีการเปลี่ยนแปลง';
+    }
     document.getElementById('modalBody').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('show');
     document.getElementById('modalConfirmBtn').onclick = async function() {
