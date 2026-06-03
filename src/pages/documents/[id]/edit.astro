@@ -168,6 +168,19 @@ const existingItems = doc.items || [];
     .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;display:none;}
     .toast.loading .spin{display:block;}
     @keyframes sp{to{transform:rotate(360deg)}}
+
+    /* Confirm modal */
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center;}
+    .modal-bg.show{display:flex;}
+    .modal{background:#fff;border-radius:10px;padding:28px;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+    .modal-title{font-size:15px;font-weight:700;margin-bottom:6px;}
+    .modal-body{font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:20px;}
+    .modal-actions{display:flex;gap:10px;}
+    .modal-cancel{flex:1;padding:10px;border:1px solid var(--border);background:transparent;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;color:var(--t2);}
+    .modal-confirm{flex:2;padding:10px;background:var(--text);color:var(--bg);border:none;border-radius:6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.04em;}
+    .modal-confirm:hover{opacity:.88;}
+    .modal-warn{background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:16px;}
+
     @media(max-width:768px){
       .main{grid-template-columns:1fr;}
       .rside{position:static;height:auto;border-left:none;border-top:1px solid var(--border);padding:16px;}
@@ -195,9 +208,15 @@ const existingItems = doc.items || [];
   <div class="tb-title">แก้ไขเอกสาร{doc.status === "published" && <span style="font-size:10px;font-weight:700;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;margin-left:8px;letter-spacing:.04em;">PUBLISHED — SUPERADMIN EDIT</span>}</div>
   <div class="tb-docnum">{doc.document_number}</div>
   <div class="tb-status"><span class="sdot" id="sDot"></span><span id="sTxt">ยังไม่ได้บันทึก</span></div>
-  <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">DRAFT</button>
-  <button class="btn btn-gold" onclick="window.savePreview()">PREVIEW PDF</button>
-  <button class="btn btn-solid" onclick="window.saveOpen()">บันทึก + เปิด</button>
+  {doc.status === 'draft' ? (
+    <>
+      <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">DRAFT</button>
+      <button class="btn btn-gold" onclick="window.savePreview()">PREVIEW PDF</button>
+      <button class="btn btn-solid" onclick="window.confirmSave()">บันทึก + เปิด</button>
+    </>
+  ) : (
+    <button class="btn btn-solid" onclick="window.confirmSave()" style="background:#B94040;">บันทึกการแก้ไข (Superadmin)</button>
+  )}
 </div>
 
 <div class="main">
@@ -327,11 +346,27 @@ const existingItems = doc.items || [];
     <textarea class="notes-inp" id="docNotes">{existingDoc.notes}</textarea>
   </div>
   <div class="act-btns">
-    <button class="act-btn btn-ol" onclick="window.saveDraft()">บันทึก Draft</button>
-    <button class="act-btn btn-gold-act" onclick="window.savePreview()">บันทึก + Preview PDF</button>
-    <button class="act-btn btn-solid-act" onclick="window.saveOpen()">บันทึก + เปิดเอกสาร</button>
+    {doc.status === 'draft' && <button class="act-btn btn-ol" onclick="window.saveDraft()">บันทึก Draft</button>}
+    {doc.status === 'draft' && <button class="act-btn btn-gold-act" onclick="window.savePreview()">บันทึก + Preview PDF</button>}
+    <button class="act-btn btn-solid-act" onclick="window.confirmSave()">{doc.status === 'published' ? 'บันทึกการแก้ไข' : 'บันทึก + เปิดเอกสาร'}</button>
   </div>
 </div>
+</div>
+
+
+<!-- Confirm Save Modal -->
+<div class="modal-bg" id="confirmModal">
+  <div class="modal">
+    <div class="modal-title">ยืนยันการบันทึก</div>
+    {doc.status === 'published' && (
+      <div class="modal-warn">เอกสารนี้ได้ออกแล้ว (Published) การแก้ไขจะมีผลกับเอกสารทันที</div>
+    )}
+    <div class="modal-body" id="modalBody">ต้องการบันทึกการเปลี่ยนแปลงและเปิดเอกสาร?</div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="document.getElementById('confirmModal').classList.remove('show')">ยกเลิก</button>
+      <button class="modal-confirm" id="modalConfirmBtn">ยืนยัน บันทึก</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast"><div class="spin"></div><span id="tMsg"></span></div>
@@ -588,6 +623,18 @@ const existingItems = doc.items || [];
 
   render();
   window.recalc();
+
+  window.confirmSave = function() {
+    document.getElementById('confirmModal').classList.add('show');
+    document.getElementById('modalConfirmBtn').onclick = async function() {
+      document.getElementById('confirmModal').classList.remove('show');
+      await window.saveOpen();
+    };
+  };
+  // Close modal on background click
+  document.getElementById('confirmModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('show');
+  });
 })();
 </script>
 </body>
