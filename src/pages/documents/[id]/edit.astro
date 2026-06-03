@@ -619,6 +619,13 @@ const existingItems = doc.items || [];
     if(!loading) setTimeout(function(){ t.className='toast'; },3500);
   }
 
+  // Store original item state for diff in popup
+  var originalItems = {};
+  cats.forEach(function(cat){
+    (ibc[cat.tid]||[]).forEach(function(item){
+      originalItems[item.id] = {qty: item.qty, price: item.price, desc: item.desc};
+    });
+  });
   render();
   window.recalc();
   // Track if BOQ was modified by user
@@ -631,21 +638,35 @@ const existingItems = doc.items || [];
     var payCond = document.getElementById('payCond').value;
     var totText = document.getElementById('rTot').textContent;
     var subText = document.getElementById('rSub').textContent;
-    var summary = '<strong>ยืนยันการบันทึกการเปลี่ยนแปลง</strong><br/><br/>'
-      + '<b>เงื่อนไขชำระเงิน:</b> ' + (payCond ? payCond.substring(0,60) : '—') + '<br/><br/>';
+    var lines = [];
     if (boqModified) {
-      var all = [].concat.apply([], cats.map(function(c){ return ibc[c.tid]||[]; }));
-      var nonSub = all.filter(function(i){ return !i.sub; });
-      summary += '<b>BOQ เปลี่ยนแปลง:</b><br/>'
-        + cats.map(function(cat){
-            var items = (ibc[cat.tid]||[]).filter(function(i){ return !i.sub; });
-            return '• ' + (cat.name||'หมวด '+cat.num) + ' (' + items.length + ' รายการ)';
-          }).join('<br/>') + '<br/>'
-        + 'ยอดรวม BOQ: ' + subText + '<br/>'
-        + 'ยอดสุทธิรวม VAT: ' + totText;
+      // Show only changed items by comparing with original
+      var changedItems = [];
+      cats.forEach(function(cat){
+        (ibc[cat.tid]||[]).filter(function(i){ return !i.sub; }).forEach(function(item){
+          var orig = originalItems[item.id];
+          if (!orig) {
+            changedItems.push('+ เพิ่ม: ' + item.desc + ' (จำนวน ' + item.qty + ' ' + item.unit + ')');
+          } else if (orig.qty !== item.qty || orig.price !== item.price) {
+            var changes = [];
+            if (orig.qty !== item.qty) changes.push('จำนวน ' + orig.qty + ' → ' + item.qty);
+            if (orig.price !== item.price) changes.push('ราคา ' + orig.price + ' → ' + item.price);
+            changedItems.push(item.desc + ': ' + changes.join(', '));
+          }
+        });
+      });
+      if (changedItems.length > 0) {
+        lines.push('<b>รายการที่เปลี่ยนแปลง:</b>');
+        changedItems.forEach(function(l){ lines.push('• ' + l); });
+        lines.push('ยอดรวมใหม่: ' + subText + ' (รวม VAT: ' + totText + ')');
+      } else {
+        lines.push('BOQ: มีการเปลี่ยนแปลงโครงสร้าง (เพิ่ม/ลบหมวดงาน)');
+        lines.push('ยอดรวมใหม่: ' + subText + ' (รวม VAT: ' + totText + ')');
+      }
     } else {
-      summary += 'BOQ: คงเดิม ไม่มีการเปลี่ยนแปลง';
+      lines.push('BOQ: คงเดิม ไม่มีการเปลี่ยนแปลง');
     }
+    var summary = '<b>เงื่อนไขชำระเงิน:</b> ' + (payCond ? payCond.substring(0,60) : '—') + '<br/><br/>' + lines.join('<br/>');
     document.getElementById('modalBody').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('show');
     document.getElementById('modalConfirmBtn').onclick = async function() {
