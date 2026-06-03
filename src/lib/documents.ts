@@ -79,12 +79,22 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
     // Fetch existing doc to preserve status
     const { data: existingDoc } = await supabaseAdmin.from('documents').select('status').eq('id', docData.id).single();
     const { status: _, ...docDataWithoutStatus } = docData;
+    const existingStatus = existingDoc?.status || 'draft';
+    
+    // For published docs: only update if categories were actually provided
+    const hasNewBOQ = categories && categories.length > 0;
+    const finalTotals = hasNewBOQ ? totals : {};
+    
     const { data: updatedDoc, error } = await supabaseAdmin.from('documents')
-      .update({ ...docDataWithoutStatus, ...totals, status: existingDoc?.status || 'draft' }).eq('id', docData.id).select().single();
+      .update({ ...docDataWithoutStatus, ...finalTotals, status: existingStatus }).eq('id', docData.id).select().single();
     if (error || !updatedDoc) return { error };
-    await supabaseAdmin.from('document_items').delete().eq('document_id', docData.id);
-    await supabaseAdmin.from('document_categories').delete().eq('document_id', docData.id);
-    await saveDocumentDetails(docData.id, categories, items);
+    
+    // Only replace BOQ if new categories were provided
+    if (hasNewBOQ) {
+      await supabaseAdmin.from('document_items').delete().eq('document_id', docData.id);
+      await supabaseAdmin.from('document_categories').delete().eq('document_id', docData.id);
+      await saveDocumentDetails(docData.id, categories, items);
+    }
     await logAction(docData.id, 'draft_saved', userId);
     return { document: updatedDoc };
   }
