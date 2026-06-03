@@ -120,20 +120,37 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
         catMap[String(i)] = sc.id;
       });
       const mappedItems = items.map((item, i) => ({
-        ...item, document_id: documentId,
+        document_id: documentId,
         category_id: item.temp_category_id ? catMap[item.temp_category_id] : null,
+        item_number: item.item_number || '',
+        item_code: item.item_code || '',
+        description_th: item.description_th || '',
+        quantity: Number(item.quantity) || 0,
+        unit_th: item.unit_th || '',
+        unit_price: Number(item.unit_price) || 0,
         amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
-        sort_order: i, temp_category_id: undefined,
+        is_subtotal_row: item.is_subtotal_row || false,
+        sort_order: i,
       }));
-      await supabaseAdmin.from('document_items').insert(mappedItems);
+      const { error: itemsError } = await supabaseAdmin.from('document_items').insert(mappedItems);
+      if (itemsError) console.error('[saveDocumentDetails] items insert error:', itemsError);
     }
   } else if (items.length > 0) {
     const mappedItems = items.map((item, i) => ({
-      ...item, document_id: documentId,
+      document_id: documentId,
+      category_id: item.category_id || null,
+      item_number: item.item_number || '',
+      item_code: item.item_code || '',
+      description_th: item.description_th || '',
+      quantity: Number(item.quantity) || 0,
+      unit_th: item.unit_th || '',
+      unit_price: Number(item.unit_price) || 0,
       amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+      is_subtotal_row: item.is_subtotal_row || false,
       sort_order: i,
     }));
-    await supabaseAdmin.from('document_items').insert(mappedItems);
+    const { error: itemsError2 } = await supabaseAdmin.from('document_items').insert(mappedItems);
+    if (itemsError2) console.error('[saveDocumentDetails] items insert error2:', itemsError2);
   }
 }
 
