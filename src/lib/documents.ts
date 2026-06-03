@@ -106,7 +106,12 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
     const { data: savedCats } = await supabaseAdmin.from('document_categories').insert(cats).select();
     if (savedCats && items.length > 0) {
       const catMap: Record<string, string> = {};
-      savedCats.forEach((sc, i) => { catMap[categories[i].temp_id || String(i)] = sc.id; });
+      // Map by temp_id AND by index as fallback
+      savedCats.forEach((sc, i) => {
+        const tid = categories[i].temp_id;
+        if (tid) catMap[tid] = sc.id;
+        catMap[String(i)] = sc.id;
+      });
       const mappedItems = items.map((item, i) => ({
         ...item, document_id: documentId,
         category_id: item.temp_category_id ? catMap[item.temp_category_id] : null,
