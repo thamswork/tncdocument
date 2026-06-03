@@ -91,9 +91,16 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
     
     // Only replace BOQ if explicitly requested
     if (!skipBOQ && hasNewBOQ) {
+      console.log('[saveDocument] Replacing BOQ - cats:', categories.length, 'items:', items.length);
       await supabaseAdmin.from('document_items').delete().eq('document_id', docData.id);
       await supabaseAdmin.from('document_categories').delete().eq('document_id', docData.id);
       await saveDocumentDetails(docData.id, categories, items);
+      // Verify after save
+      const { data: verCats } = await supabaseAdmin.from('document_categories').select('id').eq('document_id', docData.id);
+      const { data: verItems } = await supabaseAdmin.from('document_items').select('id').eq('document_id', docData.id);
+      console.log('[saveDocument] After save - cats in DB:', verCats?.length, 'items in DB:', verItems?.length);
+    } else {
+      console.log('[saveDocument] skipBOQ:', skipBOQ, 'hasNewBOQ:', hasNewBOQ, '- BOQ not touched');
     }
     await logAction(docData.id, 'draft_saved', userId);
     return { document: updatedDoc };
