@@ -528,13 +528,13 @@ const existingItems = doc.items || [];
   document.addEventListener('click', function(e) { if (!e.target.closest('.cust-wrap')) document.getElementById('custDD').classList.remove('open'); });
 
   window.setP = function(t) { document.getElementById('payCond').value = t; };
-  window.addCat = function() {
+  window.addCat = function() { markBOQModified();
     cc++; var tid='c'+cc;
     cats.push({tid:tid, num:cats.length+1, name:'', db_id:null});
     ibc[tid]=[];
     render();
   };
-  window.removeCat = function(tid) {
+  window.removeCat = function(tid) { markBOQModified();
     if (!confirm('ลบหมวดงานนี้?')) return;
     cats=cats.filter(function(c){ return c.tid!==tid; }); delete ibc[tid];
     cats.forEach(function(c,i){ c.num=i+1; });
@@ -552,8 +552,8 @@ const existingItems = doc.items || [];
     ibc[tid].push({id:'i'+Date.now()+'s', num:'', code:'', desc:'รวมราคา'+(cat.name||''), qty:0, unit:'', price:0, amt:0, sub:true});
     render();
   };
-  window.removeItem = function(tid,iid) { ibc[tid]=(ibc[tid]||[]).filter(function(i){ return i.id!==iid; }); render(); window.recalc(); };
-  window.updItem = function(tid,iid,f,v) {
+  window.removeItem = function(tid,iid) { markBOQModified(); ibc[tid]=(ibc[tid]||[]).filter(function(i){ return i.id!==iid; }); render(); window.recalc(); };
+  window.updItem = function(tid,iid,f,v) { markBOQModified();
     var item=(ibc[tid]||[]).find(function(i){ return i.id===iid; });
     if(!item) return;
     item[f]=v;
@@ -590,8 +590,8 @@ const existingItems = doc.items || [];
         discount_design:parseFloat(document.getElementById('dD').value)||0,
         discount_trade:parseFloat(document.getElementById('dT').value)||0,
       },
-      categories:cats.map(function(c,i){ return {temp_id:c.tid,category_number:c.num,name_th:c.name||'หมวดที่ '+c.num,sort_order:i}; }),
-      items:items
+      categories:boqModified ? cats.map(function(c,i){ return {temp_id:c.tid,category_number:c.num,name_th:c.name||'หมวดที่ '+c.num,sort_order:i}; }) : [],
+      items:boqModified ? items : []
     };
   }
 
@@ -623,6 +623,11 @@ const existingItems = doc.items || [];
 
   render();
   window.recalc();
+  // Track if BOQ was modified by user
+  var boqModified = false;
+  var originalCatsJSON = JSON.stringify(cats.map(function(c){ return {tid:c.tid,name:c.name,num:c.num}; }));
+  var originalItemsJSON = JSON.stringify(Object.keys(ibc).map(function(k){ return ibc[k]; }));
+  function markBOQModified() { boqModified = true; }
 
   window.confirmSave = function() {
     // Build summary of what will be saved
@@ -630,10 +635,12 @@ const existingItems = doc.items || [];
     var nonSub = all.filter(function(i){ return !i.sub; });
     var total = parseFloat(document.getElementById('rTot').textContent.replace(/[^0-9.]/g,''))||0;
     var catNames = cats.map(function(c){ return c.name||'หมวดที่ '+c.num; });
-    var summary = '<strong>สรุปที่จะบันทึก:</strong><br/>'
-      + catNames.map(function(n){ return '• '+n; }).join('<br/>')
-      + '<br/>รวม '+nonSub.length+' รายการ'
-      + '<br/>ยอดรวม: ฿'+nonSub.reduce(function(s,i){ return s+(parseFloat(i.amt)||0); },0).toLocaleString('th-TH',{minimumFractionDigits:2});
+    var totEl = document.getElementById('rTot').textContent;
+    var summary = boqModified
+      ? '<strong>สรุปที่จะบันทึก (BOQ เปลี่ยนแปลง):</strong><br/>'
+        + catNames.map(function(n){ return '• '+n; }).join('<br/>')
+        + '<br/>รวม '+nonSub.length+' รายการ ยอดรวม: '+totEl
+      : '<strong>บันทึกข้อมูลทั่วไปเท่านั้น</strong><br/>BOQ ไม่มีการเปลี่ยนแปลง<br/>รายการงานจะคงเดิม';
     document.getElementById('modalBody').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('show');
     document.getElementById('modalConfirmBtn').onclick = async function() {
