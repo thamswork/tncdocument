@@ -228,7 +228,7 @@ if (Astro.request.method === 'POST') {
             <input type="date" class="inp" id="issueDate"/>
           </div>
           <div class="fg">
-            <div class="lbl">ราคามีผลถึง / กำหนดชำระ</div>
+            <div class="lbl" id="dueDateLabel">ราคามีผลถึง</div>
             <input type="date" class="inp" id="dueDate"/>
           </div>
         </div>
@@ -595,6 +595,24 @@ if (Astro.request.method === 'POST') {
 
   render();
   window.recalc();
+
+  // Update due date label based on document type
+  function updateDueDateLabel() {
+    var sel = document.getElementById('docTypeSelect');
+    var lbl = document.getElementById('dueDateLabel');
+    if (!sel || !lbl) return;
+    var txt = sel.options[sel.selectedIndex]?.text || '';
+    if (txt.includes('Invoice') || txt.includes('ใบแจ้ง') || txt.includes('ใบวาง')) {
+      lbl.textContent = 'กำหนดชำระเงิน';
+    } else {
+      lbl.textContent = 'ราคามีผลถึง (วันหมดอายุใบเสนอ)';
+    }
+  }
+  var docTypeSel = document.getElementById('docTypeSelect');
+  if (docTypeSel) {
+    docTypeSel.addEventListener('change', updateDueDateLabel);
+    updateDueDateLabel();
+  }
 })();
 </script>
 </body>

@@ -76,8 +76,11 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
     await logAction(newDoc.id, 'draft_saved', userId);
     return { document: newDoc };
   } else {
+    // Fetch existing doc to preserve status
+    const { data: existingDoc } = await supabaseAdmin.from('documents').select('status').eq('id', docData.id).single();
+    const { status: _, ...docDataWithoutStatus } = docData;
     const { data: updatedDoc, error } = await supabaseAdmin.from('documents')
-      .update({ ...docData, ...totals }).eq('id', docData.id).select().single();
+      .update({ ...docDataWithoutStatus, ...totals, status: existingDoc?.status || 'draft' }).eq('id', docData.id).select().single();
     if (error || !updatedDoc) return { error };
     await supabaseAdmin.from('document_items').delete().eq('document_id', docData.id);
     await supabaseAdmin.from('document_categories').delete().eq('document_id', docData.id);
