@@ -625,6 +625,16 @@ const existingItems = doc.items || [];
   window.recalc();
 
   window.confirmSave = function() {
+    // Build summary of what will be saved
+    var all = [].concat.apply([], cats.map(function(c){ return ibc[c.tid]||[]; }));
+    var nonSub = all.filter(function(i){ return !i.sub; });
+    var total = parseFloat(document.getElementById('rTot').textContent.replace(/[^0-9.]/g,''))||0;
+    var catNames = cats.map(function(c){ return c.name||'หมวดที่ '+c.num; });
+    var summary = '<strong>สรุปที่จะบันทึก:</strong><br/>'
+      + catNames.map(function(n){ return '• '+n; }).join('<br/>')
+      + '<br/>รวม '+nonSub.length+' รายการ'
+      + '<br/>ยอดรวม: ฿'+nonSub.reduce(function(s,i){ return s+(parseFloat(i.amt)||0); },0).toLocaleString('th-TH',{minimumFractionDigits:2});
+    document.getElementById('modalBody').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('show');
     document.getElementById('modalConfirmBtn').onclick = async function() {
       document.getElementById('confirmModal').classList.remove('show');
