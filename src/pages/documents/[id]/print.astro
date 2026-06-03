@@ -148,19 +148,16 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   html,body{background:#fff;}
   .toolbar{display:none!important;}
   .wrap{padding:0;}
-  .sheet{box-shadow:none;padding:10mm 12mm 8mm;background-image:none;width:100%;}
+  .sheet{box-shadow:none;padding:0;background-image:none;width:100%;}
   .items thead{display:table-header-group;}
   .row-cat{page-break-after:avoid;}
   .items tbody tr{page-break-inside:avoid;}
   .tot-wrap,.bank-wrap,.sig-row,.baht-words{page-break-inside:avoid;}
-  @page{size:A4 portrait;margin:0;}
+  @page{size:A4 portrait;margin:10mm 12mm;}
 }
 
 
-@media print{
-  @page{size:A4 portrait;margin:10mm;}
-  .sheet{box-shadow:none;padding:0;background:#fff;}
-}
+
 </style>
 </head>
 <body>
