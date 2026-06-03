@@ -62,7 +62,7 @@ export function calculateTotals(items: any[], discountDesign: number, discountTr
   return { subtotal, price_before_vat: priceBeforeVat, vat_amount: vatAmount, total_amount: totalAmount };
 }
 
-export async function saveDocument(docData: any, categories: any[], items: any[], userId: string) {
+export async function saveDocument(docData: any, categories: any[], items: any[], userId: string, skipBOQ: boolean = false) {
   const isNew = !docData.id;
   const totals = calculateTotals(items, docData.discount_design || 0, docData.discount_trade || 0);
   if (isNew) {
@@ -89,8 +89,8 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
       .update({ ...docDataWithoutStatus, ...finalTotals, status: existingStatus }).eq('id', docData.id).select().single();
     if (error || !updatedDoc) return { error };
     
-    // Only replace BOQ if new categories were provided
-    if (hasNewBOQ) {
+    // Only replace BOQ if explicitly requested
+    if (!skipBOQ && hasNewBOQ) {
       await supabaseAdmin.from('document_items').delete().eq('document_id', docData.id);
       await supabaseAdmin.from('document_categories').delete().eq('document_id', docData.id);
       await saveDocumentDetails(docData.id, categories, items);
