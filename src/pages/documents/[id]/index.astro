@@ -316,7 +316,7 @@ const hasInstallments = installments.length > 0;
             <div class="aicon aicon-pdf">PDF</div>
             <div><div class="atext-title">Preview & พิมพ์</div><div class="atext-sub">เปิดหน้า PDF</div></div>
           </a>
-          {doc.status==='draft' && (
+          {(doc.status==='draft' || user.role==='superadmin') && (
             <a href={`/documents/${id}/edit`} class="aitem">
               <div class="aicon aicon-edit">✎</div>
               <div><div class="atext-title">แก้ไขเอกสาร</div><div class="atext-sub">แก้ไขรายการและข้อมูล</div></div>
