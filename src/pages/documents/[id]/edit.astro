@@ -553,7 +553,7 @@ const existingItems = doc.items || [];
     render();
   };
   window.removeItem = function(tid,iid) { markBOQModified(); ibc[tid]=(ibc[tid]||[]).filter(function(i){ return i.id!==iid; }); render(); window.recalc(); };
-  window.updItem = function(tid,iid,f,v) { markBOQModified();
+  window.updItem = function(tid,iid,f,v) {
     var item=(ibc[tid]||[]).find(function(i){ return i.id===iid; });
     if(!item) return;
     item[f]=v;
@@ -630,17 +630,10 @@ const existingItems = doc.items || [];
   function markBOQModified() { boqModified = true; }
 
   window.confirmSave = function() {
-    // Build summary of what will be saved
-    var all = [].concat.apply([], cats.map(function(c){ return ibc[c.tid]||[]; }));
-    var nonSub = all.filter(function(i){ return !i.sub; });
-    var total = parseFloat(document.getElementById('rTot').textContent.replace(/[^0-9.]/g,''))||0;
-    var catNames = cats.map(function(c){ return c.name||'หมวดที่ '+c.num; });
-    var totEl = document.getElementById('rTot').textContent;
-    var summary = boqModified
-      ? '<strong>สรุปที่จะบันทึก (BOQ เปลี่ยนแปลง):</strong><br/>'
-        + catNames.map(function(n){ return '• '+n; }).join('<br/>')
-        + '<br/>รวม '+nonSub.length+' รายการ ยอดรวม: '+totEl
-      : '<strong>บันทึกข้อมูลทั่วไปเท่านั้น</strong><br/>BOQ ไม่มีการเปลี่ยนแปลง<br/>รายการงานจะคงเดิม';
+    var payCond = document.getElementById('payCond').value;
+    var summary = '<strong>ยืนยันการบันทึกการเปลี่ยนแปลง</strong><br/><br/>'
+      + 'เงื่อนไขชำระเงิน: ' + (payCond ? payCond.substring(0,50) : '—')
+      + (boqModified ? '<br/><br/>BOQ: มีการเปลี่ยนแปลงรายการงาน' : '<br/><br/>BOQ: คงเดิม ไม่มีการเปลี่ยนแปลง');
     document.getElementById('modalBody').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('show');
     document.getElementById('modalConfirmBtn').onclick = async function() {
