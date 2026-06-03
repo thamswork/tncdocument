@@ -109,8 +109,9 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
 
 async function saveDocumentDetails(documentId: string, categories: any[], items: any[]) {
   if (categories.length > 0) {
-    const cats = categories.map((c, i) => ({ temp_id: c.temp_id, category_number: c.category_number, name_th: c.name_th, sort_order: i, document_id: documentId }));
-    const { data: savedCats } = await supabaseAdmin.from('document_categories').insert(cats).select();
+    const cats = categories.map((c, i) => ({ category_number: c.category_number, name_th: c.name_th, sort_order: i, document_id: documentId }));
+    const { data: savedCats, error: catsError } = await supabaseAdmin.from('document_categories').insert(cats).select();
+    if (catsError) console.error('[saveDocumentDetails] cats insert error:', catsError);
     if (savedCats && items.length > 0) {
       const catMap: Record<string, string> = {};
       // Map by temp_id AND by index as fallback
@@ -118,6 +119,7 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
         const tid = categories[i].temp_id;
         if (tid) catMap[tid] = sc.id;
         catMap[String(i)] = sc.id;
+        console.log('[catMap] mapped', tid, '->', sc.id);
       });
       const mappedItems = items.map((item, i) => ({
         document_id: documentId,
