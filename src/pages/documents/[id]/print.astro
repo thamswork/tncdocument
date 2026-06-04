@@ -153,7 +153,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   .row-cat{page-break-after:avoid;}
   .items tbody tr{page-break-inside:avoid;}
   .tot-wrap,.bank-wrap,.sig-row,.baht-words{page-break-inside:avoid;}
-  @page{size:A4 portrait;margin:16mm 10mm 10mm 10mm;}
+  @page{size:A4 portrait;margin:10mm;}
 }
 
 
@@ -165,6 +165,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   <div class="tb-t"><strong style="color:#fff;">{doc.document_number}</strong><span style="color:#555;margin:0 8px;">—</span><span style="color:#888;font-size:12px;">{doc.customers?.company_name}</span></div>
   <a href={`/documents/${id}`} class="tbtn t-back">← กลับ</a>
   <button class="tbtn t-print" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+  <span style="color:#666;font-size:11px;margin-left:8px;">⚠ ก่อนพิมพ์: ยกเลิกติ๊ก "Headers and footers" ในหน้าต่างพิมพ์</span>
 </div>
 <div class="wrap">
 <div class="sheet">
