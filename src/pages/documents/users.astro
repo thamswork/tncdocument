@@ -1,7 +1,6 @@
 ---
-import { getUsers } from '../../lib/documents';
 import { supabaseAdmin } from '../../lib/supabase';
-import { hashPassword } from '../../lib/auth';
+import { hashPassword, getUsers } from '../../lib/auth';
 
 const user = Astro.locals.user;
 if (user.role !== 'superadmin') return Astro.redirect('/documents/dashboard');
