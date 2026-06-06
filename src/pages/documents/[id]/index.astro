@@ -311,14 +311,27 @@ const hasInstallments = true; // always show — every project can have installm
       </div>
 
       <div class="inst-card">
-          <div class="inst-title">📋 งวดการชำระเงิน</div>
-          {installments.map((inst: any) => (
-            <div class="inst-row">
-              <span class="inst-pct">{inst.pct}%</span>
-              <span class="inst-label">{inst.label}</span>
-              <span class="inst-amount">฿{money(inst.amount)}</span>
-            </div>
-          ))}
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div class="inst-title" style="margin-bottom:0;">งวดการชำระเงิน</div>
+            <button onclick="toggleInstEdit()" id="instEditBtn" style="font-size:10px;font-weight:600;color:var(--gold);background:none;border:1px solid var(--gborder);border-radius:4px;cursor:pointer;font-family:inherit;padding:2px 8px;">แก้ไข</button>
+          </div>
+          <div id="instPreview">
+            {installments.length > 0 ? installments.map((inst: any) => (
+              <div class="inst-row">
+                <span class="inst-pct">{inst.pct}%</span>
+                <span class="inst-label">{inst.label}</span>
+                <span class="inst-amount">฿{money(inst.amount)}</span>
+              </div>
+            )) : (
+              <div style="font-size:11.5px;color:var(--t3);padding:4px 0 8px;">ยังไม่มีเงื่อนไข — กด "แก้ไข" เพื่อเพิ่ม</div>
+            )}
+          </div>
+          <div id="instEditBox" style="display:none;margin-bottom:10px;">
+            <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">เงื่อนไขการชำระเงิน</div>
+            <textarea id="instEditTA" rows="5" style="width:100%;padding:8px 10px;font-size:12px;font-family:inherit;border:1.5px solid var(--gborder);border-radius:4px;background:var(--white);resize:vertical;line-height:1.8;">{doc.payment_condition||''}</textarea>
+            <div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.6;">พิมพ์แต่ละงวดในบรรทัดใหม่ เช่น:<br/>30% เมื่อตกลงทำสัญญา<br/>70% เมื่อส่งมอบงาน</div>
+            <button onclick="saveInstCondition()" style="margin-top:8px;width:100%;padding:8px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;">บันทึกเงื่อนไข</button>
+          </div>
           <button class="inst-gen-btn" id="genInstBtn">สร้างใบแจ้งหนี้งวด →</button>
         </div>
 
@@ -557,6 +570,27 @@ const hasInstallments = true; // always show — every project can have installm
   });
 
   // ── Copy link ─────────────────────────────────────────────────
+  window.toggleInstEdit = function() {
+    var box = document.getElementById('instEditBox');
+    var btn = document.getElementById('instEditBtn');
+    var preview = document.getElementById('instPreview');
+    var isHidden = box.style.display === 'none';
+    box.style.display = isHidden ? '' : 'none';
+    preview.style.display = isHidden ? 'none' : '';
+    btn.textContent = isHidden ? 'ยกเลิก' : 'แก้ไข';
+  };
+  window.saveInstCondition = async function() {
+    var val = document.getElementById('instEditTA').value.trim();
+    try {
+      var res = await fetch('/documents/api/update-payment-condition', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ doc_id: docId, payment_condition: val })
+      });
+      if (res.ok) { window.location.reload(); }
+      else { alert('บันทึกไม่สำเร็จ'); }
+    } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
+  };
   window.copyLink = function() {
     var url = 'https://tncdocument.pages.dev/documents/' + docId + '/print';
     navigator.clipboard.writeText(url).then(function() {
