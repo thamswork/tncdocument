@@ -454,7 +454,7 @@ const hasInstallments = true; // always show — every project can have installm
       '<input type="number" class="cinp pct-inp" placeholder="%" min="1" max="100" step="0.01" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;width:100%;" oninput="updateCustomSummary()" data-row="'+customRowCount+'" value="'+(pct||'')+'"/>'+
       '<input type="text" class="cinp lbl-inp" placeholder="รายละเอียดงวด" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;width:100%;" data-row="'+customRowCount+'" value="'+(label||'')+'"/>'+
       '<span class="amt-lbl" style="font-size:11px;font-weight:600;white-space:nowrap;min-width:80px;text-align:right;">฿—</span>'+
-      '<button onclick="removeInstRow(''+id+'')" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0 4px;">×</button>';
+      '<button onclick="removeInstRow(\'' + id + '\')" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0 4px;">×</button>';
     document.getElementById('customRows').appendChild(div);
     updateCustomSummary();
   }
