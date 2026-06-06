@@ -316,6 +316,10 @@ const hasInstallments = installments.length > 0;
             <div class="aicon aicon-pdf">PDF</div>
             <div><div class="atext-title">Preview & พิมพ์</div><div class="atext-sub">เปิดหน้า PDF</div></div>
           </a>
+          <button onclick={`copyLink('${id}')`} class="aitem" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:inherit;">
+            <div class="aicon" style="background:#E8F4FD;color:#1A6FA8;font-size:11px;font-weight:700;">URL</div>
+            <div><div class="atext-title">คัดลอกลิงก์</div><div class="atext-sub" id="copy-hint-{id}">ส่งให้ลูกค้าดูเอกสาร</div></div>
+          </button>
           {(doc.status==='draft' || user.role==='superadmin') && (
             <a href={`/documents/${id}/edit`} class="aitem">
               <div class="aicon aicon-edit">✎</div>
@@ -397,6 +401,20 @@ const hasInstallments = installments.length > 0;
       window.location.href = '/documents/new?' + params.toString();
     });
     if (modal) modal.addEventListener('click', function(e){ if(e.target===modal) modal.classList.remove('show'); });
+  function copyLink(docId) {
+    const url = 'https://tncdocument.pages.dev/documents/' + docId + '/print';
+    navigator.clipboard.writeText(url).then(() => {
+      const hint = document.getElementById('copy-hint-' + docId);
+      if (hint) {
+        hint.textContent = 'คัดลอกแล้ว!';
+        hint.style.color = '#2D7A4F';
+        setTimeout(() => {
+          hint.textContent = 'ส่งให้ลูกค้าดูเอกสาร';
+          hint.style.color = '';
+        }, 2000);
+      }
+    });
+  }
   </script>
 </body>
 </html>

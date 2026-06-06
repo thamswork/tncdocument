@@ -18,6 +18,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (pathname === '/documents/api/login') {
     return next();
   }
+  // Allow public print/view links for customers
+  if (pathname.endsWith('/print')) {
+    return next();
+  }
 
   // Check session cookie
   const token = context.cookies.get(SESSION_COOKIE)?.value;
