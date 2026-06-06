@@ -316,9 +316,9 @@ const hasInstallments = installments.length > 0;
             <div class="aicon aicon-pdf">PDF</div>
             <div><div class="atext-title">Preview & พิมพ์</div><div class="atext-sub">เปิดหน้า PDF</div></div>
           </a>
-          <button onclick={`copyLink('${id}')`} class="aitem" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:inherit;">
+          <button onclick="copyLink()" class="aitem" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:inherit;">
             <div class="aicon" style="background:#E8F4FD;color:#1A6FA8;font-size:11px;font-weight:700;">URL</div>
-            <div><div class="atext-title">คัดลอกลิงก์</div><div class="atext-sub" id={`copy-hint-${id}`}>ส่งให้ลูกค้าดูเอกสาร</div></div>
+            <div><div class="atext-title">คัดลอกลิงก์</div><div class="atext-sub" id="copy-hint">ส่งให้ลูกค้าดูเอกสาร</div></div>
           </button>
           {(doc.status==='draft' || user.role==='superadmin') && (
             <a href={`/documents/${id}/edit`} class="aitem">
