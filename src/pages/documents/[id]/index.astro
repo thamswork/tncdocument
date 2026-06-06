@@ -159,10 +159,29 @@ const hasInstallments = installments.length > 0;
     .modal-cancel{flex:1;padding:9px;border:1px solid var(--border);background:transparent;border-radius:4px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;}
     .modal-confirm{flex:2;padding:9px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.04em;text-transform:uppercase;}
     @media(max-width:768px){
-      .topbar{padding:0 14px;gap:6px;}.tb-cust{display:none;}.tb-actions .spill{display:none;}
-      .layout{display:block;}.main{padding:14px 12px;border-right:none;}
+      .topbar{padding:0 14px;gap:6px;height:auto;min-height:52px;}
+      .tb-cust{display:none;}
+      .tb-actions .spill{display:none;}
+      .layout{display:block;}
+      .main{padding:14px 12px;border-right:none;}
       .aside{border-top:1px solid var(--border);padding:16px 12px;}
       .info-grid{grid-template-columns:1fr;}
+      /* bigger tap targets for action items */
+      .aitem{padding:14px 13px;}
+      .aicon{width:36px;height:36px;}
+      .atext-title{font-size:14px;}
+      .atext-sub{font-size:12px;}
+      /* BOQ table scroll on mobile */
+      .boq-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+      .boq-tbl{min-width:500px;}
+      /* summary panel full width */
+      .sum-row{font-size:13px;}
+      .sum-total{font-size:18px;}
+    }
+    @media(max-width:480px){
+      .tb-docnum{font-size:12px;}
+      .info-grid{gap:8px;}
+      .panel-sec{padding:14px 12px;}
     }
   </style>
 </head>

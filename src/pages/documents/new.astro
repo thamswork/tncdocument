@@ -188,8 +188,12 @@ if (Astro.request.method === 'POST') {
     }
     @media(max-width:480px){
       .fg2{grid-template-columns:1fr;}
-      /* On very small screens hide DRAFT button - keep Preview and Save */
       .btn-ol.draft-btn{display:none;}
+      /* inputs easier to tap */
+      input,select,textarea{font-size:16px!important;}
+      .itbl th{font-size:7pt;padding:4px 3px;}
+      .itbl td input{min-width:60px;}
+      .card-hd{padding:12px 14px;}
     }
   </style>
 </head>

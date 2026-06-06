@@ -170,6 +170,11 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
       .stat-card:first-child{grid-column:auto;}
       .tbl th:nth-child(2),.tbl td:nth-child(2){display:none;}
       .tbl th:nth-child(6),.tbl td:nth-child(6){display:none;}
+      .tbl th:nth-child(5),.tbl td:nth-child(5){display:none;}
+      /* make rows more tappable */
+      .tbl td{padding:14px 10px;}
+      .tbl tr{cursor:pointer;}
+      .content{padding:12px;}
     }
   </style>
 </head>
