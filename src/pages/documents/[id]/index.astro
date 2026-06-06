@@ -139,6 +139,7 @@ const hasInstallments = installments.length > 0;
     .aicon-edit{background:var(--gbg);color:var(--gold);}
     .aicon-pub{background:var(--grbg);color:var(--green);}
     .aicon-del{background:#FEF2F2;color:var(--red);}
+    .aicon-url{background:#E8F4FD;color:#1A6FA8;font-size:11px;font-weight:700;}
     .atext-title{font-size:13px;font-weight:600;color:var(--text);}
     .atext-sub{font-size:11px;color:var(--t3);margin-top:1px;}
     .warn-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:5px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:12px;}
@@ -316,8 +317,8 @@ const hasInstallments = installments.length > 0;
             <div class="aicon aicon-pdf">PDF</div>
             <div><div class="atext-title">Preview & พิมพ์</div><div class="atext-sub">เปิดหน้า PDF</div></div>
           </a>
-          <button onclick="copyLink()" class="aitem" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:inherit;">
-            <div class="aicon" style="background:#E8F4FD;color:#1A6FA8;font-size:11px;font-weight:700;">URL</div>
+          <button onclick="copyLink()" class="aitem">
+            <div class="aicon aicon-url">URL</div>
             <div><div class="atext-title">คัดลอกลิงก์</div><div class="atext-sub" id="copy-hint">ส่งให้ลูกค้าดูเอกสาร</div></div>
           </button>
           {(doc.status==='draft' || user.role==='superadmin') && (
