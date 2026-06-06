@@ -70,6 +70,10 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   z-index:9999;
   overflow:hidden;
 }
+@media print{
+  .wm{position:absolute;top:0;left:0;width:100%;height:100%;}
+  .wm img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg)!important;}
+}
 
 @media print{
   .wm{position:absolute;top:0;left:0;width:100%;height:100%;}
@@ -165,6 +169,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   .row-cat{page-break-after:avoid;}
   .items tbody tr{page-break-inside:avoid;}
   .tot-wrap,.bank-wrap,.sig-row,.baht-words{page-break-inside:avoid;}
+  .sheet-scaler{transform:none!important;width:100%!important;margin:0!important;}
   @page{size:A4 portrait;margin:10mm;}
 }
 
