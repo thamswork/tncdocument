@@ -149,8 +149,10 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   .tbtn{padding:9px 16px;font-size:11px;}
   .wrap{padding:70px 0 24px;background:#888;}
   .sheet-scaler{
-    transform-origin:top left;
+    transform-origin:top center;
     display:block;
+    width:794px;
+    margin:0 auto;
   }
 }
 
@@ -311,24 +313,24 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 <script>
 function printDoc(){ window.print(); }
 function scaleSheet(){
+  var el=document.querySelector('.sheet-scaler');
+  var sh=document.querySelector('.sheet');
+  if(!el||!sh)return;
   if(window.innerWidth>820){
-    document.querySelector('.sheet-scaler').style.transform='';
-    document.querySelector('.sheet-scaler').style.width='';
-    document.querySelector('.wrap').style.paddingBottom='';
+    el.style.transform='';
+    el.style.marginBottom='';
+    el.parentElement.style.height='';
     return;
   }
-  var scale=window.innerWidth/794;
-  var el=document.querySelector('.sheet-scaler');
-  if(!el)return;
+  var vw=window.innerWidth;
+  var scale=vw/794;
   el.style.transform='scale('+scale+')';
-  el.style.transformOrigin='top left';
-  el.style.width=(794)+'px';
-  var sh=document.querySelector('.sheet');
-  if(sh){
-    var h=sh.offsetHeight*scale;
-    document.querySelector('.wrap').style.paddingBottom='24px';
-    el.style.marginBottom=(sh.offsetHeight*(scale-1))+'px';
-  }
+  el.style.transformOrigin='top center';
+  el.style.display='block';
+  el.style.width='794px';
+  el.style.marginLeft='calc(50% - 397px)';
+  // collapse the extra space the unscaled element takes
+  el.style.marginBottom=(sh.offsetHeight*(scale-1))+'px';
 }
 scaleSheet();
 window.addEventListener('resize',scaleSheet);
