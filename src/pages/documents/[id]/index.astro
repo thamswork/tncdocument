@@ -433,7 +433,7 @@ const hasInstallments = true; // always show — every project can have installm
     return Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
 
-  function switchInstTab(tab) {
+  window.switchInstTab = function(tab) {
     var isPreset = tab === 'preset';
     document.getElementById('tabPresetContent').style.display = isPreset ? '' : 'none';
     document.getElementById('tabCustomContent').style.display = isPreset ? 'none' : '';
@@ -443,7 +443,7 @@ const hasInstallments = true; // always show — every project can have installm
     document.getElementById('tabCustom').style.color = isPreset ? 'var(--t2)' : 'var(--bg)';
   }
 
-  function addInstRow(pct, label) {
+  window.addInstRow = function(pct, label) {
     customRowCount++;
     var id = 'row_' + customRowCount;
     var div = document.createElement('div');
@@ -459,13 +459,13 @@ const hasInstallments = true; // always show — every project can have installm
     updateCustomSummary();
   }
 
-  function removeInstRow(id) {
+  window.removeInstRow = function(id) {
     var el = document.getElementById(id);
     if (el) el.remove();
     updateCustomSummary();
   }
 
-  function updateCustomSummary() {
+  window.updateCustomSummary = function() {
     var rows = document.querySelectorAll('#customRows > div');
     var total = 0;
     rows.forEach(function(row) {
@@ -498,7 +498,7 @@ const hasInstallments = true; // always show — every project can have installm
     }
   }
 
-  function openInstModal() {
+  window.openInstModal = function() {
     // Set subtitle
     document.getElementById('instModalSub').textContent = docNum + ' • ยอดรวม ฿' + money(TOTAL);
     // Build preset list
