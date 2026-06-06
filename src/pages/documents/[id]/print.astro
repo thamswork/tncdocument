@@ -125,7 +125,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .sig-note{text-align:center;font-size:8pt;color:#999;padding:6px 0;border-top:1px solid #e0e0e0;margin:10px 0 8px;}
 .sig-row{display:table;width:100%;table-layout:fixed;}
 .sig-cell{display:table-cell;text-align:center;padding:0 24px;width:50%;}
-.sig-line{border-top:1px solid #bbb;margin:30px 8px 7px;}
+.sig-line{border-top:1px solid #bbb;margin:16px 8px 7px;}
 .sig-lbl{font-size:7.5pt;color:#999;line-height:2;}
 /* bank */
 .bank-wrap{margin-top:14px;padding-top:12px;border-top:2px solid #112D5E;}
@@ -136,18 +136,112 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .bank-lbl{color:#666;}
 .bank-val{color:#0D1B2A;font-weight:600;}
 .bank-acc{font-size:11pt;font-weight:700;color:#112D5E;letter-spacing:.06em;}
-/* mobile — scale the A4 sheet to fit screen, same layout as PDF */
+/* ── Mobile card layout (screen only, never affects print) ── */
 @media screen and (max-width:768px){
-  .toolbar{height:auto;min-height:50px;flex-wrap:wrap;padding:8px 14px;gap:8px;}
-  .tb-t{width:100%;font-size:12px;order:-1;}
-  .tbtn{padding:8px 14px;font-size:11px;}
-  .wrap{padding:58px 0 16px;overflow-x:hidden;}
-  /* scale sheet to fit viewport — keeps exact PDF layout */
+  /* toolbar */
+  .toolbar{height:auto;min-height:52px;flex-wrap:wrap;padding:8px 14px;gap:6px;}
+  .tb-t{width:100%;font-size:12px;order:-1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tbtn{padding:9px 16px;font-size:11px;flex-shrink:0;}
+  /* wrap & sheet */
+  .wrap{padding:60px 0 32px;background:#f0eff0;}
   .sheet{
-    transform-origin:top center;
-    transform:scale(var(--sheet-scale, 0.45));
-    margin-bottom:calc((var(--sheet-scale, 0.45) - 1) * 297mm);
+    width:100%!important;
+    box-shadow:none;
+    padding:0;
+    background:transparent;
+    font-size:10pt;
   }
+  /* watermark smaller on mobile */
+  .wm img{width:200px!important;}
+  /* header card */
+  .hdr{
+    display:block;
+    background:#fff;
+    margin:0 0 2px;
+    padding:16px 16px 14px;
+    border-bottom:none;
+    border-radius:0;
+  }
+  .hdr-l{display:block;width:100%;padding-right:0;margin-bottom:12px;}
+  .hdr-r{display:block;width:100%;text-align:left;padding:0;}
+  .logo{width:110px;margin-bottom:4px;}
+  .co-name{font-size:10pt;}
+  .co-addr{font-size:8pt;line-height:1.6;}
+  .co-tax{font-size:8pt;}
+  .doc-type{font-size:22pt;line-height:1.3;}
+  .doc-bar{font-size:8pt;padding:3px 12px;margin-top:4px;}
+  /* info table card */
+  .info-tbl{
+    margin:0 0 2px;
+    border-left:none;
+    border-right:none;
+    border-radius:0;
+    font-size:10pt;
+  }
+  .info-tbl td{padding:8px 16px;}
+  /* items card */
+  .items-wrap{
+    background:#fff;
+    margin:0 0 2px;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .items{min-width:520px;margin-bottom:0;font-size:9pt;}
+  .items th{padding:8px 8px;font-size:8pt;}
+  .items td{padding:6px 8px;}
+  /* totals card */
+  .tot-wrap{
+    background:#fff;
+    margin:0 0 2px;
+    padding:12px 16px;
+  }
+  .tot-tbl{min-width:unset;width:100%;}
+  .tot-tbl td{padding:4px 8px;font-size:10pt;}
+  .grand td{font-size:12pt;}
+  /* baht words */
+  .baht-words{
+    margin:0 0 2px;
+    padding:10px 16px;
+    font-size:9pt;
+    border-left:none;
+    border-right:none;
+  }
+  /* signature card */
+  .sig-note{
+    background:#fff;
+    margin:0 0 0;
+    padding:10px 16px;
+    font-size:8.5pt;
+    border-top:none;
+  }
+  .sig-row{
+    display:table;
+    width:100%;
+    background:#fff;
+    padding:0 8px 16px;
+    margin:0 0 2px;
+  }
+  .sig-cell{display:table-cell;width:50%;padding:0 8px;text-align:center;}
+  .sig-line{margin:16px 4px 6px;}
+  .sig-lbl{font-size:8pt;line-height:1.6;}
+  /* bank card */
+  .bank-wrap{
+    margin:0;
+    padding:0;
+    border-top:none;
+  }
+  .bank-box{
+    border-radius:0;
+    border-left:none;
+    border-right:none;
+    border-bottom:none;
+    padding:14px 16px;
+  }
+  .bank-title{font-size:10pt;}
+  .bank-cols{display:block;}
+  .bank-col{display:block;width:100%;font-size:9pt;line-height:1.8;}
+  .bank-col:first-child{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #dde3f0;}
+  .bank-acc{font-size:12pt;}
 }
 /* print — always full A4, never touched by mobile CSS */
 @media print{
@@ -306,28 +400,6 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 </div>
 <script>
 function printDoc(){ window.print(); }
-function scaleSheet() {
-  var sheet = document.querySelector('.sheet');
-  if (!sheet) return;
-  var vw = window.innerWidth;
-  if (vw >= 769) {
-    sheet.style.removeProperty('--sheet-scale');
-    document.documentElement.style.removeProperty('--sheet-scale');
-    return;
-  }
-  // 210mm = 793.7px at 96dpi
-  var sheetPx = 793.7;
-  var scale = (vw - 16) / sheetPx;
-  document.documentElement.style.setProperty('--sheet-scale', scale);
-  // adjust wrap height so no gap below
-  var wrap = document.querySelector('.wrap');
-  if (wrap) {
-    var scaledHeight = sheet.scrollHeight * scale;
-    wrap.style.paddingBottom = '24px';
-  }
-}
-scaleSheet();
-window.addEventListener('resize', scaleSheet);
 </script>
 </body>
 </html>
