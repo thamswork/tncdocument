@@ -136,42 +136,34 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .bank-lbl{color:#666;}
 .bank-val{color:#0D1B2A;font-weight:600;}
 .bank-acc{font-size:11pt;font-weight:700;color:#112D5E;letter-spacing:.06em;}
-/* mobile */
-@media(max-width:768px){
+/* mobile — screen only, never affects print */
+@media screen and (max-width:768px){
   .toolbar{height:auto;min-height:50px;flex-wrap:wrap;padding:8px 14px;gap:8px;}
   .tb-t{width:100%;font-size:12px;order:-1;}
   .tbtn{padding:8px 14px;font-size:11px;}
-  .wrap{padding:58px 0 24px;}
-  .sheet{width:100%;box-shadow:none;padding:6mm 4mm 6mm;}
+  .wrap{padding:58px 8px 24px;}
+  .sheet{width:100%;box-shadow:none;padding:5mm 4mm;}
   .hdr{display:block;}
-  .hdr-l{display:block;width:100%;padding-right:0;margin-bottom:10px;}
-  .hdr-r{display:block;width:100%;text-align:left;padding-top:0;}
-  .logo{width:120px;}
-  .doc-type{font-size:20pt;}
-  .info-tbl td{display:block;width:100%!important;border-right:none;}
-  .items{font-size:8pt;}
-  .items th{padding:5px 4px;font-size:7pt;}
-  .items td{padding:3px 4px;}
-  /* hide less important columns on small screens */
-  .items th:nth-child(2),.items td:nth-child(2){display:none;}
+  .hdr-l{display:block;width:100%;padding-right:0;margin-bottom:8px;}
+  .hdr-r{display:block;width:100%;text-align:left;padding-top:4px;}
+  .logo{width:110px;}
+  .doc-type{font-size:18pt;}
   .tot-tbl{min-width:unset;width:100%;}
   .bank-cols{display:block;}
-  .bank-col{display:block;width:100%;}
+  .bank-col{display:block;width:100%;margin-bottom:4px;}
   .sig-row{display:block;}
-  .sig-cell{display:block;width:100%;padding:0;margin-bottom:16px;}
-  .sig-line{margin:24px 0 6px;}
-  .wm img{width:240px!important;}
+  .sig-cell{display:block;width:100%;padding:0;margin-bottom:14px;}
+  .sig-line{margin:20px 0 6px;}
+  .wm img{width:220px!important;}
+  /* items table — horizontal scroll on screen */
+  .items-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .items{min-width:480px;}
 }
-@media(max-width:480px){
-  .sheet{padding:4mm 3mm;}
-  .doc-type{font-size:16pt;}
-  .co-name{font-size:8pt;}
-  .co-addr{font-size:7pt;}
-  /* stack item columns further */
-  .items th:nth-child(5),.items td:nth-child(5){display:none;}
-  .baht-words{font-size:8pt;}
+@media screen and (max-width:480px){
+  .doc-type{font-size:15pt;}
+  .co-name{font-size:8.5pt;}
 }
-/* print */
+/* print — always full A4, never touched by mobile CSS */
 @media print{
   html,body{background:#fff;}
   .toolbar{display:none!important;}
@@ -235,7 +227,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <td><span class="lbl">เลขประจำตัวผู้เสียภาษี: </span><span class="val mono">{doc.customers?.tax_id||'—'}</span></td>
     </tr>
   </table>
-  <table class="items">
+  <div class="items-wrap"><table class="items">
     <thead>
       <tr>
         <th style="width:34px;">ลำดับ</th>
@@ -288,7 +280,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         );
       })}
     </tbody>
-  </table>
+  </table></div>
   <div class="tot-wrap">
     <table class="tot-tbl">
       <tr><td class="tt-l">รวมจำนวนเงิน</td><td class="tt-r">{fmt(doc.subtotal)} บาท</td></tr>
