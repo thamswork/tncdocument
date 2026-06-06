@@ -379,48 +379,186 @@ const hasInstallments = installments.length > 0;
     </div>
   </div>
 
-  {hasInstallments && (
-    <div class="modal-overlay" id="instModal">
-      <div class="modal">
+  <div class="modal-overlay" id="instModal">
+    <div class="modal" style="width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         <div class="modal-title">สร้างใบแจ้งหนี้งวด</div>
-        <div class="modal-sub">เลือกงวดที่ต้องการสร้างใบแจ้งหนี้</div>
-        {installments.map((inst: any, idx: number) => (
-          <label class="modal-opt">
-            <input type="radio" name="instChoice" value={idx}/>
-            <div>
-              <div class="modal-opt-main">{inst.pct}% — ฿{money(inst.amount)}</div>
-              <div class="modal-opt-sub">{inst.label}</div>
-            </div>
-          </label>
-        ))}
-        <div class="modal-btns">
-          <button class="modal-cancel" id="instCancel">ยกเลิก</button>
-          <button class="modal-confirm" id="instConfirm">สร้างใบแจ้งหนี้</button>
+        <button onclick="document.getElementById('instModal').classList.remove('show')" style="background:none;border:none;font-size:20px;color:var(--t3);cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div class="modal-sub" id="instModalSub"></div>
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-bottom:14px;" id="instTabs">
+        <button onclick="switchInstTab('preset')" id="tabPreset" style="flex:1;padding:7px;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;border:none;background:var(--text);color:var(--bg);">ใช้เงื่อนไขเดิม</button>
+        <button onclick="switchInstTab('custom')" id="tabCustom" style="flex:1;padding:7px;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;border:none;background:var(--bg);color:var(--t2);">กำหนดเอง</button>
+      </div>
+      <!-- Preset tab -->
+      <div id="tabPresetContent">
+        <div id="presetList"></div>
+        <div style="font-size:11px;color:var(--t3);margin-top:8px;">เลือก 1 งวดเพื่อสร้างใบแจ้งหนี้</div>
+      </div>
+      <!-- Custom tab -->
+      <div id="tabCustomContent" style="display:none;">
+        <div id="customRows" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+        <button onclick="addInstRow()" style="width:100%;padding:7px;background:var(--bg);border:1px dashed var(--border);border-radius:4px;font-size:12px;color:var(--t2);cursor:pointer;font-family:inherit;">+ เพิ่มงวด</button>
+        <div id="instSummary" style="margin-top:10px;padding:8px 12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--t2);display:flex;justify-content:space-between;">
+          <span>รวม</span><span id="instTotalPct" style="font-weight:700;">0%</span>
         </div>
+        <div id="instWarning" style="display:none;margin-top:6px;padding:7px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;font-size:11.5px;color:var(--red);"></div>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px;">เลือก 1 งวดเพื่อสร้างใบแจ้งหนี้</div>
+      </div>
+      <div class="modal-btns" style="margin-top:14px;">
+        <button class="modal-cancel" onclick="document.getElementById('instModal').classList.remove('show')">ยกเลิก</button>
+        <button class="modal-confirm" id="instConfirm">สร้างใบแจ้งหนี้ →</button>
       </div>
     </div>
-  )}
+  </div>
 
-  <script is:inline define:vars={{ installments, docId: id }}>
-    var btn = document.getElementById('genInstBtn');
-    var modal = document.getElementById('instModal');
-    var cancel = document.getElementById('instCancel');
-    var confirm2 = document.getElementById('instConfirm');
-    if (btn) btn.addEventListener('click', function(){ modal.classList.add('show'); });
-    if (cancel) cancel.addEventListener('click', function(){ modal.classList.remove('show'); });
-    if (confirm2) confirm2.addEventListener('click', function(){
+  <script is:inline define:vars={{ installments, docId: id, docNum: doc.document_number, docTotal: doc.total_amount, docCustomerId: doc.customer_id }}>
+  // ── Installment Modal ─────────────────────────────────────────
+  var TOTAL = Number(docTotal) || 0;
+  var customRowCount = 0;
+
+  function money(n) {
+    return Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function switchInstTab(tab) {
+    var isPreset = tab === 'preset';
+    document.getElementById('tabPresetContent').style.display = isPreset ? '' : 'none';
+    document.getElementById('tabCustomContent').style.display = isPreset ? 'none' : '';
+    document.getElementById('tabPreset').style.background = isPreset ? 'var(--text)' : 'var(--bg)';
+    document.getElementById('tabPreset').style.color = isPreset ? 'var(--bg)' : 'var(--t2)';
+    document.getElementById('tabCustom').style.background = isPreset ? 'var(--bg)' : 'var(--text)';
+    document.getElementById('tabCustom').style.color = isPreset ? 'var(--t2)' : 'var(--bg)';
+  }
+
+  function addInstRow(pct, label) {
+    customRowCount++;
+    var id = 'row_' + customRowCount;
+    var div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = 'display:grid;grid-template-columns:36px 70px 1fr auto auto;gap:6px;align-items:center;';
+    div.innerHTML =
+      '<input type="radio" name="customChoice" value="'+customRowCount+'" style="width:16px;height:16px;accent-color:var(--text);" onchange="updateCustomSummary()"/>'+
+      '<input type="number" class="cinp pct-inp" placeholder="%" min="1" max="100" step="0.01" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;width:100%;" oninput="updateCustomSummary()" data-row="'+customRowCount+'" value="'+(pct||'')+'"/>'+
+      '<input type="text" class="cinp lbl-inp" placeholder="รายละเอียดงวด" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;width:100%;" data-row="'+customRowCount+'" value="'+(label||'')+'"/>'+
+      '<span class="amt-lbl" style="font-size:11px;font-weight:600;white-space:nowrap;min-width:80px;text-align:right;">฿—</span>'+
+      '<button onclick="removeInstRow(''+id+'')" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0 4px;">×</button>';
+    document.getElementById('customRows').appendChild(div);
+    updateCustomSummary();
+  }
+
+  function removeInstRow(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+    updateCustomSummary();
+  }
+
+  function updateCustomSummary() {
+    var rows = document.querySelectorAll('#customRows > div');
+    var total = 0;
+    rows.forEach(function(row) {
+      var pctInp = row.querySelector('.pct-inp');
+      var amtLbl = row.querySelector('.amt-lbl');
+      var pct = parseFloat(pctInp?.value) || 0;
+      total += pct;
+      var amt = Math.round(TOTAL * pct / 100 * 100) / 100;
+      if (amtLbl) amtLbl.textContent = pct > 0 ? '฿'+money(amt) : '฿—';
+    });
+    var pctEl = document.getElementById('instTotalPct');
+    var warn = document.getElementById('instWarning');
+    if (pctEl) {
+      pctEl.textContent = total.toFixed(2).replace(/\.00$/,'') + '%';
+      pctEl.style.color = Math.abs(total - 100) < 0.01 ? 'var(--green)' : total > 100 ? 'var(--red)' : 'var(--text)';
+    }
+    if (warn) {
+      if (total > 100) {
+        warn.style.display = '';
+        warn.textContent = 'รวมเกิน 100% — กรุณาตรวจสอบ';
+      } else if (total < 100 && total > 0) {
+        warn.style.display = '';
+        warn.textContent = 'รวม ' + total.toFixed(2) + '% — ยังไม่ครบ 100% (สามารถสร้างได้)';
+        warn.style.background = '#FFFBEB';
+        warn.style.borderColor = '#FDE68A';
+        warn.style.color = '#92400E';
+      } else {
+        warn.style.display = 'none';
+      }
+    }
+  }
+
+  function openInstModal() {
+    // Set subtitle
+    document.getElementById('instModalSub').textContent = docNum + ' • ยอดรวม ฿' + money(TOTAL);
+    // Build preset list
+    var presetList = document.getElementById('presetList');
+    if (installments && installments.length > 0) {
+      presetList.innerHTML = '';
+      installments.forEach(function(inst, idx) {
+        var lbl = document.createElement('label');
+        lbl.className = 'modal-opt';
+        lbl.innerHTML =
+          '<input type="radio" name="instChoice" value="'+idx+'" style="width:16px;height:16px;accent-color:var(--text);flex-shrink:0;"/>'+
+          '<div style="flex:1;">'+
+            '<div class="modal-opt-main">'+inst.pct+'% — ฿'+money(inst.amount)+'</div>'+
+            '<div class="modal-opt-sub">'+inst.label+'</div>'+
+          '</div>';
+        presetList.appendChild(lbl);
+      });
+      // Show preset tab by default
+      switchInstTab('preset');
+      document.getElementById('tabPreset').style.display = '';
+    } else {
+      // No preset — go straight to custom tab, hide preset tab
+      document.getElementById('tabPreset').style.display = 'none';
+      switchInstTab('custom');
+    }
+    // Add initial custom row if custom tab is active and empty
+    if (document.getElementById('customRows').children.length === 0) {
+      addInstRow();
+    }
+    document.getElementById('instModal').classList.add('show');
+  }
+
+  document.getElementById('instModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+
+  var genBtn = document.getElementById('genInstBtn');
+  if (genBtn) genBtn.addEventListener('click', openInstModal);
+
+  document.getElementById('instConfirm').addEventListener('click', function() {
+    var isPreset = document.getElementById('tabPresetContent').style.display !== 'none';
+    var pct, label, amount;
+
+    if (isPreset) {
       var sel = document.querySelector('input[name="instChoice"]:checked');
       if (!sel) { alert('กรุณาเลือกงวด'); return; }
       var inst = installments[parseInt(sel.value)];
-      var params = new URLSearchParams({
-        from_doc: docId,
-        inst_pct: String(inst.pct),
-        inst_amount: String(inst.amount),
-        inst_label: inst.label,
-      });
-      window.location.href = '/documents/new?' + params.toString();
+      pct = inst.pct; label = inst.label; amount = inst.amount;
+    } else {
+      var selCustom = document.querySelector('input[name="customChoice"]:checked');
+      if (!selCustom) { alert('กรุณาเลือกงวดที่ต้องการสร้างใบแจ้งหนี้'); return; }
+      var rowId = 'row_' + selCustom.value;
+      var row = document.getElementById(rowId);
+      pct = parseFloat(row.querySelector('.pct-inp').value) || 0;
+      label = row.querySelector('.lbl-inp').value || ('งวด ' + selCustom.value);
+      amount = Math.round(TOTAL * pct / 100 * 100) / 100;
+      if (!pct || pct <= 0) { alert('กรุณากรอก % ของงวดที่เลือก'); return; }
+    }
+
+    var params = new URLSearchParams({
+      from_doc: docNum,
+      from_id: docId,
+      customer_id: docCustomerId || '',
+      inst_pct: String(pct),
+      inst_amount: String(amount),
+      inst_label: label,
     });
-    if (modal) modal.addEventListener('click', function(e){ if(e.target===modal) modal.classList.remove('show'); });
+    window.location.href = '/documents/new?' + params.toString();
+  });
+
+  // ── Copy link ─────────────────────────────────────────────────
   window.copyLink = function() {
     var url = 'https://tncdocument.pages.dev/documents/' + docId + '/print';
     navigator.clipboard.writeText(url).then(function() {
