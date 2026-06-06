@@ -52,7 +52,7 @@ const LOGO = 'https://res.cloudinary.com/dynjnftnu/image/upload/v1780149765/LOGO
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ffffff;}
+html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ffffff;max-width:100%;overflow-x:hidden;}
 /* toolbar */
 .toolbar{position:fixed;top:0;left:0;right:0;z-index:100;background:#0D1B2A;height:50px;padding:0 24px;display:flex;align-items:center;gap:12px;}
 .tb-t{color:#ccc;font-size:13px;flex:1;}
@@ -141,7 +141,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   .toolbar{height:auto;min-height:50px;flex-wrap:wrap;padding:8px 14px;gap:8px;}
   .tb-t{width:100%;font-size:12px;order:-1;}
   .tbtn{padding:8px 14px;font-size:11px;}
-  .wrap{padding:58px 8px 24px;}
+  .wrap{padding:58px 0 24px;display:block;overflow-x:hidden;}
   .sheet{width:100%;box-shadow:none;padding:4mm 3mm;}
   .hdr{display:block;padding-bottom:8px;margin-bottom:8px;}
   .hdr-l{display:block;width:100%;padding-right:0;margin-bottom:6px;}
