@@ -136,61 +136,18 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .bank-lbl{color:#666;}
 .bank-val{color:#0D1B2A;font-weight:600;}
 .bank-acc{font-size:11pt;font-weight:700;color:#112D5E;letter-spacing:.06em;}
-/* mobile — screen only, never affects print */
+/* mobile — scale the A4 sheet to fit screen, same layout as PDF */
 @media screen and (max-width:768px){
   .toolbar{height:auto;min-height:50px;flex-wrap:wrap;padding:8px 14px;gap:8px;}
   .tb-t{width:100%;font-size:12px;order:-1;}
   .tbtn{padding:8px 14px;font-size:11px;}
-  .wrap{padding:58px 0 24px;display:block;overflow-x:hidden;}
-  .sheet{width:100%;box-shadow:none;padding:4mm 3mm;}
-  .hdr{display:block;padding-bottom:8px;margin-bottom:8px;}
-  .hdr-l{display:block;width:100%;padding-right:0;margin-bottom:6px;}
-  .hdr-r{display:block;width:100%;text-align:left;padding-top:2px;}
-  .logo{width:100px;}
-  .doc-type{font-size:16pt;}
-  .doc-bar{font-size:7pt;padding:2px 8px;}
-  /* info table — stack cells */
-  .info-tbl{margin-bottom:8px;}
-  .info-tbl td{padding:4px 8px;}
-  /* items scroll */
-  .items-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .items{min-width:480px;margin-bottom:8px;}
-  /* totals */
-  .tot-wrap{margin-bottom:4px;}
-  .tot-tbl{min-width:unset;width:100%;}
-  .tot-tbl td{padding:2px 6px;font-size:8.5pt;}
-  .grand td{font-size:10pt;}
-  .baht-words{font-size:7.5pt;padding:4px 8px;margin-bottom:8px;}
-  /* sig — keep side by side, just reduce height */
-  .sig-note{padding:3px 0;margin:6px 0 4px;font-size:7.5pt;}
-  .sig-row{display:table;width:100%;}
-  .sig-cell{display:table-cell;width:50%;padding:0 8px;}
-  .sig-line{margin:12px 4px 4px;}
-  .sig-lbl{font-size:7pt;line-height:1.5;}
-  /* bank */
-  .bank-wrap{margin-top:8px;padding-top:8px;}
-  .bank-box{padding:8px 10px;}
-  .bank-cols{display:block;}
-  .bank-col{display:block;width:100%;font-size:7.5pt;line-height:1.6;}
-  .bank-title{font-size:8.5pt;margin-bottom:4px;padding-bottom:4px;}
-  .bank-acc{font-size:9.5pt;}
-  .wm img{width:200px!important;}
-}
-@media screen and (max-width:480px){
-  .doc-type{font-size:15pt;}
-  .co-name{font-size:8.5pt;}
-  /* compress vertical spacing so short docs fit one screen */
-  .sig-line{margin:14px 0 4px;}
-  .sig-lbl{font-size:7pt;line-height:1.6;}
-  .sig-note{padding:4px 0;margin:6px 0 4px;}
-  .bank-wrap{margin-top:8px;padding-top:8px;}
-  .bank-box{padding:8px 10px;}
-  .bank-col{line-height:1.6;}
-  .tot-tbl td{padding:2px 8px;}
-  .baht-words{padding:4px 8px;margin-bottom:8px;}
-  .hdr{padding-bottom:8px;margin-bottom:8px;}
-  .info-tbl{margin-bottom:8px;}
-  .items{margin-bottom:8px;}
+  .wrap{padding:58px 0 16px;overflow-x:hidden;}
+  /* scale sheet to fit viewport — keeps exact PDF layout */
+  .sheet{
+    transform-origin:top center;
+    transform:scale(var(--sheet-scale, 0.45));
+    margin-bottom:calc((var(--sheet-scale, 0.45) - 1) * 297mm);
+  }
 }
 /* print — always full A4, never touched by mobile CSS */
 @media print{
@@ -348,9 +305,29 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 </div>
 </div>
 <script>
-function printDoc(){
-  window.print();
+function printDoc(){ window.print(); }
+function scaleSheet() {
+  var sheet = document.querySelector('.sheet');
+  if (!sheet) return;
+  var vw = window.innerWidth;
+  if (vw >= 769) {
+    sheet.style.removeProperty('--sheet-scale');
+    document.documentElement.style.removeProperty('--sheet-scale');
+    return;
+  }
+  // 210mm = 793.7px at 96dpi
+  var sheetPx = 793.7;
+  var scale = (vw - 16) / sheetPx;
+  document.documentElement.style.setProperty('--sheet-scale', scale);
+  // adjust wrap height so no gap below
+  var wrap = document.querySelector('.wrap');
+  if (wrap) {
+    var scaledHeight = sheet.scrollHeight * scale;
+    wrap.style.paddingBottom = '24px';
+  }
 }
+scaleSheet();
+window.addEventListener('resize', scaleSheet);
 </script>
 </body>
 </html>
