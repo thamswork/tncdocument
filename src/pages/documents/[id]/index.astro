@@ -51,7 +51,7 @@ function parseInstallments(cond: string, total: number) {
 }
 
 const installments = parseInstallments(doc.payment_condition || '', doc.total_amount || 0);
-const hasInstallments = installments.length > 0;
+const hasInstallments = true; // always show — every project can have installments
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -310,8 +310,7 @@ const hasInstallments = installments.length > 0;
         </div>
       </div>
 
-      {hasInstallments && (
-        <div class="inst-card">
+      <div class="inst-card">
           <div class="inst-title">📋 งวดการชำระเงิน</div>
           {installments.map((inst: any) => (
             <div class="inst-row">
@@ -322,7 +321,6 @@ const hasInstallments = installments.length > 0;
           ))}
           <button class="inst-gen-btn" id="genInstBtn">สร้างใบแจ้งหนี้งวด →</button>
         </div>
-      )}
 
       <hr class="divider"/>
 
