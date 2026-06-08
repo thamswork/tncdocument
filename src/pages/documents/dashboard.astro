@@ -414,7 +414,16 @@ document.querySelectorAll('.sb-link').forEach(function(l){
       else if(sortCol==='cust'){va=a.dataset.cust||'';vb=b.dataset.cust||'';}
       return sortDir==='asc'?va.localeCompare(vb,'th'):vb.localeCompare(va,'th');
     });
-    rows.forEach(function(r){tbody.appendChild(r);});
+    rows.forEach(function(r){
+      tbody.appendChild(r);
+      // move linked rows immediately after parent
+      var docId = r.getAttribute('onclick')||'';
+      var m = docId.match(/\/documents\/([^']+)/);
+      if (m) {
+        var linked = document.querySelectorAll('[id="linked-'+m[1]+'"]');
+        linked.forEach(function(lr){ tbody.appendChild(lr); });
+      }
+    });
     ['num','cust','date','amt'].forEach(function(c){
       var el=document.getElementById('sort-'+c);
       if(!el) return;
