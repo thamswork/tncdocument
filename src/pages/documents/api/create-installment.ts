@@ -36,7 +36,9 @@ export async function POST({ request, cookies }: any) {
   } else {
     await supabaseAdmin.from('document_sequences').insert({ document_type_id: dtData.id, year: buddhistYear, last_number: 1 });
   }
-  const docNumber = 'IV' + String(nextNum).padStart(4, '0') + '/' + buddhistYear;
+  // Use parent doc number as base e.g. IV0002-1/2569
+  const parentBase = source_doc_num ? source_doc_num.replace('/'+buddhistYear,'') : ('IV'+String(nextNum).padStart(4,'0'));
+  const docNumber = parentBase + '-' + nextNum + '/' + buddhistYear;
 
   const beforeVat = Math.round(amount / 1.07 * 100) / 100;
   const vatAmt = Math.round((amount - beforeVat) * 100) / 100;
