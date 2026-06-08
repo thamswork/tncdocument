@@ -405,7 +405,6 @@ const hasInstallments = true; // always show — every project can have installm
       <!-- Preset tab -->
       <div id="tabPresetContent">
         <div id="presetList"></div>
-        <div style="font-size:11px;color:var(--t3);margin-top:8px;">เลือก 1 งวดเพื่อสร้างใบแจ้งหนี้</div>
       </div>
       <!-- Custom tab -->
       <div id="tabCustomContent" style="display:none;">
@@ -415,9 +414,20 @@ const hasInstallments = true; // always show — every project can have installm
           <span>รวม</span><span id="instTotalPct" style="font-weight:700;">0%</span>
         </div>
         <div id="instWarning" style="display:none;margin-top:6px;padding:7px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;font-size:11.5px;color:var(--red);"></div>
-        <div style="font-size:11px;color:var(--t3);margin-top:6px;">เลือก 1 งวดเพื่อสร้างใบแจ้งหนี้</div>
       </div>
-      <div class="modal-btns" style="margin-top:14px;">
+      <!-- Date fields -->
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:5px;">วันที่ออกใบแจ้งหนี้</div>
+          <input type="date" id="instIssueDate" class="inp" style="width:100%;padding:8px 10px;font-size:12.5px;font-family:inherit;border:1.5px solid var(--border);border-radius:5px;background:var(--bg);"/>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:5px;">กำหนดชำระ</div>
+          <input type="date" id="instDueDate" class="inp" style="width:100%;padding:8px 10px;font-size:12.5px;font-family:inherit;border:1.5px solid var(--border);border-radius:5px;background:var(--bg);"/>
+        </div>
+      </div>
+      <div id="instCreateStatus" style="display:none;margin-top:10px;padding:8px 12px;border-radius:5px;font-size:12px;"></div>
+      <div class="modal-btns" style="margin-top:12px;">
         <button class="modal-cancel" onclick="document.getElementById('instModal').classList.remove('show')">ยกเลิก</button>
         <button class="modal-confirm" id="instConfirm">สร้างใบแจ้งหนี้ →</button>
       </div>
@@ -528,6 +538,9 @@ const hasInstallments = true; // always show — every project can have installm
     if (document.getElementById('customRows').children.length === 0) {
       addInstRow();
     }
+    // Set today as default issue date
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('instIssueDate').value = today;
     document.getElementById('instModal').classList.add('show');
   }
 
@@ -538,7 +551,7 @@ const hasInstallments = true; // always show — every project can have installm
   var genBtn = document.getElementById('genInstBtn');
   if (genBtn) genBtn.addEventListener('click', openInstModal);
 
-  document.getElementById('instConfirm').addEventListener('click', function() {
+  document.getElementById('instConfirm').addEventListener('click', async function() {
     var isPreset = document.getElementById('tabPresetContent').style.display !== 'none';
     var pct, label, amount;
 
@@ -558,15 +571,53 @@ const hasInstallments = true; // always show — every project can have installm
       if (!pct || pct <= 0) { alert('กรุณากรอก % ของงวดที่เลือก'); return; }
     }
 
-    var params = new URLSearchParams({
-      from_doc: docNum,
-      from_id: docId,
-      customer_id: docCustomerId || '',
-      inst_pct: String(pct),
-      inst_amount: String(amount),
-      inst_label: label,
-    });
-    window.location.href = '/documents/new?' + params.toString();
+    var issueDate = document.getElementById('instIssueDate').value;
+    var dueDate = document.getElementById('instDueDate').value;
+    if (!issueDate) { alert('กรุณาระบุวันที่ออกใบแจ้งหนี้'); return; }
+
+    // Show loading
+    var btn = document.getElementById('instConfirm');
+    var status = document.getElementById('instCreateStatus');
+    btn.disabled = true;
+    btn.textContent = 'กำลังสร้าง...';
+    status.style.display = '';
+    status.style.background = 'var(--gbg)';
+    status.style.border = '1px solid var(--gborder)';
+    status.style.color = '#7A5C1E';
+    status.textContent = 'กำลังสร้างใบแจ้งหนี้...';
+
+    try {
+      var res = await fetch('/documents/api/create-installment', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          source_doc_id: docId,
+          source_doc_num: docNum,
+          customer_id: docCustomerId,
+          pct: pct,
+          amount: amount,
+          label: label,
+          issue_date: issueDate,
+          due_date: dueDate || null,
+        })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+      status.style.background = 'var(--grbg)';
+      status.style.border = '1px solid var(--grborder)';
+      status.style.color = 'var(--green)';
+      status.textContent = 'สร้างสำเร็จ! ' + data.document_number + ' — กำลังเปิดเอกสาร...';
+      setTimeout(function() {
+        window.location.href = '/documents/' + data.id;
+      }, 800);
+    } catch(e) {
+      status.style.background = 'var(--redbg)';
+      status.style.border = '1px solid #FECACA';
+      status.style.color = 'var(--red)';
+      status.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
+      btn.disabled = false;
+      btn.textContent = 'สร้างใบแจ้งหนี้ →';
+    }
   });
 
   // ── Copy link ─────────────────────────────────────────────────
