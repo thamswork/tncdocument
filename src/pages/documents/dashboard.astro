@@ -285,57 +285,60 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
             </tr>
           </thead>
           <tbody id="docTbody">
-            {documents.map((doc: any) => {
+            {documents.filter((doc: any) => !doc.source_document_id).map((doc: any) => {
               const typeCode = doc.document_types?.code || '';
               const custName = doc.customers?.company_name || '-';
               const issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '-';
               const amt = Number(doc.total_amount||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
               const rawAmt = Number(doc.total_amount||0);
               const issuedBy = doc.tnc_users?.full_name || '-';
+              const hasLinked = linkedMap[doc.id]?.length > 0;
               return (
-                <tr onclick={`window.location.href='/documents/${doc.id}'`}
-                  data-num={doc.document_number}
-                  data-cust={custName}
-                  data-type={typeCode}
-                  data-status={doc.status}
-                  data-date={doc.issue_date||''}
-                  data-amt={rawAmt}>
-                  <td><span class="doc-num">{doc.document_number}</span></td>
-                  <td><span class={`badge badge-${typeCode||'default'}`}>{doc.document_types?.name_th || typeCode}</span></td>
-                  <td>{custName}</td>
-                  <td>{issueDate}</td>
-                  <td class="num"><span class="amt">{amt}</span></td>
-                  <td><span class={`status status-${doc.status}`}><span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}</span></td>
-                  <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
-                  <td style="display:flex;align-items:center;gap:6px;">
-                    {linkedMap[doc.id] && linkedMap[doc.id].length > 0 && (
-                      <button onclick={`event.stopPropagation();toggleLinked('${doc.id}')`}
-                        id={`exp-${doc.id}`}
-                        style="background:var(--gbg);border:1px solid var(--gborder);border-radius:3px;padding:2px 6px;font-size:10px;font-weight:700;color:#8B6914;cursor:pointer;font-family:inherit;">
-                        {linkedMap[doc.id].length} งวด ▾
-                      </button>
-                    )}
-                    <a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a>
-                  </td>
-                </tr>
+                <Fragment>
+                  <tr onclick={`window.location.href='/documents/${doc.id}'`}
+                    data-num={doc.document_number}
+                    data-cust={custName}
+                    data-type={typeCode}
+                    data-status={doc.status}
+                    data-date={doc.issue_date||''}
+                    data-amt={rawAmt}>
+                    <td>
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        {hasLinked && (
+                          <button onclick={`event.stopPropagation();toggleLinked('${doc.id}')`}
+                            id={`exp-${doc.id}`}
+                            style="background:var(--gbg);border:1px solid var(--gborder);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;color:#8B6914;cursor:pointer;font-family:inherit;flex-shrink:0;">
+                            {linkedMap[doc.id].length}งวด▾
+                          </button>
+                        )}
+                        <span class="doc-num">{doc.document_number}</span>
+                      </div>
+                    </td>
+                    <td><span class={`badge badge-${typeCode||'default'}`}>{doc.document_types?.name_th || typeCode}</span></td>
+                    <td>{custName}</td>
+                    <td>{issueDate}</td>
+                    <td class="num"><span class="amt">{amt}</span></td>
+                    <td><span class={`status status-${doc.status}`}><span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}</span></td>
+                    <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
+                    <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
+                  </tr>
+                  {hasLinked && linkedMap[doc.id].map((inv: any) => (
+                    <tr id={`linked-${doc.id}`}
+                      style="display:none;background:#FAF5EC;cursor:pointer;"
+                      onclick={`window.location.href='/documents/${inv.id}'`}>
+                      <td style="padding-left:32px;"><span style="color:var(--gold);margin-right:4px;font-size:11px;">↳</span><span class="doc-num" style="font-size:11.5px;">{inv.document_number}</span></td>
+                      <td><span class="badge badge-INVOICE" style="font-size:10px;opacity:.8;">งวด</span></td>
+                      <td style="font-size:11.5px;color:var(--t2);">{inv.payment_condition||'—'}</td>
+                      <td style="font-size:11.5px;">{inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-'}</td>
+                      <td class="num"><span class="amt" style="font-size:12px;">{Number(inv.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></td>
+                      <td><span class={`status status-${inv.status}`}><span class="sdot"></span>{inv.status==='draft'?'Draft':'Published'}</span></td>
+                      <td></td>
+                      <td><a href={`/documents/${inv.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
+                    </tr>
+                  ))}
+                </Fragment>
               );
             })}
-            {documents.filter((doc: any) => linkedMap[doc.id]?.length > 0).map((doc: any) =>
-              linkedMap[doc.id].map((inv: any) => (
-                <tr id={`linked-${doc.id}`}
-                  style="display:none;background:#FAF5EC;cursor:pointer;"
-                  onclick={`window.location.href='/documents/${inv.id}'`}>
-                  <td style="padding-left:28px;"><span style="color:var(--t3);margin-right:4px;">↳</span><span class="doc-num" style="font-size:11.5px;">{inv.document_number}</span></td>
-                  <td><span class="badge badge-INVOICE" style="font-size:10px;">งวด</span></td>
-                  <td style="font-size:11.5px;color:var(--t2);">{inv.payment_condition||'—'}</td>
-                  <td style="font-size:11.5px;">{inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-'}</td>
-                  <td class="num"><span class="amt" style="font-size:12px;">{Number(inv.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></td>
-                  <td><span class={`status status-${inv.status}`}><span class="sdot"></span>{inv.status==='draft'?'Draft':'Published'}</span></td>
-                  <td></td>
-                  <td><a href={`/documents/${inv.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
-                </tr>
-              ))
-            )}
           </tbody>
         </table>
       </div>
