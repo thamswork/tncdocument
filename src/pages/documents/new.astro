@@ -639,13 +639,7 @@ if (Astro.request.method === 'POST') {
 
     // Pre-select customer
     if (custId) {
-      var custSel = document.getElementById('custSel');
-      if (custSel) {
-        custSel.value = custId;
-        custSel.dispatchEvent(new Event('change'));
-      }
-      // Also try hidden input
-      var custHid = document.getElementById('custHidden');
+      var custHid = document.getElementById('custId');
       if (custHid) custHid.value = custId;
     }
 
@@ -661,11 +655,11 @@ if (Astro.request.method === 'POST') {
     }
 
     // Set reference_po to source doc number
-    var refInp = document.getElementById('refPo');
+    var refInp = document.getElementById('refPO');
     if (refInp) refInp.value = fromDoc;
 
     // Hide BOQ section, show single line item preview
-    var boqSection = document.querySelector('.boq-wrap') || document.querySelector('[data-section="boq"]');
+    var boqSection = document.querySelector('.boq-card');
     if (boqSection) boqSection.style.display = 'none';
 
     // Inject installment item into build() override
