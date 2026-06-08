@@ -1,6 +1,6 @@
 ---
 import { getDocuments } from '../../lib/documents';
-import { Fragment } from 'astro/jsx-runtime';
+import { Fragment } from 'astro/jsx-runtime'; // v2
 const user = Astro.locals.user;
 const documents = await getDocuments();
 const linkedMap: Record<string, any[]> = {};
