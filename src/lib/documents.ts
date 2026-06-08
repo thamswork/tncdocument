@@ -57,7 +57,7 @@ export async function getDocument(id: string) {
     .order('created_at', { ascending: true });
   const { data: categories } = await supabaseAdmin.from('document_categories').select('*').eq('document_id', id).order('sort_order');
   const { data: items } = await supabaseAdmin.from('document_items').select('*').eq('document_id', id).order('sort_order');
-  return { ...doc, categories: categories || [], items: items || [] };
+  return { ...doc, categories: categories || [], items: items || [], linked_invoices: linkedInvoices || [] };
 }
 
 export function calculateTotals(items: any[], discountDesign: number, discountTrade: number) {
