@@ -21,21 +21,22 @@ export async function POST({ request, cookies }: any) {
     .single();
   if (!dtData) return new Response(JSON.stringify({ error: 'Invoice type not found' }), { status: 500 });
 
-  // Get next document number
-  const { data: lastDoc } = await supabaseAdmin
-    .from('documents')
-    .select('document_number')
-    .like('document_number', 'IV%')
-    .order('created_at', { ascending: false })
-    .limit(1);
-
-  const year = new Date().getFullYear() + 543;
+  // Get next document number using sequence table
+  const buddhistYear = new Date().getFullYear() + 543;
+  const { data: seq } = await supabaseAdmin
+    .from('document_sequences')
+    .select('id, last_number')
+    .eq('document_type_id', dtData.id)
+    .eq('year', buddhistYear)
+    .single();
   let nextNum = 1;
-  if (lastDoc && lastDoc.length > 0) {
-    const m = lastDoc[0].document_number.match(/IV(\d+)\//);
-    if (m) nextNum = parseInt(m[1]) + 1;
+  if (seq) {
+    nextNum = seq.last_number + 1;
+    await supabaseAdmin.from('document_sequences').update({ last_number: nextNum }).eq('id', seq.id);
+  } else {
+    await supabaseAdmin.from('document_sequences').insert({ document_type_id: dtData.id, year: buddhistYear, last_number: 1 });
   }
-  const docNumber = 'IV' + String(nextNum).padStart(4, '0') + '/' + year;
+  const docNumber = 'IV' + String(nextNum).padStart(4, '0') + '/' + buddhistYear;
 
   const beforeVat = Math.round(amount / 1.07 * 100) / 100;
   const vatAmt = Math.round((amount - beforeVat) * 100) / 100;
@@ -52,6 +53,7 @@ export async function POST({ request, cookies }: any) {
       issue_date: issue_date || new Date().toISOString().split('T')[0],
       due_date: due_date || null,
       reference_po: source_doc_num,
+      source_document_id: source_doc_id || null,
       payment_condition: label,
       subtotal: beforeVat,
       discount_design: 0,

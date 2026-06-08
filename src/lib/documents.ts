@@ -46,7 +46,8 @@ export async function getDocuments(filters?: any) {
 export async function getDocument(id: string) {
   const { data: doc } = await supabaseAdmin.from('documents').select(`
     *, document_types(code, name_th, name_en, prefix),
-    customers(*), tnc_users!documents_issued_by_fkey(full_name, username)
+    customers(*), tnc_users!documents_issued_by_fkey(full_name, username),
+    linked_invoices:documents!documents_source_document_id_fkey(id, document_number, status, total_amount, issue_date, due_date, payment_condition)
   `).eq('id', id).single();
   if (!doc) return null;
   const { data: categories } = await supabaseAdmin.from('document_categories').select('*').eq('document_id', id).order('sort_order');
