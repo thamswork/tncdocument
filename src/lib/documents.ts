@@ -34,7 +34,11 @@ export async function createCustomer(data: any) {
 
 export async function getDocuments(filters?: any) {
   let query = supabaseAdmin.from('documents').select(`
-    *, document_types(code, name_th, name_en, prefix),
+    id, document_number, document_type_id, customer_id, status, issue_date, due_date,
+    reference_po, payment_condition, subtotal, discount_design, discount_trade,
+    price_before_vat, vat_amount, total_amount, notes, created_by, issued_by,
+    created_at, updated_at, source_document_id,
+    document_types(code, name_th, name_en, prefix),
     customers(customer_code, company_name),
     tnc_users!documents_issued_by_fkey(full_name)
   `).order('created_at', { ascending: false });
