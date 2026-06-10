@@ -286,6 +286,8 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <tr><td class="tt-l">ราคาก่อน VAT</td><td class="tt-r">{fmt(doc.price_before_vat)} บาท</td></tr>
       <tr><td class="tt-l">ภาษีมูลค่าเพิ่ม 7%</td><td class="tt-r">{fmt(doc.vat_amount)} บาท</td></tr>
       <tr class="grand"><td class="tt-l">จำนวนเงินรวมทั้งสิ้น</td><td class="tt-r">{fmt(doc.total_amount)} บาท</td></tr>
+      <tr><td class="tt-l">หัก ณ ที่จ่าย 3%</td><td class="tt-r">- {fmt(Math.round(doc.price_before_vat*0.03*100)/100)} บาท</td></tr>
+      <tr><td class="tt-l" style="font-weight:700;color:#0D1B2A;">ยอดชำระสุทธิ</td><td class="tt-r" style="font-weight:700;color:#0D1B2A;">{fmt(Math.round((doc.total_amount - doc.price_before_vat*0.03)*100)/100)} บาท</td></tr>
       <tr style="opacity:.6;"><td class="tt-l" style="font-size:8pt;padding-top:6px;">หัก ณ ที่จ่าย 3% (คำนวณบน pre-VAT)</td><td class="tt-r" style="font-size:8pt;padding-top:6px;">- {fmt(Math.round(doc.price_before_vat*0.03*100)/100)} บาท</td></tr>
       <tr><td class="tt-l" style="font-weight:700;font-size:9pt;padding-top:4px;color:#0D1B2A;">ยอดชำระสุทธิ</td><td class="tt-r" style="font-weight:700;font-size:9pt;padding-top:4px;color:#0D1B2A;">{fmt(Math.round((doc.total_amount - doc.price_before_vat*0.03)*100)/100)} บาท</td></tr>
     </table>
