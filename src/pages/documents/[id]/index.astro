@@ -316,14 +316,7 @@ const hasInstallments = true; // always show — every project can have installm
           <span class="sum-lbl" style="font-weight:700;font-size:13px;">ยอดชำระสุทธิ</span>
           <span class="sum-val" style="font-size:18px;font-weight:700;">฿{money(Math.round((doc.total_amount - doc.price_before_vat*0.03)*100)/100)}</span>
         </div>
-        <div class="sum-row" style="opacity:.55;padding-top:8px;border-top:1px dashed var(--b2);margin-top:4px;">
-          <span class="sum-lbl" style="font-size:11.5px;">หัก ณ ที่จ่าย 3%</span>
-          <span class="sum-val" style="font-size:11.5px;color:var(--red);">-฿{money(Math.round(doc.price_before_vat*0.03*100)/100)}</span>
-        </div>
-        <div class="sum-row" style="padding-bottom:4px;">
-          <span class="sum-lbl" style="font-size:12px;font-weight:700;">ยอดชำระสุทธิ</span>
-          <span class="sum-val" style="font-size:14px;font-weight:700;">฿{money(Math.round((doc.total_amount - doc.price_before_vat*0.03)*100)/100)}</span>
-        </div>
+
       </div>
 
       <div class="inst-card">
