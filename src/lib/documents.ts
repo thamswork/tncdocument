@@ -74,7 +74,17 @@ export function calculateTotals(items: any[], discountDesign: number, discountTr
 
 export async function saveDocument(docData: any, categories: any[], items: any[], userId: string, skipBOQ: boolean = false) {
   const isNew = !docData.id;
-  const totals = calculateTotals(items, docData.discount_design || 0, docData.discount_trade || 0);
+  // When BOQ isn't being touched on an edit, recompute totals using the
+  // EXISTING items in the DB so discount changes always reflect correctly.
+  let itemsForTotals = items;
+  if (!isNew && (!items || items.length === 0)) {
+    const { data: existingItems } = await supabaseAdmin
+      .from('document_items')
+      .select('*')
+      .eq('document_id', docData.id);
+    itemsForTotals = existingItems || [];
+  }
+  const totals = calculateTotals(itemsForTotals, docData.discount_design || 0, docData.discount_trade || 0);
   if (isNew) {
     const { data: docType } = await supabaseAdmin.from('document_types').select('prefix').eq('id', docData.document_type_id).single();
     const docNumber = await generateDocumentNumber(docData.document_type_id, docType?.prefix || 'DOC');
@@ -91,12 +101,12 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
     const { status: _, ...docDataWithoutStatus } = docData;
     const existingStatus = existingDoc?.status || 'draft';
     
-    // For published docs: only update if categories were actually provided
+    // For published docs: only replace BOQ rows if categories were actually provided,
+    // but ALWAYS save recalculated totals (itemsForTotals covers both cases).
     const hasNewBOQ = categories && categories.length > 0;
-    const finalTotals = hasNewBOQ ? totals : {};
-    
+
     const { data: updatedDoc, error } = await supabaseAdmin.from('documents')
-      .update({ ...docDataWithoutStatus, ...finalTotals, status: existingStatus }).eq('id', docData.id).select().single();
+      .update({ ...docDataWithoutStatus, ...totals, status: existingStatus }).eq('id', docData.id).select().single();
     if (error || !updatedDoc) return { error };
     
     // Only replace BOQ if explicitly requested
