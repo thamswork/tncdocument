@@ -130,7 +130,7 @@ if (Astro.request.method === 'POST') {
     .itbl td input,.itbl td select{padding:5px 7px;font-size:12px;background:transparent;border:1.5px solid transparent;border-radius:3px;font-family:inherit;color:var(--text);outline:none;transition:all .15s;width:100%;}
     .itbl td input:focus,.itbl td select:focus{background:var(--bg);border-color:var(--border);}
     .itbl td input::placeholder{color:var(--t3);}
-    .w-no{width:52px;}.w-code{width:60px;}.w-desc{min-width:160px;}.w-qty{width:64px;}.w-unit{width:72px;}.w-price{width:88px;}.w-amt{width:90px;text-align:right!important;}.w-del{width:32px;text-align:center!important;}
+    .w-no{width:52px;}.w-code{width:60px;}.w-desc{min-width:140px;}.w-qty{width:56px;}.w-unit{width:64px;}.w-price{width:80px;}.w-mat{width:80px;}.w-matt{width:80px;text-align:right!important;}.w-lab{width:80px;}.w-labt{width:80px;text-align:right!important;}.w-amt{width:80px;text-align:right!important;}.w-del{width:32px;text-align:center!important;}
     .iamt{font-size:11.5px;font-weight:600;color:var(--t2);text-align:right;padding-right:6px;display:block;}
     .addrow{padding:7px 12px;border-top:1px solid var(--b2);display:flex;gap:6px;align-items:center;}
     .addrow-hint{margin-left:auto;font-size:11px;color:var(--t3);}
@@ -398,7 +398,7 @@ if (Astro.request.method === 'POST') {
       var rows = items.map(function(item) {
         if (item.sub) {
           return '<tr class="subr">'
-            + '<td colspan="6" style="text-align:right;padding-right:10px;font-size:11px;font-weight:600;color:var(--t2);">'+item.desc+'</td>'
+            + '<td colspan="10" style="text-align:right;padding-right:10px;font-size:11px;font-weight:600;color:var(--t2);">'+item.desc+'</td>'
             + '<td class="w-amt"><span id="a_'+item.id+'" class="iamt">฿'+fmt(item.amt)+'</span></td>'
             + '<td class="w-del"><button class="del-btn" onclick="window.removeItem(\''+cat.tid+'\',\''+item.id+'\')">×</button></td>'
             + '</tr>';
@@ -409,7 +409,10 @@ if (Astro.request.method === 'POST') {
           + '<td class="w-desc"><input id="d-'+item.id+'" name="d-'+item.id+'" type="text" value="'+item.desc+'" placeholder="รายละเอียดงาน..." oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'desc\',this.value)"/></td>'
           + '<td class="w-qty"><input id="q-'+item.id+'" name="q-'+item.id+'" type="number" value="'+item.qty+'" min="0" step="0.001" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'qty\',this.value)"/></td>'
           + '<td class="w-unit"><select id="u-'+item.id+'" name="u-'+item.id+'" onchange="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'unit\',this.value)">'+uOpts(item.unit)+'</select></td>'
-          + '<td class="w-price"><input id="p-'+item.id+'" name="p-'+item.id+'" type="number" value="'+item.price+'" min="0" step="0.01" placeholder="0.00" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'price\',this.value)"/></td>'
+          + '<td class="w-mat"><input id="m-'+item.id+'" type="number" value="'+(item.mat||0)+'" min="0" step="0.01" placeholder="0.00" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'mat\',this.value)"/></td>'
+          + '<td class="w-matt"><span id="mt_'+item.id+'" class="iamt">฿'+fmt(item.matT||0)+'</span></td>'
+          + '<td class="w-lab"><input id="l-'+item.id+'" type="number" value="'+(item.lab||0)+'" min="0" step="0.01" placeholder="0.00" oninput="window.updItem(\''+cat.tid+'\',\''+item.id+'\',\'lab\',this.value)"/></td>'
+          + '<td class="w-labt"><span id="lt_'+item.id+'" class="iamt">฿'+fmt(item.labT||0)+'</span></td>'
           + '<td class="w-amt"><span id="a_'+item.id+'" class="iamt">฿'+fmt(item.amt)+'</span></td>'
           + '<td class="w-del"><button class="del-btn" onclick="window.removeItem(\''+cat.tid+'\',\''+item.id+'\')">×</button></td>'
           + '</tr>';
@@ -424,8 +427,8 @@ if (Astro.request.method === 'POST') {
         + '</div>'
         + '<div class="tblw"><table class="itbl"><thead><tr>'
         + '<th class="w-no">ลำดับ</th><th class="w-code">รหัส</th><th class="w-desc">รายการงาน</th>'
-        + '<th class="w-qty">จำนวน</th><th class="w-unit">หน่วย</th><th class="w-price">ราคา/หน่วย</th>'
-        + '<th class="w-amt">จำนวนเงิน</th><th class="w-del"></th>'
+        + '<th class="w-qty">จำนวน</th><th class="w-unit">หน่วย</th><th class="w-mat">วัสดุ/หน่วย</th><th class="w-matt">รวมวัสดุ</th><th class="w-lab">แรงงาน/หน่วย</th><th class="w-labt">รวมแรงงาน</th>'
+        + '<th class="w-amt">รวม</th><th class="w-del"></th>'
         + '</tr></thead><tbody>'+(rows||emptyRow)+'</tbody></table></div>'
         + '<div class="addrow">'
         + '<button class="ghost-btn" onclick="window.addItem(\''+cat.tid+'\')">+ รายการ</button>'
@@ -517,7 +520,7 @@ if (Astro.request.method === 'POST') {
   window.addItem = function(tid) {
     var cat = cats.find(function(c){ return c.tid === tid; });
     var ex = (ibc[tid]||[]).filter(function(i){ return !i.sub; });
-    ibc[tid].push({id:'i'+Date.now(), num:cat.num+'.'+(ex.length+1), code:'', desc:'', qty:1, unit:'งาน', price:0, amt:0, sub:false});
+    ibc[tid].push({id:'i'+Date.now(), num:cat.num+'.'+(ex.length+1), code:'', desc:'', qty:1, unit:'งาน', price:0, mat:0, matT:0, lab:0, labT:0, amt:0, sub:false});
     render();
   };
   window.addSub = function(tid) {
@@ -533,10 +536,18 @@ if (Astro.request.method === 'POST') {
     var item = (ibc[tid]||[]).find(function(i){ return i.id === iid; });
     if (!item) return;
     item[f] = v;
-    if (f==='qty'||f==='price') {
-      item.amt = (parseFloat(item.qty)||0) * (parseFloat(item.price)||0);
+    if (f==='qty'||f==='price'||f==='mat'||f==='lab') {
+      var qty = parseFloat(item.qty)||0;
+      item.matT = qty * (parseFloat(item.mat)||0);
+      item.labT = qty * (parseFloat(item.lab)||0);
+      var hasML = (parseFloat(item.mat)||0) > 0 || (parseFloat(item.lab)||0) > 0;
+      item.amt = hasML ? item.matT + item.labT : qty * (parseFloat(item.price)||0);
       var el = document.getElementById('a_'+iid);
       if (el) el.textContent = '฿'+fmt(item.amt);
+      var mt = document.getElementById('mt_'+iid);
+      if (mt) mt.textContent = '฿'+fmt(item.matT);
+      var lt = document.getElementById('lt_'+iid);
+      if (lt) lt.textContent = '฿'+fmt(item.labT);
     }
     updSub(tid); window.recalc(); updCnt();
   };
@@ -550,7 +561,10 @@ if (Astro.request.method === 'POST') {
       return (ibc[c.tid]||[]).map(function(i){
         return {item_number:i.num, item_code:i.code, description_th:i.desc,
           quantity:parseFloat(i.qty)||0, unit_th:i.unit,
-          unit_price:parseFloat(i.price)||0, amount:parseFloat(i.amt)||0,
+          unit_price:parseFloat(i.price)||0,
+          material_cost:parseFloat(i.mat)||0, material_total:parseFloat(i.matT)||0,
+          labor_cost:parseFloat(i.lab)||0, labor_total:parseFloat(i.labT)||0,
+          amount:parseFloat(i.amt)||0,
           is_subtotal_row:i.sub||false, temp_category_id:c.tid};
       });
     }));

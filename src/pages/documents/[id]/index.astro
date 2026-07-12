@@ -253,13 +253,26 @@ const hasInstallments = true; // always show — every project can have installm
               <div class="tbl-wrap">
                 <table>
                   <thead>
-                    <tr>
-                      <th style="width:40px;">#</th><th style="width:48px;">รหัส</th>
-                      <th>รายการ</th><th class="r" style="width:56px;">จำนวน</th>
-                      <th class="c" style="width:48px;">หน่วย</th>
-                      <th class="r" style="width:84px;">หน่วยละ</th>
-                      <th class="r" style="width:96px;">จำนวนเงิน</th>
-                    </tr>
+                    {doc.items.some((i:any)=>(i.material_cost||0)>0||(i.labor_cost||0)>0) ? (
+                      <tr>
+                        <th style="width:36px;">#</th><th style="width:44px;">รหัส</th>
+                        <th>รายการ</th><th class="r" style="width:50px;">จำนวน</th>
+                        <th class="c" style="width:44px;">หน่วย</th>
+                        <th class="r" style="width:72px;">วัสดุ/หน่วย</th>
+                        <th class="r" style="width:72px;">รวมวัสดุ</th>
+                        <th class="r" style="width:72px;">แรงงาน/หน่วย</th>
+                        <th class="r" style="width:72px;">รวมแรงงาน</th>
+                        <th class="r" style="width:80px;">รวม</th>
+                      </tr>
+                    ) : (
+                      <tr>
+                        <th style="width:40px;">#</th><th style="width:48px;">รหัส</th>
+                        <th>รายการ</th><th class="r" style="width:56px;">จำนวน</th>
+                        <th class="c" style="width:48px;">หน่วย</th>
+                        <th class="r" style="width:84px;">หน่วยละ</th>
+                        <th class="r" style="width:96px;">จำนวนเงิน</th>
+                      </tr>
+                    )}
                   </thead>
                   <tbody>
                     {items.map((item: any) => {
@@ -276,7 +289,16 @@ const hasInstallments = true; // always show — every project can have installm
                           <td class="desc">{item.description_th}</td>
                           <td class="r">{item.quantity>0?item.quantity:'—'}</td>
                           <td class="c">{item.unit_th}</td>
-                          <td class="r">{item.unit_price>0?money(item.unit_price):'—'}</td>
+                          {doc.items.some((i:any)=>(i.material_cost||0)>0||(i.labor_cost||0)>0) ? (
+                            <>
+                              <td class="r">{item.material_cost>0?money(item.material_cost):'—'}</td>
+                              <td class="r">{item.material_total>0?money(item.material_total):'—'}</td>
+                              <td class="r">{item.labor_cost>0?money(item.labor_cost):'—'}</td>
+                              <td class="r">{item.labor_total>0?money(item.labor_total):'—'}</td>
+                            </>
+                          ) : (
+                            <td class="r">{item.unit_price>0?money(item.unit_price):'—'}</td>
+                          )}
                           <td class="r">{item.amount>0?money(item.amount):'—'}</td>
                         </tr>
                       );

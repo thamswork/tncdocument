@@ -150,7 +150,15 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
         quantity: Number(item.quantity) || 0,
         unit_th: item.unit_th || '',
         unit_price: Number(item.unit_price) || 0,
-        amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+        material_cost: Number(item.material_cost) || 0,
+        material_total: Number(item.material_total) || 0,
+        labor_cost: Number(item.labor_cost) || 0,
+        labor_total: Number(item.labor_total) || 0,
+        amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (
+          (Number(item.material_total) || 0) + (Number(item.labor_total) || 0) > 0
+            ? (Number(item.material_total) || 0) + (Number(item.labor_total) || 0)
+            : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0)
+        ),
         is_subtotal_row: item.is_subtotal_row || false,
         sort_order: i,
       }));

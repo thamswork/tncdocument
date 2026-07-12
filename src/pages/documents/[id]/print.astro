@@ -226,15 +226,30 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   </table>
   <div class="items-wrap"><table class="items">
     <thead>
-      <tr>
-        <th style="width:34px;">ลำดับ</th>
-        <th style="width:42px;">รหัส</th>
-        <th class="tl">รายการ</th>
-        <th style="width:52px;">จำนวน</th>
-        <th style="width:44px;">หน่วย</th>
-        <th style="width:86px;">หน่วยละ</th>
-        <th style="width:94px;">จำนวนเงิน</th>
-      </tr>
+      {doc.items.some((i:any) => (i.material_cost||0)>0 || (i.labor_cost||0)>0) ? (
+        <tr>
+          <th style="width:28px;">ลำดับ</th>
+          <th style="width:34px;">รหัส</th>
+          <th class="tl">รายการ</th>
+          <th style="width:40px;">จำนวน</th>
+          <th style="width:36px;">หน่วย</th>
+          <th style="width:60px;">วัสดุ/หน่วย</th>
+          <th style="width:66px;">รวมวัสดุ</th>
+          <th style="width:60px;">แรงงาน/หน่วย</th>
+          <th style="width:66px;">รวมแรงงาน</th>
+          <th style="width:66px;">รวม</th>
+        </tr>
+      ) : (
+        <tr>
+          <th style="width:34px;">ลำดับ</th>
+          <th style="width:42px;">รหัส</th>
+          <th class="tl">รายการ</th>
+          <th style="width:52px;">จำนวน</th>
+          <th style="width:44px;">หน่วย</th>
+          <th style="width:86px;">หน่วยละ</th>
+          <th style="width:94px;">จำนวนเงิน</th>
+        </tr>
+      )}
     </thead>
     <tbody>
       {doc.categories.map((cat: any) => {
@@ -247,12 +262,15 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
               <td class="tr">{fmt(catTotal)}</td>
             </tr>
             {items.map((item: any) => {
-              if (item.is_subtotal_row) return (
-                <tr class="row-sub">
-                  <td colspan="6" class="sub-lbl">{item.description_th}</td>
-                  <td class="tr tw">{fmt(item.amount)}</td>
-                </tr>
-              );
+              if (item.is_subtotal_row) {
+                const dhs = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
+                return (
+                  <tr class="row-sub">
+                    <td colspan={dhs?9:6} class="sub-lbl">{item.description_th}</td>
+                    <td class="tr tw">{fmt(item.amount)}</td>
+                  </tr>
+                );
+              }
               const dots = (item.item_number||'').split('.').length-1;
               const isSubCat = dots===1 && !item.quantity && !item.unit_price;
               if (isSubCat) return (
@@ -261,6 +279,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
                   <td colspan="5">{item.description_th}</td>
                 </tr>
               );
+              const docHasSplit = doc.items.some((i:any) => (i.material_cost||0)>0 || (i.labor_cost||0)>0);
               return (
                 <tr class="row-item">
                   <td class="tc">{item.item_number||''}</td>
@@ -268,7 +287,16 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
                   <td style={dots>=2?'padding-left:18px;':''}>{item.description_th}</td>
                   <td class="tr">{item.quantity>0?Number(item.quantity).toLocaleString('th-TH'):'—'}</td>
                   <td class="tc">{item.unit_th||''}</td>
-                  <td class="tr">{item.unit_price>0?fmt(item.unit_price):'—'}</td>
+                  {docHasSplit ? (
+                    <>
+                      <td class="tr">{item.material_cost>0?fmt(item.material_cost):'—'}</td>
+                      <td class="tr">{item.material_total>0?fmt(item.material_total):'—'}</td>
+                      <td class="tr">{item.labor_cost>0?fmt(item.labor_cost):'—'}</td>
+                      <td class="tr">{item.labor_total>0?fmt(item.labor_total):'—'}</td>
+                    </>
+                  ) : (
+                    <td class="tr">{item.unit_price>0?fmt(item.unit_price):'—'}</td>
+                  )}
                   <td class="tr tw">{item.amount>0?fmt(item.amount):'—'}</td>
                 </tr>
               );
