@@ -257,10 +257,15 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         const catTotal = items.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
         return (
           <Fragment>
-            <tr class="row-cat">
-              <td colspan="6">{cat.category_number}. {cat.name_th}</td>
-              <td class="tr">{fmt(catTotal)}</td>
-            </tr>
+            {(() => {
+              const dhs2 = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
+              return (
+                <tr class="row-cat">
+                  <td colspan={dhs2?9:6}>{cat.category_number}. {cat.name_th}</td>
+                  <td class="tr">{fmt(catTotal)}</td>
+                </tr>
+              );
+            })()}
             {items.map((item: any) => {
               if (item.is_subtotal_row) {
                 const dhs = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
@@ -301,6 +306,17 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
                 </tr>
               );
             })}
+          <Fragment>
+              {(() => {
+                const dhs3 = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
+                return (
+                  <tr class="row-sub">
+                    <td colspan={dhs3?9:6} class="sub-lbl">รวม{cat.name_th}</td>
+                    <td class="tr tw">{fmt(catTotal)}</td>
+                  </tr>
+                );
+              })()}
+            </Fragment>
           </Fragment>
         );
       })}
