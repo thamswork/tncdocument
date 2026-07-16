@@ -399,6 +399,12 @@ const hasInstallments = true; // always show — every project can have installm
             <div class="aicon aicon-url">URL</div>
             <div><div class="atext-title">คัดลอกลิงก์</div><div class="atext-sub" id="copy-hint">ส่งให้ลูกค้าดูเอกสาร</div></div>
           </button>
+          {doc.status==='published' && doc.document_types?.code==='INVOICE' && !(doc as any).linked_invoices?.some((i:any)=>i.document_types?.code==='TAX_INVOICE' || i.source_document_id===id) && (
+            <button onclick="createTaxInvoice()" class="aitem" id="txBtn">
+              <div class="aicon" style="background:#EDF7F0;color:#2D7A4F;font-size:11px;font-weight:700;">TX</div>
+              <div><div class="atext-title">ออกใบกำกับภาษี</div><div class="atext-sub" id="tx-hint">สร้างใบเสร็จรับเงิน/ใบกำกับภาษี</div></div>
+            </button>
+          )}
           {(doc.status==='draft' || user.role==='superadmin') && (
             <a href={`/documents/${id}/edit`} class="aitem">
               <div class="aicon aicon-edit">✎</div>
@@ -689,6 +695,32 @@ const hasInstallments = true; // always show — every project can have installm
       if (res.ok) { window.location.reload(); }
       else { alert('บันทึกไม่สำเร็จ'); }
     } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
+  };
+  window.createTaxInvoice = async function() {
+    var btn = document.getElementById('txBtn');
+    var hint = document.getElementById('tx-hint');
+    if (btn) btn.style.opacity = '0.6';
+    if (hint) hint.textContent = 'กำลังสร้าง...';
+    try {
+      var res = await fetch('/documents/api/create-tax-invoice', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          source_doc_id: docId,
+          source_doc_num: docNum,
+          customer_id: docCustomerId,
+          total_amount: Number(docTotal),
+          issue_date: new Date().toISOString().split('T')[0],
+        })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+      if (hint) hint.textContent = 'สร้างสำเร็จ! ' + data.document_number;
+      setTimeout(function(){ window.location.href = '/documents/' + data.id; }, 800);
+    } catch(e) {
+      if (hint) hint.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
+      if (btn) btn.style.opacity = '1';
+    }
   };
   window.copyLink = function() {
     var url = 'https://tncdocument.pages.dev/documents/' + docId + '/print';

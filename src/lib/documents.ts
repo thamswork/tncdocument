@@ -56,7 +56,7 @@ export async function getDocument(id: string) {
   // Fetch linked installment invoices separately
   const { data: linkedInvoices } = await supabaseAdmin
     .from('documents')
-    .select('id, document_number, status, total_amount, issue_date, due_date, payment_condition')
+    .select('id, document_number, status, total_amount, issue_date, due_date, payment_condition, document_type_id')
     .eq('source_document_id', id)
     .order('created_at', { ascending: true });
   const { data: categories } = await supabaseAdmin.from('document_categories').select('*').eq('document_id', id).order('sort_order');
