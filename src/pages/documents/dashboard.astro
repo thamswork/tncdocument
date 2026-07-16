@@ -11,9 +11,10 @@ for (const doc of documents) {
   }
 }
 
-const total = documents.length;
-const drafts = documents.filter((d: any) => d.status === 'draft').length;
-const published = documents.filter((d: any) => d.status === 'published').length;
+const visibleDocs = documents.filter((d: any) => !d.source_document_id);
+const total = visibleDocs.length;
+const drafts = visibleDocs.filter((d: any) => d.status === 'draft').length;
+const published = visibleDocs.filter((d: any) => d.status === 'published').length;
 const pendingAmt = documents
   .filter((d: any) => d.status === 'draft')
   .reduce((s: number, d: any) => s + (Number(d.total_amount)||0), 0);
@@ -127,10 +128,10 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
 
     .doc-num{font-weight:700;font-size:13px;letter-spacing:.01em;}
     .badge{display:inline-flex;padding:3px 8px;border-radius:4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
-    .badge-SV{background:#EBF0FA;color:#2D5A9E;}
-    .badge-IV{background:#EBF5EE;color:#2D7A4F;}
-    .badge-TX{background:#F5EBEB;color:#B94040;}
-    .badge-BQ{background:var(--gbg);color:#8B6914;}
+    .badge-SV,.badge-QUOTATION{background:#EBF0FA;color:#2D5A9E;}
+    .badge-IV,.badge-INVOICE{background:#EBF5EE;color:#2D7A4F;}
+    .badge-TX,.badge-TAX_INVOICE{background:#F5EBEB;color:#B94040;}
+    .badge-BQ,.badge-BOQ{background:var(--gbg);color:#8B6914;}
     .badge-default{background:var(--b2);color:var(--t2);}
 
     .status{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;}
@@ -260,8 +261,9 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
         </div>
         <div class="filters" id="typeFilters">
           <button class="filter-pill active" data-type="" onclick="window.filterType(this,'')">ทั้งหมด</button>
-          {docTypes.map((code: any) => (
-            <button class="filter-pill" data-type={code} onclick={`window.filterType(this,'${code}')`}>{code}</button>
+          {docTypes.map((code: any) => {
+            const label: Record<string,string> = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
+            return <button class="filter-pill" data-type={code} onclick={`window.filterType(this,'${code}')`}>{label[code]||code}</button>;
           ))}
         </div>
         <div class="filters" id="statusFilters">
