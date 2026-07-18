@@ -20,6 +20,7 @@ const pendingAmt = documents
   .reduce((s: number, d: any) => s + (Number(d.total_amount)||0), 0);
 const pendingFmt = pendingAmt.toLocaleString('th-TH', {minimumFractionDigits:0, maximumFractionDigits:0});
 const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).filter(Boolean))];
+const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -261,9 +262,7 @@ const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).f
         </div>
         <div class="filters" id="typeFilters">
           <button class="filter-pill active" data-type="" onclick="window.filterType(this,'')">ทั้งหมด</button>
-          {docTypes.map((code: any) => {
-            const labelMap = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
-            return <button class="filter-pill" data-type={code} onclick={`window.filterType(this,'${code}')`}>{(labelMap as any)[code]||code}</button>;
+          {docTypes.map((code: any) => <button class="filter-pill" data-type={code} onclick={`window.filterType(this,'${code}')`}>{typeLabels[code]||code}</button>
           ))}
         </div>
         <div class="filters" id="statusFilters">
