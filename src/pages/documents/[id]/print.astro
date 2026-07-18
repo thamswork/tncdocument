@@ -134,7 +134,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .sig-lbl{font-size:7.5pt;color:#999;line-height:2;}
 /* tax invoice footer */
 .tx-footer{margin-top:10px;}
-.tx-conditions{display:table;width:100%;border-collapse:collapse;border:1.5px solid #112D5E;margin-bottom:0;}
+.tx-conditions{display:table;width:100%;border-collapse:collapse;border:1.5px solid #112D5E;margin-bottom:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .tx-cond-left{display:table-cell;width:58%;padding:9px 12px;vertical-align:top;border-right:1.5px solid #112D5E;font-size:7.5pt;line-height:1.9;color:#333;}
 .tx-totals{display:table-cell;width:42%;vertical-align:top;}
 .tx-tot-row{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;border-bottom:1px solid #dde3f0;font-size:8.5pt;}
@@ -143,8 +143,8 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .tx-tot-val{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;}
 .tx-baht{text-align:center;border:1.5px solid #112D5E;border-top:none;padding:6px;font-size:8.5pt;color:#333;margin-bottom:10px;}
 .tx-pay-lbl{font-size:8pt;color:#555;margin-bottom:5px;padding-top:2px;}
-.tx-sig-tbl{width:100%;border-collapse:collapse;border:1.5px solid #112D5E;margin-top:0;}
-.tx-sig-tbl td{border:1px solid #112D5E;padding:4px 6px;text-align:center;width:20%;font-size:7.5pt;vertical-align:bottom;line-height:1.6;}
+.tx-sig-tbl{width:100%;border-collapse:collapse;border:2px solid #112D5E;margin-top:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.tx-sig-tbl td{border:1.5px solid #112D5E;padding:4px 6px;text-align:center;width:20%;font-size:7.5pt;vertical-align:bottom;line-height:1.6;}
 .tx-sig-tbl .sig-top{height:64px;vertical-align:middle;position:relative;}
 .tx-sig-date{font-size:7pt;color:#999;margin-top:3px;}
 /* bank */
@@ -185,6 +185,9 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   .row-cat{page-break-after:avoid;}
   .items tbody tr{page-break-inside:avoid;}
   .tot-wrap,.bank-wrap,.sig-row,.baht-words{page-break-inside:avoid;}
+  .tx-footer{page-break-inside:avoid;}
+  .tx-conditions,.tx-sig-tbl{border-width:1.5pt!important;}
+  .tx-cond-left{border-right-width:1.5pt!important;}
   .sheet-scaler{transform:none!important;width:100%!important;margin:0!important;}
   @page{size:A4 portrait;margin:10mm;}
 }
