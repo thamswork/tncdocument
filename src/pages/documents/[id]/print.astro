@@ -351,12 +351,54 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   </div>
   <div class="baht-words">จำนวนเงินเป็นตัวหนังสือ: {bahtText(doc.total_amount)}</div>
   {doc.notes && <div class="notes-box"><strong>หมายเหตุ / Remarks</strong><p>{doc.notes}</p></div>}
-  <div class="sig-note">ห้างหุ้นส่วนจำกัด ธนชัย 2018 หวังว่าจะได้รับการพิจารณาจากท่าน</div>
-  <div class="sig-row">
-    <div class="sig-cell"><div class="sig-line"></div><div class="sig-lbl">ลงชื่อผู้เสนอราคา ........................................<br/>วันที่ ......../......../........</div></div>
-    <div class="sig-cell"><div class="sig-line"></div><div class="sig-lbl">ลงชื่อผู้สั่งซื้อ ........................................<br/>วันที่ ......../......../........</div></div>
-  </div>
-  <div class="bank-wrap">
+  {doc.document_types?.code === 'TAX_INVOICE' ? (
+    <div class="tx-footer">
+      <div class="tx-conditions">
+        <div class="tx-cond-left">
+          {doc.payment_condition ? doc.payment_condition.split('\n').map((line:string, i:number) => (
+            <div key={i}>{i+1}. {line}</div>
+          )) : <div style="color:#999;">—</div>}
+        </div>
+        <div class="tx-totals">
+          <div class="tx-tot-row"><span class="tx-tot-lbl">จำนวนเงินรวม SUB TOTAL</span><span class="tx-tot-val">{fmt(doc.subtotal)}</span></div>
+          <div class="tx-tot-row"><span class="tx-tot-lbl">ภาษีมูลค่าเพิ่ม VAT 7%</span><span class="tx-tot-val">{fmt(doc.vat_amount)}</span></div>
+          <div class="tx-tot-row"><span class="tx-tot-lbl">จำนวนเงินสุทธิ NET TOTAL</span><span class="tx-tot-val">{fmt(doc.total_amount)}</span></div>
+        </div>
+      </div>
+      <div class="tx-baht">(== {bahtText(doc.total_amount)} ==)</div>
+      <div class="tx-pay-lbl">ชำระโดย / Payment / Receive By</div>
+      <table class="tx-sig-tbl">
+        <tr>
+          <td class="sig-top"></td>
+          <td class="sig-top"></td>
+          <td class="sig-top"></td>
+          <td class="sig-top"></td>
+          <td class="sig-top" style="position:relative;">
+            <img src="https://res.cloudinary.com/dynjnftnu/image/upload/v1784361742/TNC_-_Company_Stamp_fyzk1d.png"
+              style="position:absolute;width:65px;height:auto;opacity:0.85;top:50%;left:30%;transform:translate(-50%,-50%);"/>
+            <img src="https://res.cloudinary.com/dynjnftnu/image/upload/v1784361749/TNC_-_Signature_for_invoices_o2lt8s.png"
+              style="position:absolute;width:55px;height:auto;top:50%;left:65%;transform:translate(-50%,-50%);"/>
+          </td>
+        </tr>
+        <tr>
+          <td>ผู้รับสินค้า Receiver<div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้รับวางบิล Billing<div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้รับเงิน Collector<div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้ส่งสินค้า Sender<div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้มีอำนาจลงนาม Authorized Signature<div class="tx-sig-date">......./......./.......</div></td>
+        </tr>
+      </table>
+    </div>
+  ) : (
+    <>
+      <div class="sig-note">ห้างหุ้นส่วนจำกัด ธนชัย 2018 หวังว่าจะได้รับการพิจารณาจากท่าน</div>
+      <div class="sig-row">
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-lbl">ลงชื่อผู้เสนอราคา ........................................<br/>วันที่ ......../......../........</div></div>
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-lbl">ลงชื่อผู้สั่งซื้อ ........................................<br/>วันที่ ......../......../........</div></div>
+      </div>
+    </>
+  )}
+  {doc.document_types?.code !== 'TAX_INVOICE' && <div class="bank-wrap">
     <div class="bank-box">
       <div class="bank-title">ข้อมูลการชำระเงิน / Payment Information</div>
       <div class="bank-cols">
