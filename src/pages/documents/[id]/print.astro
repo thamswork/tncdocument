@@ -91,6 +91,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .hdr-doc{flex-shrink:0;text-align:right;}
 .doc-type{font-size:15pt;font-weight:700;color:#0D1B2A;display:block;line-height:1.3;}
 .doc-bar{background:#112D5E;color:#fff;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:inline-block;padding:3px 12px;margin-top:5px;}
+.doc-bar-light{background:#4A7DB5;color:#fff;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:inline-block;padding:3px 12px;margin-top:5px;}
 .draft-stamp{display:inline-block;margin-top:10px;border:3px solid #C0392B;color:#C0392B;padding:3px 14px;font-size:13pt;font-weight:900;letter-spacing:.18em;transform:rotate(-8deg);border-radius:3px;}
 /* info grid */
 .info-tbl{width:100%;border-collapse:collapse;border:2px solid #112D5E;margin-bottom:14px;font-size:9pt;}
@@ -209,12 +210,12 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
     <img class="logo" src={LOGO} alt="TNC"/>
     <div class="hdr-info">
       <div class="co-name">ห้างหุ้นส่วนจำกัด ธนชัย 2018 (สำนักงานใหญ่)</div>
-      <div class="co-addr">54/6 หมู่ 8 ตำบลบางแก้ว อำเภอบางพลี จังหวัดสมุทรปราการ 10540<br/>โทรศัพท์ 080-0064465 &emsp; อีเมล: Thanachai2018.tnc@gmail.com</div>
+      <div class="co-addr">54/6 หมู่ 8 ตำบลบางแก้ว อำเภอบางพลี จังหวัดสมุทรปราการ 10540<br/>โทรศัพท์ 080-0064465<br/>อีเมล: Thanachai2018.tnc@gmail.com</div>
       <div class="co-tax">เลขประจำตัวผู้เสียภาษีอากร 0113561003884</div>
     </div>
     <div class="hdr-doc">
       <span class="doc-type">{doc.document_types?.name_th}</span>
-      <span class="doc-bar">{doc.document_types?.name_en || doc.document_types?.code}</span>
+      <span class={doc.document_types?.code==='TAX_INVOICE'?'doc-bar-light':'doc-bar'}>{doc.document_types?.name_en || doc.document_types?.code}</span>
       {doc.status==='draft' && <div style="margin-top:8px;"><div class="draft-stamp">DRAFT</div></div>}
     </div>
   </div>
