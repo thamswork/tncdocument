@@ -16,12 +16,12 @@ export async function generateDocumentNumber(documentTypeId: string, prefix: str
 }
 
 export async function getDocumentTypes() {
-  const { data } = await supabaseAdmin.from('document_types').select('*').eq('is_active', true).order('sort_order');
+  const { data } = await supabaseAdmin.from('document_types').select('id,code,name_th,name_en,prefix,is_active,sort_order').eq('is_active', true).order('sort_order');
   return data || [];
 }
 
 export async function getCustomers(search?: string) {
-  let query = supabaseAdmin.from('customers').select('*').order('customer_code');
+  let query = supabaseAdmin.from('customers').select('id,customer_code,company_name,contact_name,address,phone,fax,tax_id,email,notes,created_by,created_at,updated_at').order('customer_code');
   if (search) query = query.or(`company_name.ilike.%${search}%,customer_code.ilike.%${search}%`);
   const { data } = await query;
   return data || [];
@@ -53,15 +53,22 @@ export async function getDocument(id: string) {
     customers(*), tnc_users!documents_issued_by_fkey(full_name, username)
   `).eq('id', id).single();
   if (!doc) return null;
-  // Fetch linked installment invoices separately
-  const { data: linkedInvoices } = await supabaseAdmin
-    .from('documents')
-    .select('id, document_number, status, total_amount, issue_date, due_date, payment_condition, document_type_id')
-    .eq('source_document_id', id)
-    .order('created_at', { ascending: true });
-  const { data: categories } = await supabaseAdmin.from('document_categories').select('*').eq('document_id', id).order('sort_order');
-  const { data: items } = await supabaseAdmin.from('document_items').select('*').eq('document_id', id).order('sort_order');
-  return { ...doc, categories: categories || [], items: items || [], linked_invoices: linkedInvoices || [] };
+  // Parallel fetch — linked invoices, categories, items all at once
+  const [linkedResult, catsResult, itemsResult] = await Promise.all([
+    supabaseAdmin
+      .from('documents')
+      .select('id, document_number, status, total_amount, issue_date, due_date, payment_condition, document_type_id')
+      .eq('source_document_id', id)
+      .order('created_at', { ascending: true }),
+    supabaseAdmin.from('document_categories').select('*').eq('document_id', id).order('sort_order'),
+    supabaseAdmin.from('document_items').select('*').eq('document_id', id).order('sort_order'),
+  ]);
+  return {
+    ...doc,
+    categories: catsResult.data || [],
+    items: itemsResult.data || [],
+    linked_invoices: linkedResult.data || [],
+  };
 }
 
 export function calculateTotals(items: any[], discountDesign: number, discountTrade: number) {
