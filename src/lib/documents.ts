@@ -41,6 +41,8 @@ export async function createCustomer(data: any) {
 }
 
 export async function getDocuments(filters?: any) {
+  const limit = filters?.limit || 50;
+  const offset = filters?.offset || 0;
   let query = supabaseAdmin.from('documents').select(`
     id, document_number, document_type_id, customer_id, status, issue_date, due_date,
     reference_po, payment_condition, subtotal, discount_design, discount_trade,
@@ -49,10 +51,10 @@ export async function getDocuments(filters?: any) {
     document_types(code, name_th, name_en, prefix),
     customers(customer_code, company_name),
     tnc_users!documents_issued_by_fkey(full_name)
-  `).order('created_at', { ascending: false });
+  `, { count: 'exact' }).order('created_at', { ascending: false }).range(offset, offset + limit - 1);
   if (filters?.status) query = query.eq('status', filters.status);
-  const { data } = await query;
-  return data || [];
+  const { data, count } = await query;
+  return { data: data || [], count: count || 0 };
 }
 
 export async function getDocument(id: string) {
