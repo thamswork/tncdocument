@@ -224,7 +224,11 @@ const hasInstallments = true; // always show — every project can have installm
           <div class="icard-lbl">ข้อมูลเอกสาร</div>
           <div class="icard-val">{doc.document_types?.name_th}</div>
           <div class="icard-sub">
-            วันที่ออก: {thaiDate(doc.issue_date)}<br/>
+            {doc.document_types?.code === 'TAX_INVOICE' ? (
+              <span>วันที่ออก: <input type="date" id="txDateInp" value={doc.issue_date||''} onchange="saveTxDate(this.value)" style="font-size:11.5px;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);background:var(--white);cursor:pointer;"/></span>
+            ) : (
+              <span>วันที่ออก: {thaiDate(doc.issue_date)}</span>
+            )}<br/>
             {doc.due_date ? `วันครบกำหนด: ${thaiDate(doc.due_date)}` : ''}
             {doc.reference_po ? `P/O: ${doc.reference_po}` : ''}
           </div>
@@ -721,6 +725,22 @@ const hasInstallments = true; // always show — every project can have installm
       if (hint) hint.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
       if (btn) btn.style.opacity = '1';
     }
+  };
+  window.saveTxDate = async function(val) {
+    if (!val) return;
+    try {
+      var res = await fetch('/documents/api/update-date', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ doc_id: docId, issue_date: val })
+      });
+      var data = await res.json();
+      if (!res.ok) { alert('บันทึกไม่สำเร็จ: ' + (data.error||'')); return; }
+      // Update displayed Thai date without reload
+      var hint = document.getElementById('txDateHint');
+      if (hint) hint.textContent = '✓ บันทึกแล้ว';
+      setTimeout(function(){ if(hint) hint.textContent=''; }, 2000);
+    } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
   };
   window.copyLink = function() {
     var url = 'https://tncdocument.pages.dev/documents/' + docId + '/print';
