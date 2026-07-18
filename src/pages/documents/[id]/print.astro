@@ -132,20 +132,20 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .sig-line{border-top:1px solid #bbb;margin:16px 8px 7px;}
 .sig-lbl{font-size:7.5pt;color:#999;line-height:2;}
 /* tax invoice footer */
-.tx-footer{margin-top:14px;}
-.tx-conditions{display:table;width:100%;border-collapse:collapse;border:1px solid #112D5E;margin-bottom:10px;}
-.tx-cond-left{display:table-cell;width:60%;padding:8px 12px;vertical-align:top;border-right:1px solid #112D5E;font-size:8pt;line-height:1.8;}
-.tx-totals{display:table-cell;width:40%;vertical-align:top;}
-.tx-tot-row{display:flex;justify-content:space-between;padding:4px 12px;border-bottom:1px solid #e0e0e0;font-size:9pt;}
-.tx-tot-row:last-child{border-bottom:none;font-weight:700;font-size:10pt;background:#EEF3FF;}
+.tx-footer{margin-top:10px;}
+.tx-conditions{display:table;width:100%;border-collapse:collapse;border:1.5px solid #112D5E;margin-bottom:0;}
+.tx-cond-left{display:table-cell;width:58%;padding:9px 12px;vertical-align:top;border-right:1.5px solid #112D5E;font-size:7.5pt;line-height:1.9;color:#333;}
+.tx-totals{display:table-cell;width:42%;vertical-align:top;}
+.tx-tot-row{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;border-bottom:1px solid #dde3f0;font-size:8.5pt;}
+.tx-tot-row:last-child{border-bottom:none;font-weight:700;font-size:10pt;background:#EEF3FF;padding:7px 12px;}
 .tx-tot-lbl{color:#555;}
-.tx-tot-val{font-weight:600;text-align:right;}
-.tx-baht{text-align:center;border:1px solid #112D5E;border-top:none;padding:5px;font-size:8.5pt;margin-bottom:10px;}
-.tx-pay-lbl{font-size:8pt;color:#555;margin-bottom:6px;}
-.tx-sig-tbl{width:100%;border-collapse:collapse;border:1px solid #112D5E;margin-top:4px;}
-.tx-sig-tbl td{border:1px solid #112D5E;padding:4px 6px;text-align:center;width:20%;font-size:7.5pt;vertical-align:bottom;}
-.tx-sig-tbl .sig-top{height:56px;vertical-align:middle;position:relative;}
-.tx-sig-date{font-size:7pt;color:#999;margin-top:4px;}
+.tx-tot-val{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;}
+.tx-baht{text-align:center;border:1.5px solid #112D5E;border-top:none;padding:6px;font-size:8.5pt;color:#333;margin-bottom:10px;}
+.tx-pay-lbl{font-size:8pt;color:#555;margin-bottom:5px;padding-top:2px;}
+.tx-sig-tbl{width:100%;border-collapse:collapse;border:1.5px solid #112D5E;margin-top:0;}
+.tx-sig-tbl td{border:1px solid #112D5E;padding:4px 6px;text-align:center;width:20%;font-size:7.5pt;vertical-align:bottom;line-height:1.6;}
+.tx-sig-tbl .sig-top{height:64px;vertical-align:middle;position:relative;}
+.tx-sig-date{font-size:7pt;color:#999;margin-top:3px;}
 /* bank */
 .bank-wrap{margin-top:14px;padding-top:12px;border-top:2px solid #112D5E;}
 .bank-box{border:1.5px solid #112D5E;border-radius:3px;padding:10px 14px;background:#EEF3FF;}
@@ -337,7 +337,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       })}
     </tbody>
   </table></div>
-  <div class="tot-wrap">
+  {doc.document_types?.code !== 'TAX_INVOICE' && <div class="tot-wrap">
     <table class="tot-tbl">
       <tr><td class="tt-l">รวมจำนวนเงิน</td><td class="tt-r">{fmt(doc.subtotal)} บาท</td></tr>
       {doc.discount_design>0 && <tr><td class="tt-l">ส่วนลดค่าแบบ</td><td class="tt-r">- {fmt(doc.discount_design)} บาท</td></tr>}
@@ -348,16 +348,18 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <tr><td class="tt-l" style="padding-top:6px;">หัก ณ ที่จ่าย 3%</td><td class="tt-r" style="padding-top:6px;">- {fmt(Math.round(doc.price_before_vat*0.03*100)/100)} บาท</td></tr>
       <tr><td class="tt-l" style="font-weight:700;font-size:11pt;padding-top:6px;border-top:2px solid #112D5E;color:#0D1B2A;">ยอดชำระสุทธิ</td><td class="tt-r" style="font-weight:700;font-size:11pt;padding-top:6px;border-top:2px solid #112D5E;color:#0D1B2A;">{fmt(Math.round((doc.total_amount - doc.price_before_vat*0.03)*100)/100)} บาท</td></tr>
     </table>
-  </div>
-  <div class="baht-words">จำนวนเงินเป็นตัวหนังสือ: {bahtText(doc.total_amount)}</div>
+  </div>}
+  {doc.document_types?.code !== 'TAX_INVOICE' && <div class="baht-words">จำนวนเงินเป็นตัวหนังสือ: {bahtText(doc.total_amount)}</div>
+}
   {doc.notes && <div class="notes-box"><strong>หมายเหตุ / Remarks</strong><p>{doc.notes}</p></div>}
   {doc.document_types?.code === 'TAX_INVOICE' ? (
     <div class="tx-footer">
       <div class="tx-conditions">
         <div class="tx-cond-left">
-          {doc.payment_condition ? doc.payment_condition.split('\n').map((line:string, i:number) => (
-            <div key={i}>{i+1}. {line}</div>
-          )) : <div style="color:#999;">—</div>}
+          <div>1. สินค้าของบิลนี้เป็นทรัพย์สินของผู้ขาย จนกว่าผู้ซื้อจะชำระค่าสินค้าเรียบร้อยแล้ว</div>
+          <div>2. กรณีชำระด้วยเช็ค โปรดชำระด้วยเช็คขีดคร่อมสั่งจ่ายในนาม "ห้างหุ้นส่วนจำกัด ธนชัย 2018"</div>
+          <div>3. การชำระด้วยเช็คจะสมบูรณ์ก็ต่อเมื่อบริษัทฯ ได้เรียกเก็บเงินตามเช็คเรียบร้อยแล้ว</div>
+          <div>4. หากชำระช้ากว่ากำหนดที่ตกลง ต้องเสียดอกเบี้ยในอัตราร้อยละ 1.25 ต่อเดือน</div>
         </div>
         <div class="tx-totals">
           <div class="tx-tot-row"><span class="tx-tot-lbl">จำนวนเงินรวม SUB TOTAL</span><span class="tx-tot-val">{fmt(doc.subtotal)}</span></div>
