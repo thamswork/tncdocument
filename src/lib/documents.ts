@@ -26,7 +26,11 @@ export async function getDocumentTypes() {
 
 export async function getCustomers(search?: string) {
   let query = supabaseAdmin.from('customers').select('id,customer_code,company_name,contact_name,address,phone,fax,tax_id,email,notes,created_by,created_at,updated_at').order('customer_code');
-  if (search) query = query.or(`company_name.ilike.%${search}%,customer_code.ilike.%${search}%`);
+  if (search) {
+    query = query.or(`company_name.ilike.%${search}%,customer_code.ilike.%${search}%`).limit(50);
+  } else {
+    query = query.limit(200);
+  }
   const { data } = await query;
   return data || [];
 }
