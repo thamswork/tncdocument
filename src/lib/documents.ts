@@ -15,9 +15,13 @@ export async function generateDocumentNumber(documentTypeId: string, prefix: str
   return `${prefix}${String(nextNumber).padStart(4, '0')}/${buddhistYear}`;
 }
 
+// Cache document types — they never change at runtime
+let _docTypesCache: any[] | null = null;
 export async function getDocumentTypes() {
+  if (_docTypesCache) return _docTypesCache;
   const { data } = await supabaseAdmin.from('document_types').select('id,code,name_th,name_en,prefix,is_active,sort_order').eq('is_active', true).order('sort_order');
-  return data || [];
+  _docTypesCache = data || [];
+  return _docTypesCache;
 }
 
 export async function getCustomers(search?: string) {
