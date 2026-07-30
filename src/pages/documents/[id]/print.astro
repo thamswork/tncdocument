@@ -340,6 +340,20 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         );
       })}
     </tbody>
+    {Array.from({length: 12}).map((_:any, i:number) => (
+      <tr class="row-item" key={'empty-'+i}>
+        {doc.items.some((it:any) => (it.material_cost||0)>0||(it.labor_cost||0)>0) ? (
+          <>
+            <td style="height:22px;"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+          </>
+        ) : (
+          <>
+            <td style="height:22px;"></td><td></td><td></td><td></td><td></td><td></td><td></td>
+          </>
+        )}
+      </tr>
+    ))}
+  </tbody>
   </table></div>
   {doc.document_types?.code !== 'TAX_INVOICE' && <div class="tot-wrap">
     <table class="tot-tbl">
@@ -360,10 +374,18 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
     <div class="tx-footer">
       <div class="tx-conditions">
         <div class="tx-cond-left">
-          <div>1. สินค้าของบิลนี้เป็นทรัพย์สินของผู้ขาย จนกว่าผู้ซื้อจะชำระค่าสินค้าเรียบร้อยแล้ว</div>
-          <div>2. กรณีชำระด้วยเช็ค โปรดชำระด้วยเช็คขีดคร่อมสั่งจ่ายในนาม "ห้างหุ้นส่วนจำกัด ธนชัย 2018"</div>
-          <div>3. การชำระด้วยเช็คจะสมบูรณ์ก็ต่อเมื่อบริษัทฯ ได้เรียกเก็บเงินตามเช็คเรียบร้อยแล้ว</div>
-          <div>4. หากชำระช้ากว่ากำหนดที่ตกลง ต้องเสียดอกเบี้ยในอัตราร้อยละ 1.25 ต่อเดือน</div>
+          {doc.payment_condition ? (
+            doc.payment_condition.split('\n').map((line:string, i:number) => (
+              <div key={i}>{line}</div>
+            ))
+          ) : (
+            <>
+              <div>1. สินค้าของบิลนี้เป็นทรัพย์สินของผู้ขาย จนกว่าผู้ซื้อจะชำระค่าสินค้าเรียบร้อยแล้ว</div>
+              <div>2. กรณีชำระด้วยเช็ค โปรดชำระด้วยเช็คขีดคร่อมสั่งจ่ายในนาม "ห้างหุ้นส่วนจำกัด ธนชัย 2018"</div>
+              <div>3. การชำระด้วยเช็คจะสมบูรณ์ก็ต่อเมื่อบริษัทฯ ได้เรียกเก็บเงินตามเช็คเรียบร้อยแล้ว</div>
+              <div>4. หากชำระช้ากว่ากำหนดที่ตกลง ต้องเสียดอกเบี้ยในอัตราร้อยละ 1.25 ต่อเดือน</div>
+            </>
+          )}
         </div>
         <div class="tx-totals">
           <div class="tx-tot-row"><span class="tx-tot-lbl">จำนวนเงินรวม SUB TOTAL</span><span class="tx-tot-val">{fmt(doc.subtotal)}</span></div>
