@@ -325,33 +325,30 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
                 </tr>
               );
             })}
-          <Fragment>
-              {(() => {
-                const dhs3 = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
-                return (
-                  <tr class="row-sub">
-                    <td colspan={dhs3?9:6} class="sub-lbl">รวม{cat.name_th}</td>
-                    <td class="tr tw">{fmt(catTotal)}</td>
-                  </tr>
-                );
-              })()}
-            </Fragment>
           </Fragment>
         );
       })}
-    {Array.from({length: 12}).map((_:any, i:number) => (
-      <tr class="row-item" key={'empty-'+i}>
+    <tr class="row-item" style="height:280px;vertical-align:bottom;border-bottom:1px solid #eee;">
         {doc.items.some((it:any) => (it.material_cost||0)>0||(it.labor_cost||0)>0) ? (
-          <>
-            <td style="height:22px;"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-          </>
+          <><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></>
         ) : (
-          <>
-            <td style="height:22px;"></td><td></td><td></td><td></td><td></td><td></td><td></td>
-          </>
+          <><td></td><td></td><td></td><td></td><td></td><td></td><td></td></>
         )}
       </tr>
-    ))}
+    {(() => {
+      const dhs3 = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
+      const allCats = doc.categories;
+      return allCats.map((cat:any) => {
+        const catItems = doc.items.filter((i:any) => i.category_id === cat.id);
+        const catTot = catItems.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
+        return (
+          <tr class="row-sub" key={cat.id}>
+            <td colspan={dhs3?9:6} class="sub-lbl">รวม{cat.name_th}</td>
+            <td class="tr tw">{fmt(catTot)}</td>
+          </tr>
+        );
+      });
+    })()}
     </tbody>
   </table></div>
   {doc.document_types?.code !== 'TAX_INVOICE' && <div class="tot-wrap">
