@@ -210,7 +210,11 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);width:420px;height:auto;opacity:0.07;pointer-events:none;"/>
   </div>
   <div class="hdr">
-    <img class="logo" src={LOGO} alt="TNC"/>
+    {doc.document_types?.code === 'TAX_INVOICE' ? (
+      <img class="logo" src="https://res.cloudinary.com/dynjnftnu/image/upload/v1785421361/TNC_Stamp_iczld6.png" alt="TNC Stamp"/>
+    ) : (
+      <img class="logo" src={LOGO} alt="TNC"/>
+    )}
     <div class="hdr-info">
       <div class="co-name">ห้างหุ้นส่วนจำกัด ธนชัย 2018 (สำนักงานใหญ่)</div>
       <div class="co-addr">54/6 หมู่ 8 ตำบลบางแก้ว อำเภอบางพลี จังหวัดสมุทรปราการ 10540<br/>โทรศัพท์ 080-0064465<br/>อีเมล: Thanachai2018.tnc@gmail.com</div>
