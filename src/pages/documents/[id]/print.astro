@@ -328,13 +328,15 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
           </Fragment>
         );
       })}
-    <tr class="row-item" style="height:280px;vertical-align:bottom;border-bottom:1px solid #eee;">
+    {[...Array(10)].map((_:any,i:number) => (
+      <tr key={'sp'+i} style="height:24px;border-bottom:1px solid #f5f5f5;">
         {doc.items.some((it:any) => (it.material_cost||0)>0||(it.labor_cost||0)>0) ? (
           <><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></>
         ) : (
           <><td></td><td></td><td></td><td></td><td></td><td></td><td></td></>
         )}
       </tr>
+    ))}
     {(() => {
       const dhs3 = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
       const allCats = doc.categories;
