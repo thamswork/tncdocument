@@ -339,7 +339,6 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
           </Fragment>
         );
       })}
-    </tbody>
     {Array.from({length: 12}).map((_:any, i:number) => (
       <tr class="row-item" key={'empty-'+i}>
         {doc.items.some((it:any) => (it.material_cost||0)>0||(it.labor_cost||0)>0) ? (
@@ -353,7 +352,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         )}
       </tr>
     ))}
-  </tbody>
+    </tbody>
   </table></div>
   {doc.document_types?.code !== 'TAX_INVOICE' && <div class="tot-wrap">
     <table class="tot-tbl">
