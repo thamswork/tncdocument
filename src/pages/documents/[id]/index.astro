@@ -729,6 +729,7 @@ const hasInstallments = true; // always show — every project can have installm
           customer_id: docCustomerId,
           total_amount: Number(docTotal),
           issue_date: new Date().toISOString().split('T')[0],
+          inst_label: document.getElementById('txDateHint')?.dataset?.label || null,
         })
       });
       var data = await res.json();

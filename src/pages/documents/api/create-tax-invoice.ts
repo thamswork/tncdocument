@@ -7,7 +7,7 @@ export async function POST({ request, cookies }: any) {
   if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
 
   const body = await request.json();
-  const { source_doc_id, source_doc_num, customer_id, total_amount, issue_date, job_id, job_name } = body;
+  const { source_doc_id, source_doc_num, customer_id, total_amount, issue_date, job_id, job_name, inst_label } = body;
 
   if (!customer_id || !total_amount) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
@@ -89,7 +89,7 @@ export async function POST({ request, cookies }: any) {
       category_id: cat.id,
       item_number: '1.1',
       item_code: '',
-      description_th: 'ชำระเงินตามใบแจ้งหนี้ ' + source_doc_num + (job_name ? ' — ' + job_name : ''),
+      description_th: 'ชำระเงินตามใบแจ้งหนี้ ' + source_doc_num + (inst_label ? ' (' + inst_label + ')' : '') + (job_name ? ' — ' + job_name : ''),
       quantity: 1,
       unit_th: 'งาน',
       unit_price: beforeVat,
