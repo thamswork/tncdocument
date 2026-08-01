@@ -296,18 +296,15 @@ if (Astro.request.method === 'POST') {
       <div class="card-title">ชื่องาน / Job<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">ขั้นตอนที่ 4</span></div>
     </div>
     <div class="card-bd">
-      <div class="fg2">
-        <div class="fg">
+      <div style="display:flex;gap:10px;align-items:flex-end;">
+        <div style="flex:1;">
           <div class="lbl">เลือกงานที่มีอยู่</div>
           <select class="inp" id="jobSel" onchange="window.onJobChange(this.value)">
             <option value="">— ไม่ระบุงาน —</option>
             {jobs.map((j: any) => <option value={j.id}>{j.name}</option>)}
           </select>
         </div>
-        <div class="fg">
-          <div class="lbl" style="opacity:0;">.</div>
-          <button onclick="window.showNewJob()" style="width:100%;height:42px;background:var(--white);cursor:pointer;font-family:inherit;font-size:13px;color:var(--t2);border:1.5px dashed var(--border);border-radius:6px;text-align:center;padding:0 14px;">+ สร้างงานใหม่</button>
-        </div>
+        <button onclick="window.showNewJob()" style="flex-shrink:0;padding:0 18px;height:42px;background:var(--white);cursor:pointer;font-family:inherit;font-size:13px;color:var(--t2);border:1.5px dashed var(--border);border-radius:6px;white-space:nowrap;">+ สร้างงานใหม่</button>
       </div>
       <div id="jobPreview" style="display:none;margin-top:10px;padding:9px 14px;background:var(--gbg);border:1.5px solid var(--gborder);border-radius:6px;font-size:13px;font-weight:600;color:#7A5C1E;">งาน: <span id="jobPreviewText"></span></div>
       <div id="newJobForm" style="display:none;margin-top:12px;padding:14px 16px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
