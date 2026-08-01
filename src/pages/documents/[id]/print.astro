@@ -336,7 +336,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       const spLab = doc.items.some((it:any) => (it.labor_cost||0)>0);
       const spCols = 6 + (spMat?2:0) + (spLab?2:0);
       return (
-        <tr key={'sp'+i} style="height:24px;">
+        <tr key={'sp'+i} style="height:24px;background:#fff;">
           {[...Array(spCols)].map((_:any,j:number) => <td key={j} style="border:1px solid #C8D0DC;height:24px;background:#fff;"></td>)}
         </tr>
       );
