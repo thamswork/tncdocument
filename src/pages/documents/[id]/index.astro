@@ -220,6 +220,13 @@ const hasInstallments = true; // always show — every project can have installm
           <div class="icard-val">{doc.customers?.company_name}</div>
           <div class="icard-sub">{doc.customers?.customer_code}<br/>{doc.customers?.address}</div>
         </div>
+        {(doc as any).jobs && (
+          <div class="icard" style="grid-column:span 2;background:var(--gbg);border-color:var(--gborder);">
+            <div class="icard-lbl" style="color:#8B6914;">ชื่องาน</div>
+            <div class="icard-val" style="color:#7A5C1E;">{(doc as any).jobs?.name}</div>
+            {(doc as any).jobs?.description && <div class="icard-sub">{(doc as any).jobs?.description}</div>}
+          </div>
+        )}
         <div class="icard">
           <div class="icard-lbl">ข้อมูลเอกสาร</div>
           <div class="icard-val">{doc.document_types?.name_th}</div>

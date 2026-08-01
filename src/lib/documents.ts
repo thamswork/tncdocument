@@ -17,6 +17,18 @@ export async function generateDocumentNumber(documentTypeId: string, prefix: str
 
 // Cache document types — they never change at runtime
 let _docTypesCache: any[] | null = null;
+export async function getJobs(search?: string) {
+  let query = supabaseAdmin.from('jobs').select('id, name, description').order('name');
+  if (search) query = query.ilike('name', '%'+search+'%');
+  const { data } = await query.limit(100);
+  return data || [];
+}
+
+export async function createJob(name: string, description: string, userId: string) {
+  const { data, error } = await supabaseAdmin.from('jobs').insert({ name, description, created_by: userId }).select().single();
+  return { data, error };
+}
+
 export async function getDocumentTypes() {
   if (_docTypesCache) return _docTypesCache;
   const { data } = await supabaseAdmin.from('document_types').select('id,code,name_th,name_en,prefix,is_active,sort_order').eq('is_active', true).order('sort_order');
@@ -44,7 +56,7 @@ export async function getDocuments(filters?: any) {
   const limit = filters?.limit || 50;
   const offset = filters?.offset || 0;
   let query = supabaseAdmin.from('documents').select(`
-    id, document_number, document_type_id, customer_id, status, issue_date, due_date,
+    id, document_number, document_type_id, customer_id, job_id, status, issue_date, due_date,
     reference_po, payment_condition, subtotal, discount_design, discount_trade,
     price_before_vat, vat_amount, total_amount, notes, created_by, issued_by,
     created_at, updated_at, source_document_id,
@@ -60,7 +72,8 @@ export async function getDocuments(filters?: any) {
 export async function getDocument(id: string) {
   const { data: doc } = await supabaseAdmin.from('documents').select(`
     *, document_types(code, name_th, name_en, prefix),
-    customers(*), tnc_users!documents_issued_by_fkey(full_name, username)
+    customers(*), tnc_users!documents_issued_by_fkey(full_name, username),
+    jobs(id, name, description)
   `).eq('id', id).single();
   if (!doc) return null;
   // Parallel fetch — linked invoices, categories, items all at once

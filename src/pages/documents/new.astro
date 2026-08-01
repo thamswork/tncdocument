@@ -1,8 +1,9 @@
 ---
-import { getDocumentTypes, getCustomers, saveDocument } from '../../lib/documents';
+import { getDocumentTypes, getCustomers, saveDocument, getJobs } from '../../lib/documents';
 const user = Astro.locals.user;
 const documentTypes = await getDocumentTypes();
 const customers = await getCustomers();
+const jobs = await getJobs();
 
 if (Astro.request.method === 'POST') {
   try {
@@ -289,10 +290,42 @@ if (Astro.request.method === 'POST') {
   </div>
 
   <!-- 4: BOQ -->
+  <div class="card" id="jobCard">
+    <div class="card-hd">
+      <div class="step-n">4</div>
+      <div class="card-title">ชื่องาน (Job)</div>
+      <div style="font-size:11px;color:var(--t3);margin-left:auto;">ขั้นตอนที่ 4</div>
+    </div>
+    <div class="card-bd">
+      <div class="fg">
+        <div class="lbl">เลือกงาน</div>
+        <div style="display:flex;gap:8px;">
+          <select class="inp" id="jobSel" style="flex:1;" onchange="window.onJobChange(this.value)">
+            <option value="">— ไม่ระบุงาน —</option>
+            {jobs.map((j: any) => <option value={j.id}>{j.name}</option>)}
+          </select>
+          <button class="btn btn-ol" style="font-size:11px;padding:5px 13px;white-space:nowrap;" onclick="window.showNewJob()">+ งานใหม่</button>
+        </div>
+      </div>
+      <div id="newJobForm" style="display:none;margin-top:10px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
+        <div class="fg" style="margin-bottom:8px;">
+          <div class="lbl">ชื่องาน *</div>
+          <input type="text" class="inp" id="newJobName" placeholder="เช่น ติดตั้งระบบเสียง Central Westgate"/>
+        </div>
+        <div class="fg" style="margin-bottom:8px;">
+          <div class="lbl">รายละเอียด</div>
+          <input type="text" class="inp" id="newJobDesc" placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"/>
+        </div>
+        <button class="btn btn-solid" style="font-size:11px;" onclick="window.saveNewJob()">บันทึกงานใหม่</button>
+        <button class="btn btn-ol" style="font-size:11px;margin-left:6px;" onclick="window.hideNewJob()">ยกเลิก</button>
+      </div>
+      <div id="jobPreview" style="display:none;margin-top:8px;padding:8px 12px;background:var(--gbg);border:1px solid var(--gborder);border-radius:5px;font-size:12.5px;font-weight:600;color:#7A5C1E;"></div>
+    </div>
+  </div>
   <div class="boq-card">
     <div class="boq-hd">
-      <div class="step-n">4</div>
-      <div class="boq-title">รายการงาน (BOQ)<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">ขั้นตอนที่ 4</span></div>
+      <div class="step-n">5</div>
+      <div class="boq-title">รายการงาน (BOQ)<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">ขั้นตอนที่ 5</span></div>
       <div class="boq-cnt" id="boqCnt">ยังไม่มีรายการ</div>
       <button class="btn btn-ol" style="font-size:11px;padding:5px 13px;margin-left:8px;" onclick="window.addCat()">+ เพิ่มหมวดงาน</button>
     </div>
@@ -575,6 +608,7 @@ if (Astro.request.method === 'POST') {
         issue_date: document.getElementById('issueDate').value,
         due_date: document.getElementById('dueDate').value||null,
         reference_po: document.getElementById('refPO').value||null,
+        job_id: document.getElementById('jobSel').value||null,
         payment_condition: document.getElementById('payCond').value||null,
         notes: document.getElementById('docNotes').value||null,
         discount_design: parseFloat(document.getElementById('dD').value)||0,
@@ -600,6 +634,49 @@ if (Astro.request.method === 'POST') {
     } catch(e) { toast(e.message, true); return null; }
   }
 
+  window.onJobChange = function(val) {
+    var preview = document.getElementById('jobPreview');
+    var sel = document.getElementById('jobSel');
+    if (val && sel) {
+      var opt = sel.options[sel.selectedIndex];
+      preview.textContent = '✓ งาน: ' + opt.text;
+      preview.style.display = '';
+    } else {
+      preview.style.display = 'none';
+    }
+  };
+  window.showNewJob = function() {
+    document.getElementById('newJobForm').style.display = '';
+    document.getElementById('newJobName').focus();
+  };
+  window.hideNewJob = function() {
+    document.getElementById('newJobForm').style.display = 'none';
+    document.getElementById('newJobName').value = '';
+    document.getElementById('newJobDesc').value = '';
+  };
+  window.saveNewJob = async function() {
+    var name = document.getElementById('newJobName').value.trim();
+    if (!name) { alert('กรุณากรอกชื่องาน'); return; }
+    var desc = document.getElementById('newJobDesc').value.trim();
+    try {
+      var res = await fetch('/documents/api/create-job', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ name, description: desc })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+      // Add to select and auto-select
+      var sel = document.getElementById('jobSel');
+      var opt = document.createElement('option');
+      opt.value = data.id;
+      opt.text = data.name;
+      sel.appendChild(opt);
+      sel.value = data.id;
+      window.onJobChange(data.id);
+      window.hideNewJob();
+    } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
+  };
   window.saveDraft   = async function(){ var p=build('draft'); if(p) await doSave(p); };
   window.saveOpen    = async function(){ var p=build('draft'); if(!p) return; var r=await doSave(p); if(r&&r.id) window.location.href='/documents/'+r.id; };
   window.savePreview = async function(){ var p=build('draft'); if(!p) return; var r=await doSave(p); if(r&&r.id) window.open('/documents/'+r.id+'/print','_blank'); };
