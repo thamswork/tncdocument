@@ -412,7 +412,14 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
           <td>ผู้รับวางบิล Billing<div class="tx-sig-date">......./......./.......</div></td>
           <td>ผู้รับเงิน Collector<div class="tx-sig-date">......./......./.......</div></td>
           <td>ผู้ส่งสินค้า Sender<div class="tx-sig-date">......./......./.......</div></td>
-          <td>ผู้มีอำนาจลงนาม Authorized Signature<div class="tx-sig-date" id="authDate"></div></td>
+          {(() => {
+              const now = new Date();
+              const d = now.getDate();
+              const m = now.getMonth() + 1;
+              const y = now.getFullYear() + 543;
+              const dateStr = (d<10?'0'+d:d) + '/' + (m<10?'0'+m:m) + '/' + y;
+              return <td>ผู้มีอำนาจลงนาม Authorized Signature<div class="tx-sig-date" style="color:#333;font-weight:600;">{dateStr}</div></td>;
+            })()}
         </tr>
       </table>
     </div>
@@ -469,20 +476,7 @@ function scaleSheet(){
 }
 scaleSheet();
 window.addEventListener('resize',scaleSheet);
-// Auto-fill authorized signature date v3
-document.addEventListener('DOMContentLoaded', function(){
-  var el = document.getElementById('authDate');
-  if (!el) return;
-  var d = new Date();
-  var day = d.getDate();
-  var month = d.getMonth() + 1;
-  var year = d.getFullYear() + 543;
-  var dateStr = (day<10?'0'+day:day) + '/' + (month<10?'0'+month:month) + '/' + year;
-  el.textContent = dateStr;
-  el.style.color = '#333';
-  el.style.fontWeight = '600';
-  el.style.fontSize = '8pt';
-});
+// Date rendered server-side
 </script>
 </body>
 </html>
