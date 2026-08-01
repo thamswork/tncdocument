@@ -409,17 +409,17 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
           <td class="sig-top"></td>
         </tr>
         <tr>
-          <td>ผู้รับสินค้า Receiver<div class="tx-sig-date">......./......./.......</div></td>
-          <td>ผู้รับวางบิล Billing<div class="tx-sig-date">......./......./.......</div></td>
-          <td>ผู้รับเงิน Collector<div class="tx-sig-date">......./......./.......</div></td>
-          <td>ผู้ส่งสินค้า Sender<div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้รับสินค้า<br/><span style="font-size:6.5pt;opacity:.7;">Receiver</span><div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้รับวางบิล<br/><span style="font-size:6.5pt;opacity:.7;">Billing</span><div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้รับเงิน<br/><span style="font-size:6.5pt;opacity:.7;">Collector</span><div class="tx-sig-date">......./......./.......</div></td>
+          <td>ผู้ส่งสินค้า<br/><span style="font-size:6.5pt;opacity:.7;">Sender</span><div class="tx-sig-date">......./......./.......</div></td>
           {(() => {
               const now = new Date();
               const d = now.getDate();
               const m = now.getMonth() + 1;
               const y = now.getFullYear() + 543;
               const dateStr = (d<10?'0'+d:d) + '/' + (m<10?'0'+m:m) + '/' + y;
-              return <td>ผู้มีอำนาจลงนาม Authorized Signature<div class="tx-sig-date" style="color:#333;font-weight:600;">{dateStr}</div></td>;
+              return <td>ผู้มีอำนาจลงนาม<br/><span style="font-size:6.5pt;opacity:.7;">Authorized Signature</span><div class="tx-sig-date" style="color:#333;font-weight:600;">{dateStr}</div></td>;
             })()}
         </tr>
       </table>
