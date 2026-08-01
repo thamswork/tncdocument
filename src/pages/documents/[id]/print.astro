@@ -469,19 +469,20 @@ function scaleSheet(){
 }
 scaleSheet();
 window.addEventListener('resize',scaleSheet);
-// Auto-fill authorized signature date v2
-(function(){
+// Auto-fill authorized signature date v3
+document.addEventListener('DOMContentLoaded', function(){
   var el = document.getElementById('authDate');
   if (!el) return;
   var d = new Date();
   var day = d.getDate();
   var month = d.getMonth() + 1;
   var year = d.getFullYear() + 543;
-  el.textContent = (day<10?'0'+day:day) + '/' + (month<10?'0'+month:month) + '/' + year;
+  var dateStr = (day<10?'0'+day:day) + '/' + (month<10?'0'+month:month) + '/' + year;
+  el.textContent = dateStr;
   el.style.color = '#333';
   el.style.fontWeight = '600';
   el.style.fontSize = '8pt';
-})();
+});
 </script>
 </body>
 </html>
