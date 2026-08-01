@@ -111,7 +111,6 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .row-cat td{background:#112D5E;color:#fff;font-weight:700;font-size:10pt;padding:5px 8px;border-color:#0D1B2A;}
 .row-subcat td{background:#E8EDF5;color:#0D1B2A;font-weight:700;padding:4px 8px;border-color:#bbb;}
 .row-item td{background:#fff;}
-.row-item:nth-child(even) td{background:#f9f9f9;}
 .row-sub td{background:#efefef;font-weight:700;}
 .sub-lbl{text-align:right!important;padding-right:14px!important;color:#444;}
 /* totals */
@@ -338,7 +337,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       const spCols = 6 + (spMat?2:0) + (spLab?2:0);
       return (
         <tr key={'sp'+i} style="height:24px;">
-          {[...Array(spCols)].map((_:any,j:number) => <td key={j} style="border:1px solid #C8D0DC;height:24px;"></td>)}
+          {[...Array(spCols)].map((_:any,j:number) => <td key={j} style="border:1px solid #C8D0DC;height:24px;background:#fff;"></td>)}
         </tr>
       );
     })}
