@@ -257,30 +257,23 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
   )}
   <div class="items-wrap"><table class="items">
     <thead>
-      {doc.items.some((i:any) => (i.material_cost||0)>0 || (i.labor_cost||0)>0) ? (
-        <tr>
-          <th style="width:28px;">ลำดับ</th>
-          <th style="width:34px;">รหัส</th>
-          <th class="tl">รายการ</th>
-          <th style="width:40px;">จำนวน</th>
-          <th style="width:36px;">หน่วย</th>
-          <th style="width:60px;">วัสดุ</th>
-          <th style="width:66px;">รวมวัสดุ</th>
-          <th style="width:60px;">แรงงาน</th>
-          <th style="width:66px;">รวมแรงงาน</th>
-          <th style="width:66px;">รวม</th>
-        </tr>
-      ) : (
-        <tr>
-          <th style="width:34px;">ลำดับ</th>
-          <th style="width:42px;">รหัส</th>
-          <th class="tl">รายการ</th>
-          <th style="width:52px;">จำนวน</th>
-          <th style="width:44px;">หน่วย</th>
-          <th style="width:86px;">หน่วยละ</th>
-          <th style="width:94px;">จำนวนเงิน</th>
-        </tr>
-      )}
+      {(() => {
+        const hasMat = doc.items.some((i:any) => (i.material_cost||0)>0);
+        const hasLab = doc.items.some((i:any) => (i.labor_cost||0)>0);
+        return (
+          <tr>
+            <th style="width:28px;">ลำดับ</th>
+            <th style="width:34px;">รหัส</th>
+            <th class="tl">รายการ</th>
+            <th style="width:44px;">จำนวน</th>
+            <th style="width:38px;">หน่วย</th>
+            {!hasMat && !hasLab && <th style="width:86px;">หน่วยละ</th>}
+            {hasMat && <><th style="width:64px;">วัสดุ</th><th style="width:70px;">รวมวัสดุ</th></>}
+            {hasLab && <><th style="width:64px;">แรงงาน</th><th style="width:70px;">รวมแรงงาน</th></>}
+            <th style="width:70px;">รวม</th>
+          </tr>
+        );
+      })()}
     </thead>
     <tbody>
       {doc.categories.map((cat: any) => {
@@ -289,20 +282,24 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         return (
           <Fragment>
             {(() => {
-              const dhs2 = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
+              const cHasMat = doc.items.some((i:any) => (i.material_cost||0)>0);
+              const cHasLab = doc.items.some((i:any) => (i.labor_cost||0)>0);
+              const cCols = 5 + (cHasMat?2:0) + (cHasLab?2:0) + (!cHasMat&&!cHasLab?1:0);
               return (
                 <tr class="row-cat">
-                  <td colspan={dhs2?9:6}>{cat.category_number}. {cat.name_th}</td>
+                  <td colspan={cCols}>{cat.category_number}. {cat.name_th}</td>
                   <td class="tr">{fmt(catTotal)}</td>
                 </tr>
               );
             })()}
             {items.map((item: any) => {
               if (item.is_subtotal_row) {
-                const dhs = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
+                const sHasMat = doc.items.some((i:any) => (i.material_cost||0)>0);
+                const sHasLab = doc.items.some((i:any) => (i.labor_cost||0)>0);
+                const sCols = 5 + (sHasMat?2:0) + (sHasLab?2:0) + (!sHasMat&&!sHasLab?1:0);
                 return (
                   <tr class="row-sub">
-                    <td colspan={dhs?9:6} class="sub-lbl">{item.description_th}</td>
+                    <td colspan={sCols} class="sub-lbl">{item.description_th}</td>
                     <td class="tr tw">{fmt(item.amount)}</td>
                   </tr>
                 );
@@ -315,7 +312,8 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
                   <td colspan="5">{item.description_th}</td>
                 </tr>
               );
-              const docHasSplit = doc.items.some((i:any) => (i.material_cost||0)>0 || (i.labor_cost||0)>0);
+              const docHasMat = doc.items.some((i:any) => (i.material_cost||0)>0);
+              const docHasLab = doc.items.some((i:any) => (i.labor_cost||0)>0);
               return (
                 <tr class="row-item">
                   <td class="tc">{item.item_number||''}</td>
@@ -323,16 +321,9 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
                   <td style={dots>=2?'padding-left:18px;':''}>{item.description_th}</td>
                   <td class="tr">{item.quantity>0?Number(item.quantity).toLocaleString('th-TH'):'—'}</td>
                   <td class="tc">{item.unit_th||''}</td>
-                  {docHasSplit ? (
-                    <>
-                      <td class="tr">{item.material_cost>0?fmt(item.material_cost):'—'}</td>
-                      <td class="tr">{item.material_total>0?fmt(item.material_total):'—'}</td>
-                      <td class="tr">{item.labor_cost>0?fmt(item.labor_cost):'—'}</td>
-                      <td class="tr">{item.labor_total>0?fmt(item.labor_total):'—'}</td>
-                    </>
-                  ) : (
-                    <td class="tr">{item.unit_price>0?fmt(item.unit_price):'—'}</td>
-                  )}
+                  {!docHasMat && !docHasLab && <td class="tr">{item.unit_price>0?fmt(item.unit_price):'—'}</td>}
+                  {docHasMat && <><td class="tr">{item.material_cost>0?fmt(item.material_cost):'—'}</td><td class="tr">{item.material_total>0?fmt(item.material_total):'—'}</td></>}
+                  {docHasLab && <><td class="tr">{item.labor_cost>0?fmt(item.labor_cost):'—'}</td><td class="tr">{item.labor_total>0?fmt(item.labor_total):'—'}</td></>}
                   <td class="tr tw">{item.amount>0?fmt(item.amount):'—'}</td>
                 </tr>
               );
@@ -340,24 +331,27 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
           </Fragment>
         );
       })}
-    {[...Array(10)].map((_:any,i:number) => (
-      <tr key={'sp'+i} style="height:24px;border-bottom:1px solid #f5f5f5;">
-        {doc.items.some((it:any) => (it.material_cost||0)>0||(it.labor_cost||0)>0) ? (
-          <><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></>
-        ) : (
-          <><td></td><td></td><td></td><td></td><td></td><td></td><td></td></>
-        )}
-      </tr>
-    ))}
+    {[...Array(10)].map((_:any,i:number) => {
+      const spMat = doc.items.some((it:any) => (it.material_cost||0)>0);
+      const spLab = doc.items.some((it:any) => (it.labor_cost||0)>0);
+      const spCols = 6 + (spMat?2:0) + (spLab?2:0);
+      return (
+        <tr key={'sp'+i} style="height:24px;border-bottom:1px solid #f5f5f5;">
+          {[...Array(spCols)].map((_:any,j:number) => <td key={j}></td>)}
+        </tr>
+      );
+    })}
     {(() => {
-      const dhs3 = doc.items.some((i:any) => (i.material_cost||0)>0||(i.labor_cost||0)>0);
+      const bMat = doc.items.some((i:any) => (i.material_cost||0)>0);
+      const bLab = doc.items.some((i:any) => (i.labor_cost||0)>0);
+      const bCols = 5 + (bMat?2:0) + (bLab?2:0) + (!bMat&&!bLab?1:0);
       const allCats = doc.categories;
       return allCats.map((cat:any) => {
         const catItems = doc.items.filter((i:any) => i.category_id === cat.id);
         const catTot = catItems.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
         return (
           <tr class="row-sub" key={cat.id}>
-            <td colspan={dhs3?9:6} class="sub-lbl">รวม{cat.name_th}</td>
+            <td colspan={bCols} class="sub-lbl">รวม{cat.name_th}</td>
             <td class="tr tw">{fmt(catTot)}</td>
           </tr>
         );
