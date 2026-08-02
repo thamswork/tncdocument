@@ -308,7 +308,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
               if (isSubCat) return (
                 <tr class="row-subcat">
                   <td>{item.item_number}</td>
-                  <td colspan="5">{item.description_th}</td>
+                  <td colspan="4">{item.description_th}</td>
                 </tr>
               );
               const docHasMat = doc.items.some((i:any) => (i.material_cost||0)>0);
