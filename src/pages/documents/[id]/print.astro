@@ -109,7 +109,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .items td{padding:4px 8px;border:1px solid #C8D0DC;vertical-align:middle;line-height:1.6;}
 .items td.desc{vertical-align:middle;}
 .tc{text-align:center;}.tr{text-align:right;}.tw{font-weight:600;}
-.row-cat td{background:#112D5E;color:#fff;font-weight:700;font-size:10pt;padding:5px 8px;border-color:#0D1B2A;}
+.row-cat td{background:#112D5E;color:#fff;font-weight:700;font-size:9pt;padding:5px 8px;border-color:#0D1B2A;}
 .row-subcat td{background:#E8EDF5;color:#0D1B2A;font-weight:700;padding:4px 8px;border-color:#bbb;}
 .row-item td{background:#fff;}
 .row-sub td{background:#efefef;font-weight:700;}
@@ -120,7 +120,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .tot-tbl td{padding:3px 10px;font-size:9pt;border-bottom:1px solid #eee;}
 .tt-l{color:#555;padding-right:24px;}
 .tt-r{text-align:right;font-weight:600;white-space:nowrap;}
-.grand td{border-top:2px solid #112D5E;border-bottom:none;font-weight:700;font-size:11pt;padding-top:7px;color:#0D1B2A;}
+.grand td{border-top:2px solid #112D5E;border-bottom:none;font-weight:700;font-size:9pt;padding-top:7px;color:#0D1B2A;}
 .baht-words{text-align:center;font-size:8.5pt;color:#555;border:1px solid #ddd;padding:5px 12px;background:#fafafa;margin-bottom:12px;}
 /* notes */
 .notes-box{border-left:3px solid #112D5E;padding:8px 12px;margin-bottom:12px;background:#F5F8FF;}
@@ -350,7 +350,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         const catTot = catItems.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
         return (
           <tr class="row-sub" key={cat.id}>
-            <td colspan={bCols} class="sub-lbl">รวม{cat.name_th}</td>
+            <td colspan={bCols} class="sub-lbl" style="text-align:right;padding-right:12px;">รวม{cat.name_th}</td>
             <td class="tr tw">{fmt(catTot)}</td>
           </tr>
         );
