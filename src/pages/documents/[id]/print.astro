@@ -87,7 +87,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .hdr-info{flex:1;}
 .co-name{font-size:9pt;font-weight:700;color:#0D1B2A;margin-bottom:3px;}
 .co-addr{font-size:7.5pt;color:#555;line-height:1.7;}
-.co-tax{font-size:7.5pt;color:#112D5E;font-weight:700;margin-top:5px;padding-top:5px;border-top:0.5px solid #E0DDD7;}
+.co-tax{font-size:8pt;color:#112D5E;font-weight:700;margin-top:5px;padding-top:5px;border-top:0.5px solid #E0DDD7;}
 .hdr-doc{flex-shrink:0;text-align:right;}
 .doc-type{font-size:15pt;font-weight:700;color:#0D1B2A;display:block;line-height:1.3;}
 .doc-bar{background:#112D5E;color:#fff;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:inline-block;padding:3px 12px;margin-top:5px;}
@@ -99,12 +99,12 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .lbl{font-weight:700;color:#0D1B2A;white-space:nowrap;}
 .val{color:#222;}
 .mono{font-family:monospace;letter-spacing:.03em;}
-.pay{white-space:pre-line;line-height:1.7;margin-top:3px;font-size:8.5pt;}
+.pay{white-space:pre-line;line-height:1.7;margin-top:3px;font-size:9pt;}
 .valid-until{font-size:8.5pt;color:#B94040;font-weight:700;margin-top:4px;}
 /* items */
 .items{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:9pt;}
 .items thead{display:table-header-group;}
-.items th{background:#112D5E;color:#fff;padding:6px 8px;border:1px solid #0D1B2A;font-size:8pt;font-weight:600;text-align:center;white-space:nowrap;line-height:1.4;}
+.items th{background:#112D5E;color:#fff;padding:6px 8px;border:1px solid #0D1B2A;font-size:9pt;font-weight:600;text-align:center;white-space:nowrap;line-height:1.4;}
 .items th.tl{text-align:left;}
 .items td{padding:4px 8px;border:1px solid #C8D0DC;vertical-align:middle;line-height:1.6;}
 .items td.desc{vertical-align:middle;}
@@ -367,7 +367,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <tr><td class="tt-l">ภาษีมูลค่าเพิ่ม 7%</td><td class="tt-r">{fmt(doc.vat_amount)} บาท</td></tr>
       <tr class="grand"><td class="tt-l">จำนวนเงินรวมทั้งสิ้น</td><td class="tt-r">{fmt(doc.total_amount)} บาท</td></tr>
       <tr><td class="tt-l" style="padding-top:6px;">หัก ณ ที่จ่าย 3%</td><td class="tt-r" style="padding-top:6px;">- {fmt(Math.round(doc.price_before_vat*0.03*100)/100)} บาท</td></tr>
-      <tr><td class="tt-l" style="font-weight:700;font-size:11pt;padding-top:6px;border-top:2px solid #112D5E;color:#0D1B2A;">ยอดชำระสุทธิ</td><td class="tt-r" style="font-weight:700;font-size:11pt;padding-top:6px;border-top:2px solid #112D5E;color:#0D1B2A;">{fmt(Math.round((doc.total_amount - doc.price_before_vat*0.03)*100)/100)} บาท</td></tr>
+      <tr><td class="tt-l" style="font-weight:700;font-size:9pt;padding-top:6px;border-top:2px solid #112D5E;color:#0D1B2A;">ยอดชำระสุทธิ</td><td class="tt-r" style="font-weight:700;font-size:9pt;padding-top:6px;border-top:2px solid #112D5E;color:#0D1B2A;">{fmt(Math.round((doc.total_amount - doc.price_before_vat*0.03)*100)/100)} บาท</td></tr>
     </table>
   </div>}
   {doc.document_types?.code !== 'TAX_INVOICE' && <div class="baht-words">จำนวนเงินเป็นตัวหนังสือ: {bahtText(doc.total_amount)}</div>
