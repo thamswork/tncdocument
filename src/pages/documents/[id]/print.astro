@@ -251,11 +251,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <td><span class="lbl">เลขประจำตัวผู้เสียภาษี: </span><span class="val mono">{doc.customers?.tax_id||'—'}</span></td>
     </tr>
   </table>
-  {(doc as any).jobs && (
-    <div style="background:var(--gbg,#FAF5EC);border:1.5px solid #C9A96E;border-radius:4px;padding:6px 14px;margin-bottom:8px;font-size:9pt;font-weight:700;color:#7A5C1E;">
-      งาน: {(doc as any).jobs?.name}{(doc as any).jobs?.description ? ' — '+(doc as any).jobs?.description : ''}
-    </div>
-  )}
+
   <div class="items-wrap"><table class="items">
     <thead>
       {(() => {
