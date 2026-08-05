@@ -81,9 +81,13 @@ const jobs = await getJobsWithCount();
     .icon-btn{padding:6px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--t2);transition:all .15s;white-space:nowrap;}
     .icon-btn:hover{border-color:var(--text);color:var(--text);}
     .icon-btn.danger:hover{border-color:var(--red);color:var(--red);}
-    .edit-form{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--b2);gap:8px;flex-direction:column;}
+    .edit-form{display:none;margin-top:10px;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;gap:10px;flex-direction:column;}
     .job-row.editing .job-static{display:none;}
     .job-row.editing .edit-form{display:flex;}
+    .edit-heading{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
+    .edit-heading span{color:var(--text);text-transform:none;letter-spacing:0;font-weight:600;}
+    .edit-field{display:flex;flex-direction:column;gap:5px;}
+    .edit-field label{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
     .inp{padding:10px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:all .2s;width:100%;}
     .inp:focus{border-color:var(--text);background:var(--white);}
     .edit-btns{display:flex;gap:8px;}
@@ -148,8 +152,15 @@ const jobs = await getJobsWithCount();
             <form method="POST" class="edit-form">
               <input type="hidden" name="action" value="rename"/>
               <input type="hidden" name="job_id" value={j.id}/>
-              <input class="inp" type="text" name="name" value={j.name} placeholder="ชื่องาน" required/>
-              <input class="inp" type="text" name="description" value={j.description || ''} placeholder="รายละเอียด (ไม่บังคับ)"/>
+              <div class="edit-heading">แก้ไขงาน: <span>{j.name}</span></div>
+              <div class="edit-field">
+                <label>ชื่องาน</label>
+                <input class="inp" type="text" name="name" value={j.name} placeholder="ชื่องาน" required/>
+              </div>
+              <div class="edit-field">
+                <label>รายละเอียด (ไม่บังคับ)</label>
+                <input class="inp" type="text" name="description" value={j.description || ''} placeholder="รายละเอียด (ไม่บังคับ)"/>
+              </div>
               <div class="edit-btns">
                 <button type="submit" class="btn-save">บันทึก</button>
                 <button type="button" class="btn-cancel" onclick={`document.getElementById('row-${j.id}').classList.remove('editing')`}>ยกเลิก</button>
@@ -167,7 +178,7 @@ const jobs = await getJobsWithCount();
           <div class="card-title">เพิ่มงานใหม่</div>
           <div class="card-sub">สร้างงานเพื่อผูกกับเอกสาร</div>
         </div>
-        <span style="font-size:18px;">🏗️</span>
+        <span style="font-size:18px;color:var(--t3);">▤</span>
       </div>
       <div class="card-body">
         {success && <div class="alert alert-ok">✓ {success}</div>}

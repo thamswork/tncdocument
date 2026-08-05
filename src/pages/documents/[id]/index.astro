@@ -1,5 +1,5 @@
 ---
-import { getDocument, logAction, publishDocument, deleteDocument } from '../../../lib/documents';
+import { getDocument, logAction, publishDocument, deleteDocument, updateJob } from '../../../lib/documents';
 const user = Astro.locals.user;
 const { id } = Astro.params;
 const doc = await getDocument(id!);
@@ -15,6 +15,15 @@ if (Astro.request.method === 'POST') {
   if (action === 'delete' && user.role === 'superadmin') {
     await deleteDocument(id!, user.id);
     return Astro.redirect('/documents/dashboard');
+  }
+  if (action === 'rename_job') {
+    const jobId = (doc as any).jobs?.id;
+    const name = (form.get('job_name') as string || '').trim();
+    const description = (form.get('job_description') as string || '').trim();
+    if (jobId && name) {
+      await updateJob(jobId, name, description);
+    }
+    return Astro.redirect(`/documents/${id}`);
   }
 }
 
@@ -89,11 +98,26 @@ const hasInstallments = true; // always show — every project can have installm
     .layout{display:grid;grid-template-columns:1fr 270px;min-height:calc(100dvh - 54px);}
     .main{padding:24px;border-right:1px solid var(--border);min-width:0;}
     .aside{padding:20px;background:var(--white);}
-    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+    .info-grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
     .icard{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
     .icard-lbl{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:6px;}
     .icard-val{font-size:14px;font-weight:600;}
     .icard-sub{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.6;}
+    .icard-pay{margin-bottom:20px;}
+    .job-icard{position:relative;}
+    .job-edit-btn{position:absolute;top:14px;right:14px;padding:4px 10px;font-size:10px;font-weight:700;font-family:inherit;color:#8B6914;background:var(--white);border:1px solid var(--gborder);border-radius:20px;cursor:pointer;}
+    .job-edit-btn:hover{background:var(--gbg);}
+    .job-edit-form{display:none;flex-direction:column;gap:8px;}
+    .job-icard.editing .job-static{display:none;}
+    .job-icard.editing .job-edit-form{display:flex;}
+    .jfield{display:flex;flex-direction:column;gap:4px;}
+    .jfield label{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B6914;}
+    .jinp{padding:8px 10px;background:var(--white);border:1.5px solid var(--gborder);border-radius:5px;font-size:12.5px;font-family:inherit;color:var(--text);outline:none;}
+    .jinp:focus{border-color:var(--gold);}
+    .jbtns{display:flex;gap:6px;margin-top:2px;}
+    .jbtn-save{padding:6px 12px;background:#7A5C1E;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;}
+    .jbtn-cancel{padding:6px 12px;background:transparent;border:1px solid var(--gborder);border-radius:5px;font-size:11px;font-family:inherit;color:#8B6914;cursor:pointer;}
     .cat-sec{margin-bottom:16px;}
     .cat-hd{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--text);color:var(--bg);border-radius:5px 5px 0 0;font-size:13px;font-weight:600;}
     .cat-badge{background:rgba(255,255,255,.15);padding:2px 8px;border-radius:3px;font-size:10px;}
@@ -158,6 +182,9 @@ const hasInstallments = true; // always show — every project can have installm
     .modal-btns{display:flex;gap:8px;margin-top:16px;}
     .modal-cancel{flex:1;padding:9px;border:1px solid var(--border);background:transparent;border-radius:4px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;}
     .modal-confirm{flex:2;padding:9px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.04em;text-transform:uppercase;}
+    @media(max-width:900px){
+      .info-grid.cols-3{grid-template-columns:1fr 1fr;}
+    }
     @media(max-width:768px){
       .topbar{padding:0 14px;gap:6px;height:auto;min-height:52px;}
       .tb-cust{display:none;}
@@ -166,6 +193,7 @@ const hasInstallments = true; // always show — every project can have installm
       .main{padding:14px 12px;border-right:none;}
       .aside{border-top:1px solid var(--border);padding:16px 12px;}
       .info-grid{grid-template-columns:1fr;}
+      .info-grid.cols-3{grid-template-columns:1fr;}
       /* bigger tap targets for action items */
       .aitem{padding:14px 13px;}
       .aicon{width:36px;height:36px;}
@@ -214,17 +242,35 @@ const hasInstallments = true; // always show — every project can have installm
 
   <div class="layout">
     <div class="main">
-      <div class="info-grid">
+      <div class={`info-grid${(doc as any).jobs ? ' cols-3' : ''}`}>
         <div class="icard">
           <div class="icard-lbl">ลูกค้า</div>
           <div class="icard-val">{doc.customers?.company_name}</div>
           <div class="icard-sub">{doc.customers?.customer_code}<br/>{doc.customers?.address}</div>
         </div>
         {(doc as any).jobs && (
-          <div class="icard" style="grid-column:span 2;background:var(--gbg);border-color:var(--gborder);">
-            <div class="icard-lbl" style="color:#8B6914;">ชื่องาน</div>
-            <div class="icard-val" style="color:#7A5C1E;">{(doc as any).jobs?.name}</div>
-            {(doc as any).jobs?.description && <div class="icard-sub">{(doc as any).jobs?.description}</div>}
+          <div class="icard job-icard" id="jobIcard" style="background:var(--gbg);border-color:var(--gborder);">
+            <div class="job-static">
+              <div class="icard-lbl" style="color:#8B6914;">ชื่องาน</div>
+              <div class="icard-val" style="color:#7A5C1E;">{(doc as any).jobs?.name}</div>
+              {(doc as any).jobs?.description && <div class="icard-sub">{(doc as any).jobs?.description}</div>}
+              <button type="button" class="job-edit-btn" onclick="document.getElementById('jobIcard').classList.add('editing')">แก้ไข</button>
+            </div>
+            <form method="POST" class="job-edit-form">
+              <input type="hidden" name="action" value="rename_job"/>
+              <div class="jfield">
+                <label>ชื่องาน</label>
+                <input class="jinp" type="text" name="job_name" value={(doc as any).jobs?.name} required/>
+              </div>
+              <div class="jfield">
+                <label>รายละเอียด (ไม่บังคับ)</label>
+                <input class="jinp" type="text" name="job_description" value={(doc as any).jobs?.description || ''}/>
+              </div>
+              <div class="jbtns">
+                <button type="submit" class="jbtn-save">บันทึก</button>
+                <button type="button" class="jbtn-cancel" onclick="document.getElementById('jobIcard').classList.remove('editing')">ยกเลิก</button>
+              </div>
+            </form>
           </div>
         )}
         <div class="icard">
@@ -247,13 +293,13 @@ const hasInstallments = true; // always show — every project can have installm
             {doc.reference_po ? `P/O: ${doc.reference_po}` : ''}
           </div>
         </div>
-        {doc.payment_condition && (
-          <div class="icard" style="grid-column:span 2;">
-            <div class="icard-lbl">เงื่อนไขการชำระเงิน</div>
-            <div class="icard-sub" style="white-space:pre-line;">{doc.payment_condition}</div>
-          </div>
-        )}
       </div>
+      {doc.payment_condition && (
+        <div class="icard icard-pay">
+          <div class="icard-lbl">เงื่อนไขการชำระเงิน</div>
+          <div class="icard-sub" style="white-space:pre-line;">{doc.payment_condition}</div>
+        </div>
+      )}
 
       {doc.categories.length === 0 ? (
         <div class="no-items">ยังไม่มีรายการงานในเอกสารนี้</div>
