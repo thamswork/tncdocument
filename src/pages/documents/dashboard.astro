@@ -22,6 +22,28 @@ const pendingFmt = pendingAmt.toLocaleString('th-TH', {minimumFractionDigits:0, 
 const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).filter(Boolean))];
 const hasMore = (totalCount || 0) > documents.length;
 const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
+
+// Group top-level documents by customer — documents already arrive sorted by
+// date desc, so the first doc encountered per customer is their most recent,
+// which we use to order the customer groups themselves (most active first).
+const customerGroups: Record<string, any> = {};
+for (const doc of visibleDocs) {
+  const cid = doc.customer_id || 'unknown';
+  if (!customerGroups[cid]) {
+    customerGroups[cid] = {
+      id: cid,
+      name: doc.customers?.company_name || 'ไม่ระบุลูกค้า',
+      code: doc.customers?.customer_code || '',
+      docs: [] as any[],
+      total: 0,
+      latestDate: doc.issue_date || '',
+    };
+  }
+  customerGroups[cid].docs.push(doc);
+  customerGroups[cid].total += Number(doc.total_amount || 0);
+  if ((doc.issue_date || '') > customerGroups[cid].latestDate) customerGroups[cid].latestDate = doc.issue_date;
+}
+const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.latestDate||'').localeCompare(a.latestDate||''));
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -152,6 +174,20 @@ const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอรา�
     .result-count{font-size:11px;color:var(--t3);padding:8px 18px;border-top:1px solid var(--b2);text-align:right;}
     .kbd{display:inline-block;background:var(--b2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:9.5px;color:var(--t2);font-family:monospace;}
 
+    /* ── Customer group headers ── */
+    .cust-header{background:var(--bg);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .cust-header:hover{background:var(--b2);}
+    .cust-header td{padding:11px 18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+    .cust-header-inner{display:flex;align-items:center;gap:10px;}
+    .cust-chevron{font-size:11px;color:var(--t3);width:12px;flex-shrink:0;transition:transform .15s;}
+    .cust-avatar{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#C9A96E,#a8824f);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+    .cust-name{font-size:13px;font-weight:700;color:var(--text);}
+    .cust-code{font-size:10.5px;font-family:monospace;color:var(--t3);background:var(--white);border:1px solid var(--border);border-radius:4px;padding:1px 6px;}
+    .cust-meta{font-size:11px;color:var(--t2);margin-left:auto;}
+    .cust-total{font-size:12.5px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:110px;text-align:right;}
+    .expand-all-btn{padding:7px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:11.5px;font-family:inherit;color:var(--t2);cursor:pointer;white-space:nowrap;}
+    .expand-all-btn:hover{border-color:var(--text);color:var(--text);}
+
     /* ── Mobile ── */
     @media(max-width:768px){
       body{display:block;}
@@ -271,6 +307,7 @@ const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอรา�
           <button class="filter-pill draft" data-status="draft" onclick="window.filterStatus('draft')">Draft</button>
           <button class="filter-pill published" data-status="published" onclick="window.filterStatus('published')">Published</button>
         </div>
+        <button class="expand-all-btn" id="expandAllBtn" onclick="window.toggleAllGroups()">ยุบทั้งหมด</button>
       </div>
 
       <div class="tbl-wrap">
@@ -288,57 +325,78 @@ const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอรา�
             </tr>
           </thead>
           <tbody id="docTbody">
-            {documents.filter((doc: any) => !doc.source_document_id).map((doc: any) => {
-              const typeCode = doc.document_types?.code || '';
-              const custName = doc.customers?.company_name || '-';
-              const issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '-';
-              const amt = Number(doc.total_amount||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
-              const rawAmt = Number(doc.total_amount||0);
-              const issuedBy = doc.tnc_users?.full_name || '-';
-              const hasLinked = linkedMap[doc.id]?.length > 0;
+            {groupList.map((g: any) => {
+              const totalFmt = g.total.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
               return (
                 <Fragment>
-                  <tr onclick={`window.location.href='/documents/${doc.id}'`}
-                    data-num={doc.document_number}
-                    data-cust={custName}
-                    data-type={typeCode}
-                    data-status={doc.status}
-                    data-date={doc.issue_date||''}
-                    data-amt={rawAmt}>
-                    <td>
-                      <div style="display:flex;align-items:center;gap:6px;">
-                        {hasLinked && (
-                          <button onclick={`event.stopPropagation();toggleLinked('${doc.id}')`}
-                            id={`exp-${doc.id}`}
-                            style="background:var(--gbg);border:1px solid var(--gborder);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;color:#8B6914;cursor:pointer;font-family:inherit;flex-shrink:0;">
-                            {linkedMap[doc.id].length}งวด▾
-                          </button>
-                        )}
-                        <span class="doc-num">{doc.document_number}</span>
+                  <tr class="cust-header" data-cust-id={g.id} data-cust-name={g.name} onclick={`toggleCustomerGroup('${g.id}')`}>
+                    <td colspan="8">
+                      <div class="cust-header-inner">
+                        <span class="cust-chevron" id={`chev-${g.id}`}>▾</span>
+                        <span class="cust-avatar">{(g.name||'?').charAt(0).toUpperCase()}</span>
+                        <span class="cust-name">{g.name}</span>
+                        {g.code && <span class="cust-code">{g.code}</span>}
+                        <span class="cust-meta">{g.docs.length} เอกสาร</span>
+                        <span class="cust-total" id={`tot-${g.id}`} data-total={g.total}>฿{totalFmt}</span>
                       </div>
                     </td>
-                    <td><span class={`badge badge-${typeCode||'default'}`}>{doc.document_types?.name_th || typeCode}</span></td>
-                    <td>{custName}</td>
-                    <td>{issueDate}</td>
-                    <td class="num"><span class="amt">{amt}</span></td>
-                    <td><span class={`status status-${doc.status}`}><span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}</span></td>
-                    <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
-                    <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
                   </tr>
-                  {hasLinked && linkedMap[doc.id].map((inv: any) => (
-                    <tr id={`linked-${doc.id}`}
-                      style="display:none;background:#FAF5EC;cursor:pointer;"
-                      onclick={`window.location.href='/documents/${inv.id}'`}>
-                      <td style="padding-left:32px;"><span style="color:var(--gold);margin-right:4px;font-size:11px;">↳</span><span class="doc-num" style="font-size:11.5px;">{inv.document_number}</span></td>
-                      <td><span class="badge badge-INVOICE" style="font-size:10px;opacity:.8;">งวด</span></td>
-                      <td style="font-size:11.5px;color:var(--t2);">{inv.payment_condition||'—'}</td>
-                      <td style="font-size:11.5px;">{inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-'}</td>
-                      <td class="num"><span class="amt" style="font-size:12px;">{Number(inv.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></td>
-                      <td><span class={`status status-${inv.status}`}><span class="sdot"></span>{inv.status==='draft'?'Draft':'Published'}</span></td>
-                      <td></td>
-                      <td><a href={`/documents/${inv.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
-                    </tr>
-                  ))}
+                  {g.docs.map((doc: any) => {
+                    const typeCode = doc.document_types?.code || '';
+                    const custName = doc.customers?.company_name || '-';
+                    const issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '-';
+                    const amt = Number(doc.total_amount||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+                    const rawAmt = Number(doc.total_amount||0);
+                    const issuedBy = doc.tnc_users?.full_name || '-';
+                    const hasLinked = linkedMap[doc.id]?.length > 0;
+                    return (
+                      <Fragment>
+                        <tr onclick={`window.location.href='/documents/${doc.id}'`}
+                          data-group={g.id}
+                          data-num={doc.document_number}
+                          data-cust={custName}
+                          data-type={typeCode}
+                          data-status={doc.status}
+                          data-date={doc.issue_date||''}
+                          data-amt={rawAmt}>
+                          <td>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                              {hasLinked && (
+                                <button onclick={`event.stopPropagation();toggleLinked('${doc.id}')`}
+                                  id={`exp-${doc.id}`}
+                                  style="background:var(--gbg);border:1px solid var(--gborder);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;color:#8B6914;cursor:pointer;font-family:inherit;flex-shrink:0;">
+                                  {linkedMap[doc.id].length}งวด▾
+                                </button>
+                              )}
+                              <span class="doc-num">{doc.document_number}</span>
+                            </div>
+                          </td>
+                          <td><span class={`badge badge-${typeCode||'default'}`}>{doc.document_types?.name_th || typeCode}</span></td>
+                          <td>{custName}</td>
+                          <td>{issueDate}</td>
+                          <td class="num"><span class="amt">{amt}</span></td>
+                          <td><span class={`status status-${doc.status}`}><span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}</span></td>
+                          <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
+                          <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
+                        </tr>
+                        {hasLinked && linkedMap[doc.id].map((inv: any) => (
+                          <tr id={`linked-${doc.id}`}
+                            data-group={g.id}
+                            style="display:none;background:#FAF5EC;cursor:pointer;"
+                            onclick={`window.location.href='/documents/${inv.id}'`}>
+                            <td style="padding-left:32px;"><span style="color:var(--gold);margin-right:4px;font-size:11px;">↳</span><span class="doc-num" style="font-size:11.5px;">{inv.document_number}</span></td>
+                            <td><span class="badge badge-INVOICE" style="font-size:10px;opacity:.8;">งวด</span></td>
+                            <td style="font-size:11.5px;color:var(--t2);">{inv.payment_condition||'—'}</td>
+                            <td style="font-size:11.5px;">{inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-'}</td>
+                            <td class="num"><span class="amt" style="font-size:12px;">{Number(inv.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></td>
+                            <td><span class={`status status-${inv.status}`}><span class="sdot"></span>{inv.status==='draft'?'Draft':'Published'}</span></td>
+                            <td></td>
+                            <td><a href={`/documents/${inv.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    );
+                  })}
                 </Fragment>
               );
             })}
@@ -360,55 +418,166 @@ const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอรา�
 
 <script is:inline>
 var currentOffset = 50;
-  window.loadMore = async function() {
-    var btn = document.getElementById('loadMoreBtn');
-    if (btn) { btn.textContent = 'กำลังโหลด...'; btn.disabled = true; }
-    try {
-      var res = await fetch('/documents/api/load-more?offset='+currentOffset+'&limit=50');
-      var json = await res.json();
-      var tbody = document.getElementById('docTbody');
-      var labelMap = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
-      json.data.forEach(function(doc) {
-        if (doc.source_document_id) return;
-        var tr = document.createElement('tr');
-        var typeCode = doc.document_types?.code || '';
-        var custName = doc.customers?.company_name || '-';
-        var issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-';
-        var amt = Number(doc.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
-        tr.setAttribute('onclick',"window.location.href='/documents/"+doc.id+"'");
-        tr.setAttribute('data-num',doc.document_number);
-        tr.setAttribute('data-cust',custName);
-        tr.setAttribute('data-type',typeCode);
-        tr.setAttribute('data-status',doc.status);
-        tr.setAttribute('data-date',doc.issue_date||'');
-        tr.setAttribute('data-amt',String(Number(doc.total_amount||0)));
-        tr.innerHTML='<td><span class="doc-num">'+doc.document_number+'</span></td>'+
-          '<td><span class="badge badge-'+typeCode+'">'+(labelMap[typeCode]||typeCode)+'</span></td>'+
-          '<td>'+custName+'</td><td>'+issueDate+'</td>'+
-          '<td class="num"><span class="amt">'+amt+'</span></td>'+
-          '<td><span class="status status-'+doc.status+'"><span class="sdot"></span>'+(doc.status==='draft'?'Draft':'Published')+'</span></td>'+
-          '<td style="font-size:11.5px;color:var(--t2);">'+(doc.tnc_users?.full_name||'-')+'</td>'+
-          '<td><a href="/documents/'+doc.id+'" class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>';
-        tbody.appendChild(tr);
-      });
-      currentOffset += 50;
-      var wrap = document.getElementById('loadMoreWrap');
-      if (currentOffset >= json.count) {
-        if (wrap) wrap.style.display = 'none';
-      } else {
-        if (btn) { btn.textContent='โหลดเพิ่มเติม (เหลือ '+(json.count-currentOffset)+' รายการ)'; btn.disabled=false; }
-      }
-    } catch(e) {
-      if (btn) { btn.textContent='โหลดไม่สำเร็จ — ลองอีกครั้ง'; btn.disabled=false; }
+var collapsedGroups = {};
+
+function ensureGroup(doc, tbody) {
+  var gid = doc.customer_id || 'unknown';
+  var header = document.querySelector('tr.cust-header[data-cust-id="'+gid+'"]');
+  if (header) return { gid: gid, header: header, isNew: false };
+  var custName = doc.customers?.company_name || 'ไม่ระบุลูกค้า';
+  var custCode = doc.customers?.customer_code || '';
+  header = document.createElement('tr');
+  header.className = 'cust-header';
+  header.setAttribute('data-cust-id', gid);
+  header.setAttribute('data-cust-name', custName);
+  header.setAttribute('onclick', "toggleCustomerGroup('"+gid+"')");
+  header.innerHTML = '<td colspan="8"><div class="cust-header-inner">'+
+    '<span class="cust-chevron" id="chev-'+gid+'">▾</span>'+
+    '<span class="cust-avatar">'+(custName.charAt(0).toUpperCase())+'</span>'+
+    '<span class="cust-name">'+custName+'</span>'+
+    (custCode ? '<span class="cust-code">'+custCode+'</span>' : '')+
+    '<span class="cust-meta" id="cnt-'+gid+'">0 เอกสาร</span>'+
+    '<span class="cust-total" id="tot-'+gid+'" data-total="0">฿0.00</span>'+
+    '</div></td>';
+  tbody.appendChild(header);
+  return { gid: gid, header: header, isNew: true };
+}
+
+function bumpGroupTotals(gid, amount) {
+  var totEl = document.getElementById('tot-'+gid);
+  var cntEl = document.getElementById('cnt-'+gid);
+  if (totEl) {
+    var newTotal = (parseFloat(totEl.dataset.total)||0) + amount;
+    totEl.dataset.total = String(newTotal);
+    totEl.textContent = '฿'+newTotal.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  if (cntEl) {
+    var n = (parseInt(cntEl.dataset.n||cntEl.textContent)||0) + 1;
+    cntEl.dataset.n = String(n);
+    cntEl.textContent = n+' เอกสาร';
+  }
+}
+
+window.loadMore = async function() {
+  var btn = document.getElementById('loadMoreBtn');
+  if (btn) { btn.textContent = 'กำลังโหลด...'; btn.disabled = true; }
+  try {
+    var res = await fetch('/documents/api/load-more?offset='+currentOffset+'&limit=50');
+    var json = await res.json();
+    var tbody = document.getElementById('docTbody');
+    var labelMap = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
+    json.data.forEach(function(doc) {
+      if (doc.source_document_id) return;
+      var g = ensureGroup(doc, tbody);
+      var typeCode = doc.document_types?.code || '';
+      var custName = doc.customers?.company_name || '-';
+      var issueDate = doc.issue_date ? new Date(doc.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-';
+      var amt = Number(doc.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+      var tr = document.createElement('tr');
+      tr.setAttribute('onclick',"window.location.href='/documents/"+doc.id+"'");
+      tr.setAttribute('data-group', g.gid);
+      tr.setAttribute('data-num',doc.document_number);
+      tr.setAttribute('data-cust',custName);
+      tr.setAttribute('data-type',typeCode);
+      tr.setAttribute('data-status',doc.status);
+      tr.setAttribute('data-date',doc.issue_date||'');
+      tr.setAttribute('data-amt',String(Number(doc.total_amount||0)));
+      tr.innerHTML='<td><span class="doc-num">'+doc.document_number+'</span></td>'+
+        '<td><span class="badge badge-'+typeCode+'">'+(labelMap[typeCode]||typeCode)+'</span></td>'+
+        '<td>'+custName+'</td><td>'+issueDate+'</td>'+
+        '<td class="num"><span class="amt">'+amt+'</span></td>'+
+        '<td><span class="status status-'+doc.status+'"><span class="sdot"></span>'+(doc.status==='draft'?'Draft':'Published')+'</span></td>'+
+        '<td style="font-size:11.5px;color:var(--t2);">'+(doc.tnc_users?.full_name||'-')+'</td>'+
+        '<td><a href="/documents/'+doc.id+'" class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>';
+      tbody.appendChild(tr);
+      bumpGroupTotals(g.gid, Number(doc.total_amount||0));
+    });
+    currentOffset += 50;
+    var wrap = document.getElementById('loadMoreWrap');
+    if (currentOffset >= json.count) {
+      if (wrap) wrap.style.display = 'none';
+    } else {
+      if (btn) { btn.textContent='โหลดเพิ่มเติม (เหลือ '+(json.count-currentOffset)+' รายการ)'; btn.disabled=false; }
     }
-  };
-  function toggleLinked(docId) {
+    applyFilters();
+  } catch(e) {
+    if (btn) { btn.textContent='โหลดไม่สำเร็จ — ลองอีกครั้ง'; btn.disabled=false; }
+  }
+};
+
+function toggleLinked(docId) {
   var rows = document.querySelectorAll('[id="linked-'+docId+'"]');
   var btn = document.getElementById('exp-'+docId);
   var isHidden = rows.length > 0 && rows[0].style.display === 'none';
   rows.forEach(function(r) { r.style.display = isHidden ? '' : 'none'; });
   if (btn) btn.innerHTML = isHidden ? btn.innerHTML.replace('▾','▴') : btn.innerHTML.replace('▴','▾');
 }
+
+window.toggleCustomerGroup = function(gid) {
+  if (collapsedGroups[gid]) delete collapsedGroups[gid]; else collapsedGroups[gid] = true;
+  renderGroups();
+};
+
+window.toggleAllGroups = function() {
+  var headers = document.querySelectorAll('tr.cust-header');
+  var anyCollapsed = false;
+  headers.forEach(function(h){ if (collapsedGroups[h.dataset.custId]) anyCollapsed = true; });
+  collapsedGroups = {};
+  if (!anyCollapsed) {
+    headers.forEach(function(h){ collapsedGroups[h.dataset.custId] = true; });
+  }
+  renderGroups();
+};
+
+function renderGroups() {
+  var filtering = !!(window.__searchVal || window.__typeVal || window.__statusVal);
+  var anyCollapsed = false;
+  document.querySelectorAll('tr.cust-header').forEach(function(header){
+    var gid = header.dataset.custId;
+    var groupRows = document.querySelectorAll('tr[data-group="'+gid+'"]');
+    var docRows = Array.from(groupRows).filter(function(r){ return r.hasAttribute('data-num'); });
+    var visibleDocRows = docRows.filter(function(r){ return !r.classList.contains('hidden'); });
+    var hasMatch = visibleDocRows.length > 0;
+    header.style.display = hasMatch ? '' : 'none';
+    if (!hasMatch) {
+      groupRows.forEach(function(r){ r.style.display = 'none'; });
+      return;
+    }
+    var expanded = filtering ? true : !collapsedGroups[gid];
+    if (!expanded) anyCollapsed = true;
+    var chev = document.getElementById('chev-'+gid);
+    if (chev) chev.textContent = expanded ? '▾' : '▸';
+    docRows.forEach(function(r){
+      r.style.display = (expanded && !r.classList.contains('hidden')) ? '' : 'none';
+    });
+    groupRows.forEach(function(r){
+      if (r.hasAttribute('data-num')) return;
+      if (!expanded) r.style.display = 'none';
+    });
+  });
+  var expandAllBtn = document.getElementById('expandAllBtn');
+  if (expandAllBtn) expandAllBtn.textContent = anyCollapsed ? 'ขยายทั้งหมด' : 'ยุบทั้งหมด';
+
+  var totalRows = document.querySelectorAll('#docTbody tr[data-num]').length;
+  var shownRows = document.querySelectorAll('#docTbody tr[data-num]:not(.hidden)').length;
+  var resultEl = document.getElementById('resultCount');
+  if (resultEl) resultEl.textContent = shownRows === totalRows ? 'แสดง '+totalRows+' รายการ' : 'แสดง '+shownRows+' จาก '+totalRows+' รายการ';
+
+  var empty = document.getElementById('emptyRow');
+  if (!shownRows) {
+    if (!empty) {
+      empty = document.createElement('tr');
+      empty.id = 'emptyRow';
+      empty.className = 'empty-row';
+      empty.innerHTML = '<td colspan="8"><div class="empty-row-title">ไม่พบเอกสาร</div><div>ลองเปลี่ยนเงื่อนไขการค้นหา</div></td>';
+      document.getElementById('docTbody').appendChild(empty);
+    }
+    empty.style.display = '';
+  } else if (empty) {
+    empty.style.display = 'none';
+  }
+}
+
 // ── Sidebar toggle (must be on window scope) ──
 window.toggleSidebar = function() {
   var sb = document.getElementById('sidebar');
@@ -425,100 +594,97 @@ document.querySelectorAll('.sb-link').forEach(function(l){
 });
 
 // ── Table logic ──
-(function(){
-  var searchVal='', typeVal='', statusVal='', sortCol='date', sortDir='desc';
+var searchVal='', typeVal='', statusVal='', sortCol='date', sortDir='desc';
 
-  function applyFilters(){
-    var rows = Array.from(document.querySelectorAll('#docTbody tr[data-num]'));
-    var q = searchVal.toLowerCase().trim();
-    var visible = 0;
-    rows.forEach(function(row){
-      var match = (!q || (row.dataset.num||'').toLowerCase().includes(q) || (row.dataset.cust||'').toLowerCase().includes(q) || (row.dataset.type||'').toLowerCase().includes(q))
-        && (!typeVal || row.dataset.type === typeVal)
-        && (!statusVal || row.dataset.status === statusVal);
-      row.classList.toggle('hidden', !match);
-      if(match) visible++;
-    });
-    var empty = document.getElementById('emptyRow');
-    if(!visible){
-      if(!empty){
-        empty = document.createElement('tr');
-        empty.id = 'emptyRow';
-        empty.className = 'empty-row';
-        empty.innerHTML = '<td colspan="8"><div class="empty-row-title">ไม่พบเอกสาร</div><div>ลองเปลี่ยนเงื่อนไขการค้นหา</div></td>';
-        document.getElementById('docTbody').appendChild(empty);
-      }
-      empty.style.display = '';
-    } else {
-      if(empty) empty.style.display = 'none';
-    }
-    var total = rows.length;
-    document.getElementById('resultCount').textContent = visible === total ? 'แสดง '+total+' รายการ' : 'แสดง '+visible+' จาก '+total+' รายการ';
-  }
-
-  function sortRows(){
-    var tbody = document.getElementById('docTbody');
-    var rows = Array.from(tbody.querySelectorAll('tr[data-num]'));
-    rows.sort(function(a,b){
-      if(sortCol==='amt'){ var d=(parseFloat(a.dataset.amt)||0)-(parseFloat(b.dataset.amt)||0); return sortDir==='asc'?d:-d; }
-      var va='', vb='';
-      if(sortCol==='date'){va=a.dataset.date||'';vb=b.dataset.date||'';}
-      else if(sortCol==='num'){va=a.dataset.num||'';vb=b.dataset.num||'';}
-      else if(sortCol==='cust'){va=a.dataset.cust||'';vb=b.dataset.cust||'';}
-      return sortDir==='asc'?va.localeCompare(vb,'th'):vb.localeCompare(va,'th');
-    });
-    rows.forEach(function(r){
-      tbody.appendChild(r);
-      // move linked rows immediately after parent
-      var docId = r.getAttribute('onclick')||'';
-      var m = docId.match(/\/documents\/([^']+)/);
-      if (m) {
-        var linked = document.querySelectorAll('[id="linked-'+m[1]+'"]');
-        linked.forEach(function(lr){ tbody.appendChild(lr); });
-      }
-    });
-    ['num','cust','date','amt'].forEach(function(c){
-      var el=document.getElementById('sort-'+c);
-      if(!el) return;
-      el.textContent = c===sortCol?(sortDir==='asc'?'↑':'↓'):'';
-    });
-  }
-
-  window.doSearch = function(v){ searchVal=v; applyFilters(); };
-
-  window.filterType = function(el, type){
-    typeVal=type;
-    document.querySelectorAll('#typeFilters .filter-pill').forEach(function(b){b.classList.remove('active');});
-    el.classList.add('active');
-    applyFilters();
-  };
-
-  window.filterStatus = function(status){
-    statusVal=status;
-    ['all','draft','published'].forEach(function(s){
-      var el=document.getElementById('stat-'+s);
-      if(el) el.classList.toggle('active',(s==='all'&&!status)||s===status);
-    });
-    document.querySelectorAll('#statusFilters .filter-pill').forEach(function(b){
-      b.classList.toggle('active',(b.dataset.status||'')===status);
-    });
-    applyFilters();
-  };
-
-  window.sortBy = function(col){
-    if(sortCol===col){sortDir=sortDir==='asc'?'desc':'asc';}
-    else{sortCol=col;sortDir=col==='amt'?'desc':'asc';}
-    sortRows(); applyFilters();
-  };
-
-  document.addEventListener('keydown', function(e){
-    var inp=document.getElementById('searchInp');
-    if(e.key==='/'&&document.activeElement!==inp){e.preventDefault();inp.focus();inp.select();}
-    if(e.key==='Escape'){inp.value='';inp.blur();window.doSearch('');}
+function applyFilters(){
+  window.__searchVal = searchVal; window.__typeVal = typeVal; window.__statusVal = statusVal;
+  var rows = Array.from(document.querySelectorAll('#docTbody tr[data-num]'));
+  var q = searchVal.toLowerCase().trim();
+  rows.forEach(function(row){
+    var match = (!q || (row.dataset.num||'').toLowerCase().includes(q) || (row.dataset.cust||'').toLowerCase().includes(q) || (row.dataset.type||'').toLowerCase().includes(q))
+      && (!typeVal || row.dataset.type === typeVal)
+      && (!statusVal || row.dataset.status === statusVal);
+    row.classList.toggle('hidden', !match);
   });
+  renderGroups();
+}
 
+function sortRows(){
+  var tbody = document.getElementById('docTbody');
+  if (sortCol === 'cust') {
+    var headers = Array.from(tbody.querySelectorAll('tr.cust-header'));
+    headers.sort(function(a,b){
+      var va = a.dataset.custName||'', vb = b.dataset.custName||'';
+      return sortDir==='asc' ? va.localeCompare(vb,'th') : vb.localeCompare(va,'th');
+    });
+    headers.forEach(function(h){
+      tbody.appendChild(h);
+      var gid = h.dataset.custId;
+      document.querySelectorAll('tr[data-group="'+gid+'"]').forEach(function(r){ tbody.appendChild(r); });
+    });
+  } else {
+    var headers2 = Array.from(tbody.querySelectorAll('tr.cust-header'));
+    headers2.forEach(function(h){
+      tbody.appendChild(h);
+      var gid = h.dataset.custId;
+      var docRows = Array.from(tbody.querySelectorAll('tr[data-group="'+gid+'"][data-num]'));
+      docRows.sort(function(a,b){
+        if(sortCol==='amt'){ var d=(parseFloat(a.dataset.amt)||0)-(parseFloat(b.dataset.amt)||0); return sortDir==='asc'?d:-d; }
+        var va='', vb='';
+        if(sortCol==='date'){va=a.dataset.date||'';vb=b.dataset.date||'';}
+        else if(sortCol==='num'){va=a.dataset.num||'';vb=b.dataset.num||'';}
+        return sortDir==='asc'?va.localeCompare(vb,'th'):vb.localeCompare(va,'th');
+      });
+      docRows.forEach(function(r){
+        tbody.appendChild(r);
+        var m = (r.getAttribute('onclick')||'').match(/\/documents\/([^']+)/);
+        if (m) {
+          document.querySelectorAll('[id="linked-'+m[1]+'"]').forEach(function(lr){ tbody.appendChild(lr); });
+        }
+      });
+    });
+  }
+  ['num','cust','date','amt'].forEach(function(c){
+    var el=document.getElementById('sort-'+c);
+    if(!el) return;
+    el.textContent = c===sortCol?(sortDir==='asc'?'↑':'↓'):'';
+  });
+}
+
+window.doSearch = function(v){ searchVal=v; applyFilters(); };
+
+window.filterType = function(el, type){
+  typeVal=type;
+  document.querySelectorAll('#typeFilters .filter-pill').forEach(function(b){b.classList.remove('active');});
+  el.classList.add('active');
+  applyFilters();
+};
+
+window.filterStatus = function(status){
+  statusVal=status;
+  ['all','draft','published'].forEach(function(s){
+    var el=document.getElementById('stat-'+s);
+    if(el) el.classList.toggle('active',(s==='all'&&!status)||s===status);
+  });
+  document.querySelectorAll('#statusFilters .filter-pill').forEach(function(b){
+    b.classList.toggle('active',(b.dataset.status||'')===status);
+  });
+  applyFilters();
+};
+
+window.sortBy = function(col){
+  if(sortCol===col){sortDir=sortDir==='asc'?'desc':'asc';}
+  else{sortCol=col;sortDir=col==='amt'?'desc':'asc';}
   sortRows(); applyFilters();
-})();
+};
+
+document.addEventListener('keydown', function(e){
+  var inp=document.getElementById('searchInp');
+  if(e.key==='/'&&document.activeElement!==inp){e.preventDefault();inp.focus();inp.select();}
+  if(e.key==='Escape'){inp.value='';inp.blur();window.doSearch('');}
+});
+
+sortRows(); applyFilters();
 </script>
 </body>
 </html>
