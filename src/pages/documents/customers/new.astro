@@ -1,12 +1,14 @@
 ---
-import { createCustomer } from '../../../lib/documents';
+import { createCustomer, getNextCustomerCode } from '../../../lib/documents';
 const user = Astro.locals.user;
 let error = '';
+let codeValue = '';
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
+  codeValue = (form.get('customer_code') as string || '').trim().toUpperCase();
   const result = await createCustomer({
-    customer_code: (form.get('customer_code') as string || '').trim().toUpperCase(),
+    customer_code: codeValue,
     company_name: (form.get('company_name') as string || '').trim(),
     contact_name: (form.get('contact_name') as string || '') || undefined,
     address: (form.get('address') as string || '') || undefined,
@@ -19,6 +21,8 @@ if (Astro.request.method === 'POST') {
   });
   if (result.error) { error = result.error.message; }
   else { return Astro.redirect('/documents/customers'); }
+} else {
+  codeValue = await getNextCustomerCode();
 }
 ---
 <!DOCTYPE html>
@@ -42,6 +46,7 @@ if (Astro.request.method === 'POST') {
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
     .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
     .fg.full{grid-column:span 2;}
+    .hint{font-size:10.5px;color:var(--text3);margin-top:-2px;}
     label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
     label span{color:var(--red);margin-left:2px;}
     input,textarea{padding:10px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:13.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;}
@@ -68,7 +73,8 @@ if (Astro.request.method === 'POST') {
         <div class="grid">
           <div class="fg">
             <label>รหัสลูกค้า <span>*</span></label>
-            <input type="text" name="customer_code" placeholder="เช่น 005212" required />
+            <input type="text" name="customer_code" value={codeValue} placeholder="เช่น 005212" required />
+            <div class="hint">สร้างให้อัตโนมัติ — แก้ไขได้หากต้องการ</div>
           </div>
           <div class="fg">
             <label>ชื่อผู้ติดต่อ</label>
