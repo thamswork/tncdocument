@@ -1,0 +1,192 @@
+---
+import { getJobsWithCount, updateJob, createJob, deleteJob } from '../../lib/documents';
+
+const user = Astro.locals.user;
+
+let error = '', success = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('action') as string;
+
+  if (action === 'rename') {
+    const jobId = form.get('job_id') as string;
+    const name = (form.get('name') as string || '').trim();
+    const description = (form.get('description') as string || '').trim();
+    if (!name) {
+      error = 'กรุณากรอกชื่องาน';
+    } else {
+      const { error: dbErr } = await updateJob(jobId, name, description);
+      if (dbErr) { error = dbErr.message; } else { success = `เปลี่ยนชื่องานเป็น "${name}" สำเร็จ — อัปเดตในทุกเอกสารที่เชื่อมโยงแล้ว`; }
+    }
+  }
+
+  if (action === 'create') {
+    const name = (form.get('name') as string || '').trim();
+    const description = (form.get('description') as string || '').trim();
+    if (!name) {
+      error = 'กรุณากรอกชื่องาน';
+    } else {
+      const { error: dbErr } = await createJob(name, description, user.id);
+      if (dbErr) { error = dbErr.message; } else { success = `เพิ่มงาน "${name}" สำเร็จ`; }
+    }
+  }
+
+  if (action === 'delete') {
+    const jobId = form.get('job_id') as string;
+    const { error: dbErr } = await deleteJob(jobId);
+    if (dbErr) { error = 'ลบไม่ได้ — งานนี้ถูกใช้งานอยู่ในเอกสาร'; } else { success = 'ลบงานสำเร็จ'; }
+  }
+}
+
+const jobs = await getJobsWithCount();
+---
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>จัดการงาน — TNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
+      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
+      --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
+      --green:#2D7A4F;--grbg:#EDF7F0;--grborder:#C5E8D2;
+      --red:#B94040;--redbg:#FEF2F2;
+    }
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;}
+    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 14px;border:1px solid var(--border);border-radius:6px;transition:all .15s;}
+    .back:hover{border-color:var(--text);color:var(--text);}
+    .topbar-title{font-size:16px;font-weight:700;}
+    .layout{display:grid;grid-template-columns:1fr 380px;gap:24px;padding:28px;max-width:1100px;margin:0 auto;align-items:start;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+    .card-hd{padding:18px 22px;border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;}
+    .card-title{font-size:14px;font-weight:700;}
+    .card-sub{font-size:11.5px;color:var(--t3);margin-top:2px;}
+    .card-count{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--t2);}
+    .job-list{padding:8px 0;}
+    .job-row{padding:14px 22px;border-bottom:1px solid var(--b2);}
+    .job-row:last-child{border-bottom:none;}
+    .job-static{display:flex;align-items:center;gap:12px;}
+    .job-avatar{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#C9A96E,#a8824f);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+    .job-info{flex:1;min-width:0;}
+    .job-name{font-size:13.5px;font-weight:600;color:var(--text);}
+    .job-desc{font-size:11.5px;color:var(--t3);margin-top:1px;}
+    .job-count{font-size:10.5px;font-weight:700;color:var(--t2);background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;white-space:nowrap;}
+    .job-actions{display:flex;gap:6px;flex-shrink:0;}
+    .icon-btn{padding:6px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--t2);transition:all .15s;white-space:nowrap;}
+    .icon-btn:hover{border-color:var(--text);color:var(--text);}
+    .icon-btn.danger:hover{border-color:var(--red);color:var(--red);}
+    .edit-form{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--b2);gap:8px;flex-direction:column;}
+    .job-row.editing .job-static{display:none;}
+    .job-row.editing .edit-form{display:flex;}
+    .inp{padding:10px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:all .2s;width:100%;}
+    .inp:focus{border-color:var(--text);background:var(--white);}
+    .edit-btns{display:flex;gap:8px;}
+    .btn-save{padding:9px 16px;background:var(--text);color:var(--bg);border:none;border-radius:6px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;}
+    .btn-cancel{padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;color:var(--t2);cursor:pointer;}
+    .card-body{padding:22px;}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+    .field label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
+    .hint{font-size:11px;color:var(--t3);margin-top:-10px;margin-bottom:14px;line-height:1.6;}
+    .alert{border-radius:7px;padding:12px 16px;font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+    .alert-ok{background:var(--grbg);border:1px solid var(--grborder);color:var(--green);}
+    .alert-err{background:var(--redbg);border:1px solid #FECACA;color:var(--red);}
+    .btn-submit{width:100%;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:7px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:opacity .15s;margin-top:4px;}
+    .btn-submit:hover{opacity:.88;}
+    .empty{padding:40px 22px;text-align:center;color:var(--t3);font-size:13px;}
+    @media(max-width:768px){
+      .layout{grid-template-columns:1fr;padding:14px;}
+      .topbar{padding:0 16px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="/documents/dashboard" class="back">← กลับ</a>
+    <div>
+      <div class="topbar-title">จัดการงาน / Jobs</div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- Jobs List -->
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <div class="card-title">รายชื่องานทั้งหมด</div>
+          <div class="card-sub">แก้ไขชื่องานที่นี่ที่เดียว จะอัปเดตในทุกเอกสารที่เชื่อมโยงทันที</div>
+        </div>
+        <div class="card-count">{jobs.length} งาน</div>
+      </div>
+      <div class="job-list">
+        {jobs.length === 0 && <div class="empty">ยังไม่มีงานในระบบ</div>}
+        {jobs.map((j: any) => (
+          <div class="job-row" id={`row-${j.id}`}>
+            <div class="job-static">
+              <div class="job-avatar">{j.name.charAt(0).toUpperCase()}</div>
+              <div class="job-info">
+                <div class="job-name">{j.name}</div>
+                {j.description && <div class="job-desc">{j.description}</div>}
+              </div>
+              <div class="job-count">{j.doc_count} เอกสาร</div>
+              <div class="job-actions">
+                <button type="button" class="icon-btn" onclick={`document.getElementById('row-${j.id}').classList.add('editing')`}>แก้ไข</button>
+                {j.doc_count === 0 && (
+                  <form method="POST" style="display:inline;" onsubmit="return confirm('ลบงานนี้?')">
+                    <input type="hidden" name="action" value="delete"/>
+                    <input type="hidden" name="job_id" value={j.id}/>
+                    <button type="submit" class="icon-btn danger">ลบ</button>
+                  </form>
+                )}
+              </div>
+            </div>
+            <form method="POST" class="edit-form">
+              <input type="hidden" name="action" value="rename"/>
+              <input type="hidden" name="job_id" value={j.id}/>
+              <input class="inp" type="text" name="name" value={j.name} placeholder="ชื่องาน" required/>
+              <input class="inp" type="text" name="description" value={j.description || ''} placeholder="รายละเอียด (ไม่บังคับ)"/>
+              <div class="edit-btns">
+                <button type="submit" class="btn-save">บันทึก</button>
+                <button type="button" class="btn-cancel" onclick={`document.getElementById('row-${j.id}').classList.remove('editing')`}>ยกเลิก</button>
+              </div>
+            </form>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- Add Job Form -->
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <div class="card-title">เพิ่มงานใหม่</div>
+          <div class="card-sub">สร้างงานเพื่อผูกกับเอกสาร</div>
+        </div>
+        <span style="font-size:18px;">🏗️</span>
+      </div>
+      <div class="card-body">
+        {success && <div class="alert alert-ok">✓ {success}</div>}
+        {error && <div class="alert alert-err">✕ {error}</div>}
+        <form method="POST">
+          <input type="hidden" name="action" value="create"/>
+          <div class="field">
+            <label>ชื่องาน *</label>
+            <input class="inp" type="text" name="name" placeholder="เช่น ตกแต่งร้าน Central Westgate" required/>
+          </div>
+          <div class="field">
+            <label>รายละเอียด (ไม่บังคับ)</label>
+            <input class="inp" type="text" name="description" placeholder="ข้อมูลเพิ่มเติม"/>
+          </div>
+          <div class="hint">งานนี้จะปรากฏในขั้นตอนสร้างเอกสารใหม่ และแก้ไขได้ทุกเมื่อจากหน้านี้</div>
+          <button type="submit" class="btn-submit">+ เพิ่มงานใหม่</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

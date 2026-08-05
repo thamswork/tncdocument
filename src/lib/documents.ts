@@ -29,6 +29,28 @@ export async function createJob(name: string, description: string, userId: strin
   return { data, error };
 }
 
+// Jobs list with a count of documents linked to each — used on the job management page
+export async function getJobsWithCount() {
+  const { data: jobs } = await supabaseAdmin.from('jobs').select('id, name, description').order('name');
+  if (!jobs || jobs.length === 0) return [];
+  const { data: docs } = await supabaseAdmin.from('documents').select('job_id').not('job_id', 'is', null);
+  const counts: Record<string, number> = {};
+  (docs || []).forEach((d: any) => { counts[d.job_id] = (counts[d.job_id] || 0) + 1; });
+  return jobs.map((j: any) => ({ ...j, doc_count: counts[j.id] || 0 }));
+}
+
+// Renaming a job here updates it everywhere at once — every document, print page,
+// and view page pulls the job name live via the job_id foreign key.
+export async function updateJob(id: string, name: string, description: string) {
+  const { data, error } = await supabaseAdmin.from('jobs').update({ name, description }).eq('id', id).select().single();
+  return { data, error };
+}
+
+export async function deleteJob(id: string) {
+  const { error } = await supabaseAdmin.from('jobs').delete().eq('id', id);
+  return { error };
+}
+
 export async function getDocumentTypes() {
   if (_docTypesCache) return _docTypesCache;
   const { data } = await supabaseAdmin.from('document_types').select('id,code,name_th,name_en,prefix,is_active,sort_order').eq('is_active', true).order('sort_order');
