@@ -74,19 +74,21 @@ export async function createCustomer(data: any) {
   return { customer, error };
 }
 
-// Suggests the next customer code as (highest existing numeric code) + 1,
-// padded to match the width of the longest existing code. Purely a default —
-// the field on the create-customer page stays editable.
+// Suggests the next customer code as TNC{currentYear}_{seq}, where seq is the next
+// sequential number within the current year. Purely a default — the field on the
+// create-customer page stays editable.
 export async function getNextCustomerCode() {
-  const { data } = await supabaseAdmin.from('customers').select('customer_code');
-  const nums = (data || [])
-    .map((c: any) => c.customer_code)
-    .filter((code: string) => /^\d+$/.test(code || ''))
-    .map((code: string) => ({ val: parseInt(code, 10), len: code.length }));
-  if (nums.length === 0) return '000001';
-  const maxLen = Math.max(...nums.map((n) => n.len));
-  const maxVal = Math.max(...nums.map((n) => n.val));
-  return String(maxVal + 1).padStart(maxLen, '0');
+  const year = new Date().getFullYear();
+  const { data } = await supabaseAdmin
+    .from('customers')
+    .select('customer_code')
+    .ilike('customer_code', `TNC${year}_%`);
+  const seqs = (data || []).map((c: any) => {
+    const m = (c.customer_code || '').match(/^TNC\d{4}_(\d+)$/);
+    return m ? parseInt(m[1], 10) : 0;
+  });
+  const nextSeq = (seqs.length ? Math.max(...seqs) : 0) + 1;
+  return `TNC${year}_${String(nextSeq).padStart(4, '0')}`;
 }
 
 export async function getDocuments(filters?: any) {
