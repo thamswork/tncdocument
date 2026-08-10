@@ -70,6 +70,5 @@ export async function getUsers() {
   return data || [];
 }
 
-export function canPublish(user: TNCUser): boolean { return user.role === 'superadmin' || user.role === 'admin'; }
+export function canPublish(user: TNCUser): boolean { return user.role === 'superadmin'; }
 export function canEdit(user: TNCUser): boolean { return user.role === 'superadmin' || user.role === 'admin'; }
-export function canDelete(user: TNCUser): boolean { return user.role === 'superadmin' || user.role === 'admin'; }

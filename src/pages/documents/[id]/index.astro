@@ -1,6 +1,5 @@
 ---
 import { getDocument, logAction, publishDocument, deleteDocument, updateJob } from '../../../lib/documents';
-import { canPublish, canDelete } from '../../../lib/auth';
 const user = Astro.locals.user;
 const { id } = Astro.params;
 const doc = await getDocument(id!);
@@ -9,11 +8,11 @@ if (!doc) return Astro.redirect('/documents/dashboard');
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = form.get('action') as string;
-  if (action === 'publish' && canPublish(user)) {
+  if (action === 'publish' && user.role === 'superadmin') {
     await publishDocument(id!, user.id);
     return Astro.redirect(`/documents/${id}`);
   }
-  if (action === 'delete' && canDelete(user)) {
+  if (action === 'delete' && user.role === 'superadmin') {
     await deleteDocument(id!, user.id);
     return Astro.redirect('/documents/dashboard');
   }
@@ -224,14 +223,14 @@ const hasInstallments = true; // always show — every project can have installm
         <span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}
       </span>
       <a href={`/documents/${id}/print`} target="_blank" class="btn btn-ol">PDF</a>
-      {doc.status === 'draft' && canPublish(user) && (
+      {doc.status === 'draft' && user.role === 'superadmin' && (
         <form method="POST" style="display:inline;">
           <input type="hidden" name="action" value="publish"/>
           <button type="submit" class="btn btn-green"
-            onclick="return confirm('ออกเอกสารนี้?')">ออกเอกสาร</button>
+            onclick="return confirm('ออกเอกสารนี้? จะไม่สามารถแก้ไขได้หลังจากนี้')">ออกเอกสาร</button>
         </form>
       )}
-      {canDelete(user) && (
+      {user.role === 'superadmin' && (
         <form method="POST" style="display:inline;">
           <input type="hidden" name="action" value="delete"/>
           <button type="submit" class="btn btn-red"
@@ -470,13 +469,13 @@ const hasInstallments = true; // always show — every project can have installm
               <div><div class="atext-title">ออกใบกำกับภาษี</div><div class="atext-sub" id="tx-hint">สร้างใบเสร็จรับเงิน/ใบกำกับภาษี</div></div>
             </button>
           )}
-          {canEdit(user) && (
+          {(doc.status==='draft' || user.role==='superadmin') && (
             <a href={`/documents/${id}/edit`} class="aitem">
               <div class="aicon aicon-edit">✎</div>
               <div><div class="atext-title">แก้ไขเอกสาร</div><div class="atext-sub">แก้ไขรายการและข้อมูล</div></div>
             </a>
           )}
-          {doc.status==='draft' && canPublish(user) && (
+          {doc.status==='draft' && user.role==='superadmin' && (
             <form method="POST">
               <input type="hidden" name="action" value="publish"/>
               <button type="submit" class="aitem" style="background:var(--grbg);border-color:var(--grborder);"
@@ -486,7 +485,7 @@ const hasInstallments = true; // always show — every project can have installm
               </button>
             </form>
           )}
-          {canDelete(user) && (
+          {user.role==='superadmin' && (
             <form method="POST">
               <input type="hidden" name="action" value="delete"/>
               <button type="submit" class="aitem danger"
