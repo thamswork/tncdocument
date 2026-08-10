@@ -541,14 +541,16 @@ const existingItems = doc.items || [];
     cats.forEach(function(c,i){ c.num=i+1; });
     render(); window.recalc();
   };
-  window.setCatName = function(tid,v) { var c=cats.find(function(x){ return x.tid===tid; }); if(c) c.name=v; };
+  window.setCatName = function(tid,v) { markBOQModified(); var c=cats.find(function(x){ return x.tid===tid; }); if(c) c.name=v; };
   window.addItem = function(tid) {
+    markBOQModified();
     var cat=cats.find(function(c){ return c.tid===tid; });
     var ex=(ibc[tid]||[]).filter(function(i){ return !i.sub; });
     ibc[tid].push({id:'i'+Date.now(), num:cat.num+'.'+(ex.length+1), code:'', desc:'', qty:1, unit:'งาน', price:0, amt:0, sub:false});
     render();
   };
   window.addSub = function(tid) {
+    markBOQModified();
     var cat=cats.find(function(c){ return c.tid===tid; });
     ibc[tid].push({id:'i'+Date.now()+'s', num:'', code:'', desc:'รวมราคา'+(cat.name||''), qty:0, unit:'', price:0, amt:0, sub:true});
     render();
