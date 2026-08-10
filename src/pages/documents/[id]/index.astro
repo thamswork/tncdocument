@@ -1,6 +1,6 @@
 ---
 import { getDocument, logAction, publishDocument, deleteDocument, updateJob } from '../../../lib/documents';
-import { canPublish, canDelete } from '../../../lib/auth';
+import { canPublish, canDelete, canEdit } from '../../../lib/auth';
 const user = Astro.locals.user;
 const { id } = Astro.params;
 const doc = await getDocument(id!);
