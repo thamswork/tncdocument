@@ -103,7 +103,14 @@ export async function getDocuments(filters?: any) {
     customers(customer_code, company_name),
     tnc_users!documents_issued_by_fkey(full_name)
   `, { count: 'exact' }).order('created_at', { ascending: false }).range(offset, offset + limit - 1);
-  if (filters?.status) query = query.eq('status', filters.status);
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  } else {
+    // Default dashboard view: never show removed documents unless the caller
+    // explicitly asked for status: 'removed' (e.g. the customer trash bucket,
+    // which uses getRemovedDocumentsForCustomer instead of this function).
+    query = query.neq('status', 'removed');
+  }
   const { data, count } = await query;
   return { data: data || [], count: count || 0 };
 }
@@ -157,25 +164,37 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
   if (isNew) {
     const { data: docType } = await supabaseAdmin.from('document_types').select('prefix').eq('id', docData.document_type_id).single();
     const docNumber = await generateDocumentNumber(docData.document_type_id, docType?.prefix || 'DOC');
+    // LIFECYCLE CHANGE: every document gets its real, permanent number and an
+    // 'in_progress' status the moment it's created. There is no unnumbered
+    // draft state anymore — see Migration 001. status is intentionally NOT
+    // taken from docData here, so callers can't accidentally create a
+    // pre-published or pre-removed document.
     const { data: newDoc, error } = await supabaseAdmin.from('documents').insert({
       ...docData, document_number: docNumber, ...totals, created_by: userId, issued_by: userId,
+      status: 'in_progress', last_activity_at: new Date().toISOString(),
     }).select().single();
     if (error || !newDoc) return { error };
     await saveDocumentDetails(newDoc.id, categories, items);
-    await logAction(newDoc.id, 'draft_saved', userId);
+    await logAction(newDoc.id, 'document_created', userId);
     return { document: newDoc };
   } else {
-    // Fetch existing doc to preserve status
+    // Fetch existing doc to preserve status (removed/stale/in_progress/published/draft —
+    // whatever it currently is, this save should never silently change it).
     const { data: existingDoc } = await supabaseAdmin.from('documents').select('status').eq('id', docData.id).single();
     const { status: _, ...docDataWithoutStatus } = docData;
-    const existingStatus = existingDoc?.status || 'draft';
-    
+    const existingStatus = existingDoc?.status || 'in_progress';
+
+    // A real edit clears 'stale' back to 'in_progress' automatically — touching
+    // the document is what stale flagging exists to detect the absence of.
+    const nextStatus = existingStatus === 'stale' ? 'in_progress' : existingStatus;
+
     // For published docs: only replace BOQ rows if categories were actually provided,
     // but ALWAYS save recalculated totals (itemsForTotals covers both cases).
     const hasNewBOQ = categories && categories.length > 0;
 
     const { data: updatedDoc, error } = await supabaseAdmin.from('documents')
-      .update({ ...docDataWithoutStatus, ...totals, status: existingStatus }).eq('id', docData.id).select().single();
+      .update({ ...docDataWithoutStatus, ...totals, status: nextStatus, last_activity_at: new Date().toISOString() })
+      .eq('id', docData.id).select().single();
     if (error || !updatedDoc) return { error };
     
     // Only replace BOQ if explicitly requested
@@ -191,9 +210,79 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
     } else {
       console.log('[saveDocument] skipBOQ:', skipBOQ, 'hasNewBOQ:', hasNewBOQ, '- BOQ not touched');
     }
-    await logAction(docData.id, 'draft_saved', userId);
+    await logAction(docData.id, 'document_saved', userId);
     return { document: updatedDoc };
   }
+}
+
+// ============================================================
+// LIFECYCLE: stale flagging, soft-delete (customer-scoped trash), restore, purge
+// ============================================================
+
+/** Run on a schedule (e.g. daily cron / Cloudflare Cron Trigger). Flags anything
+ *  idle 5+ days that isn't already stale/removed. Never touches removed docs. */
+export async function flagStaleDocuments() {
+  const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabaseAdmin.from('documents')
+    .update({ status: 'stale' })
+    .lt('last_activity_at', fiveDaysAgo)
+    .in('status', ['in_progress'])
+    .select('id');
+  if (!error && data) {
+    for (const d of data) await logAction(d.id, 'auto_flagged_stale', null);
+  }
+  return { flagged: data?.length || 0, error };
+}
+
+/** Soft-delete: moves a document into its customer's trash bucket. Works on any
+ *  status (flagged or not) per the "manual removal always available" rule.
+ *  Keeps document_number and full history intact for audit purposes. */
+export async function removeDocument(id: string, userId: string) {
+  const purgeAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabaseAdmin.from('documents')
+    .update({ status: 'removed', removed_at: new Date().toISOString(), removed_by: userId, purge_at: purgeAt })
+    .eq('id', id).select().single();
+  if (!error) await logAction(id, 'removed', userId);
+  return { document: data, error };
+}
+
+/** Restore from a customer's trash bucket back to active (in_progress). Must be
+ *  called before purge_at or the row will already be gone. */
+export async function restoreDocument(id: string, userId: string) {
+  const { data, error } = await supabaseAdmin.from('documents')
+    .update({ status: 'in_progress', removed_at: null, removed_by: null, purge_at: null, last_activity_at: new Date().toISOString() })
+    .eq('id', id).select().single();
+  if (!error) await logAction(id, 'restored', userId);
+  return { document: data, error };
+}
+
+/** Trash bucket for a single customer — feeds the "Removed" tab inside the
+ *  customer editor page. */
+export async function getRemovedDocumentsForCustomer(customerId: string) {
+  const { data } = await supabaseAdmin.from('documents')
+    .select('id, document_number, document_type_id, status, removed_at, purge_at, total_amount, document_types(code, prefix)')
+    .eq('customer_id', customerId).eq('status', 'removed')
+    .order('removed_at', { ascending: false });
+  return data || [];
+}
+
+/** Run on a schedule (daily). Permanently deletes anything past its 45-day
+ *  purge_at. This is the one irreversible step in the whole lifecycle —
+ *  logAction is called BEFORE the delete so the audit trail survives the
+ *  document itself. */
+export async function purgeExpiredDocuments() {
+  const now = new Date().toISOString();
+  const { data: toPurge } = await supabaseAdmin.from('documents')
+    .select('id, document_number').eq('status', 'removed').lt('purge_at', now);
+  if (!toPurge || toPurge.length === 0) return { purged: 0 };
+  for (const doc of toPurge) {
+    await logAction(doc.id, `auto_purged (was ${doc.document_number})`, null);
+  }
+  const ids = toPurge.map(d => d.id);
+  await supabaseAdmin.from('document_items').delete().in('document_id', ids);
+  await supabaseAdmin.from('document_categories').delete().in('document_id', ids);
+  await supabaseAdmin.from('documents').delete().in('id', ids);
+  return { purged: ids.length };
 }
 
 async function saveDocumentDetails(documentId: string, categories: any[], items: any[]) {
@@ -262,7 +351,9 @@ export async function deleteDocument(id: string, userId: string) {
   return { error };
 }
 
-export async function logAction(documentId: string, action: string, userId: string, notes?: string) {
+export async function logAction(documentId: string, action: string, userId: string | null, notes?: string) {
+  // userId can be null for system-triggered actions (auto_flagged_stale, auto_purged)
+  // so the audit trail still records what happened even when no human clicked anything.
   await supabaseAdmin.from('export_logs').insert({ document_id: documentId, action, performed_by: userId, notes });
 }
 
