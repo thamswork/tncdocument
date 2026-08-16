@@ -1,5 +1,5 @@
 ---
-import { getDocument, logAction, publishDocument, deleteDocument, updateJob } from '../../../lib/documents';
+import { getDocument, logAction, publishDocument, removeDocument, updateJob } from '../../../lib/documents';
 import { canPublish, canDelete, canEdit } from '../../../lib/auth';
 const user = Astro.locals.user;
 const { id } = Astro.params;
@@ -14,7 +14,7 @@ if (Astro.request.method === 'POST') {
     return Astro.redirect(`/documents/${id}`);
   }
   if (action === 'delete' && canDelete(user)) {
-    await deleteDocument(id!, user.id);
+    await removeDocument(id!, user.id);
     return Astro.redirect('/documents/dashboard');
   }
   if (action === 'rename_job') {
@@ -235,7 +235,7 @@ const hasInstallments = true; // always show — every project can have installm
         <form method="POST" style="display:inline;">
           <input type="hidden" name="action" value="delete"/>
           <button type="submit" class="btn btn-red"
-            onclick={`return confirm('ลบเอกสาร ${doc.document_number}? ไม่สามารถกู้คืนได้')`}>ลบ</button>
+            onclick={`return confirm('ลบเอกสาร ${doc.document_number}? จะย้ายไปที่ถังขยะของลูกค้า สามารถกู้คืนได้ภายใน 45 วัน')`}>ลบ</button>
         </form>
       )}
     </div>
@@ -492,7 +492,7 @@ const hasInstallments = true; // always show — every project can have installm
               <button type="submit" class="aitem danger"
                 onclick={`return confirm('ลบเอกสาร ${doc.document_number}? ไม่สามารถกู้คืนได้')`}>
                 <div class="aicon aicon-del">🗑</div>
-                <div><div class="atext-title" style="color:var(--red);">ลบเอกสาร</div><div class="atext-sub">ลบถาวร ไม่สามารถกู้คืนได้</div></div>
+                <div><div class="atext-title" style="color:var(--red);">ลบเอกสาร</div><div class="atext-sub">ย้ายไปถังขยะ กู้คืนได้ภายใน 45 วัน</div></div>
               </button>
             </form>
           )}
