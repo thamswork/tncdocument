@@ -336,22 +336,6 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         </tr>
       );
     })}
-    {(() => {
-      const bMat = doc.items.some((i:any) => (i.material_cost||0)>0);
-      const bLab = doc.items.some((i:any) => (i.labor_cost||0)>0);
-      const bCols = 4 + (bMat?2:0) + (bLab?2:0) + (!bMat&&!bLab?1:0);
-      const allCats = doc.categories;
-      return allCats.map((cat:any) => {
-        const catItems = doc.items.filter((i:any) => i.category_id === cat.id);
-        const catTot = catItems.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
-        return (
-          <tr class="row-sub" key={cat.id}>
-            <td colspan={bCols} class="sub-lbl" style="text-align:right;padding-right:12px;">รวม{cat.name_th}</td>
-            <td class="tr tw">{fmt(catTot)}</td>
-          </tr>
-        );
-      });
-    })()}
     </tbody>
   </table></div>
   {doc.document_types?.code !== 'TAX_INVOICE' && <div class="tot-wrap">
