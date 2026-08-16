@@ -417,13 +417,24 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
                           <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
                           <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
                         </tr>
-                        {hasLinked && linkedMap[doc.id].map((inv: any) => (
+                        {hasLinked && linkedMap[doc.id].map((inv: any) => {
+                          const invType = inv.document_types?.code || 'INVOICE';
+                          return (
                           <tr id={`linked-${doc.id}`}
+                            class="linked-row"
+                            data-parent={doc.id}
                             data-group={g.id}
-                            style="display:none;background:#FAF5EC;cursor:pointer;"
+                            data-num={inv.document_number}
+                            data-cust={custName}
+                            data-type={invType}
+                            data-status={inv.status}
+                            data-statusgroup={statusGroup(inv.status)}
+                            data-date={inv.issue_date||''}
+                            data-amt={Number(inv.total_amount||0)}
+                            style="background:#FAF5EC;cursor:pointer;"
                             onclick={`window.location.href='/documents/${inv.id}'`}>
                             <td style="padding-left:32px;"><span style="color:var(--gold);margin-right:4px;font-size:11px;">↳</span><span class="doc-num" style="font-size:11.5px;">{inv.document_number}</span></td>
-                            <td><span class="badge badge-INVOICE" style="font-size:10px;opacity:.8;">งวด</span></td>
+                            <td><span class="badge badge-INVOICE" style="font-size:10px;opacity:.8;">{invType === 'TAX_INVOICE' ? 'ใบกำกับภาษี' : 'งวด'}</span></td>
                             <td style="font-size:11.5px;color:var(--t2);">{inv.payment_condition||'—'}</td>
                             <td style="font-size:11.5px;">{inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-'}</td>
                             <td class="num"><span class="amt" style="font-size:12px;">{Number(inv.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></td>
@@ -431,7 +442,7 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
                             <td></td>
                             <td><a href={`/documents/${inv.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
                           </tr>
-                        ))}
+                        );})}
                       </Fragment>
                     );
                   })}
@@ -457,6 +468,7 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
 <script is:inline>
 var currentOffset = 50;
 var collapsedGroups = {};
+var expandedLinked = {};
 
 function ensureGroup(doc, tbody) {
   var gid = doc.customer_id || 'unknown';
@@ -549,11 +561,10 @@ window.loadMore = async function() {
 };
 
 function toggleLinked(docId) {
-  var rows = document.querySelectorAll('[id="linked-'+docId+'"]');
+  expandedLinked[docId] = !expandedLinked[docId];
   var btn = document.getElementById('exp-'+docId);
-  var isHidden = rows.length > 0 && rows[0].style.display === 'none';
-  rows.forEach(function(r) { r.style.display = isHidden ? '' : 'none'; });
-  if (btn) btn.innerHTML = isHidden ? btn.innerHTML.replace('▾','▴') : btn.innerHTML.replace('▴','▾');
+  if (btn) btn.innerHTML = expandedLinked[docId] ? btn.innerHTML.replace('▾','▴') : btn.innerHTML.replace('▴','▾');
+  renderGroups();
 }
 
 window.toggleCustomerGroup = function(gid) {
@@ -591,7 +602,16 @@ function renderGroups() {
     var chev = document.getElementById('chev-'+gid);
     if (chev) chev.textContent = expanded ? '▾' : '▸';
     docRows.forEach(function(r){
-      r.style.display = (expanded && !r.classList.contains('hidden')) ? '' : 'none';
+      var isLinked = r.classList.contains('linked-row');
+      // Linked rows (installment/tax invoices nested under their parent) stay
+      // collapsed by default — only shown if the user manually expanded that
+      // parent's "Xงวด▾" toggle, OR a search/filter is actively matching this
+      // specific row, so a matching Tax Invoice is never permanently unfindable
+      // just because it lives nested rather than as a top-level row.
+      var manuallyOpen = isLinked ? !!expandedLinked[r.dataset.parent] : true;
+      var revealedByFilter = filtering && !r.classList.contains('hidden');
+      var visible = expanded && !r.classList.contains('hidden') && (manuallyOpen || revealedByFilter);
+      r.style.display = visible ? '' : 'none';
     });
     groupRows.forEach(function(r){
       if (r.hasAttribute('data-num')) return;
