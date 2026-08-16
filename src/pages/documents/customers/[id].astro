@@ -1,5 +1,6 @@
 ---
 import { supabaseAdmin } from '../../../lib/supabase';
+import { getRemovedDocumentsForCustomer, restoreDocument } from '../../../lib/documents';
 const user = Astro.locals.user;
 const { id } = Astro.params;
 
@@ -12,6 +13,14 @@ let error = '', success = '';
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
+  const action = form.get('action') as string;
+
+  if (action === 'restore') {
+    const docId = form.get('document_id') as string;
+    if (docId) await restoreDocument(docId, user.id);
+    return Astro.redirect(`/documents/customers/${id}?restored=1`);
+  }
+
   const { error: updateError } = await supabaseAdmin
     .from('customers')
     .update({
@@ -29,6 +38,15 @@ if (Astro.request.method === 'POST') {
 
   if (updateError) { error = updateError.message; }
   else { success = 'บันทึกข้อมูลสำเร็จ'; }
+}
+
+const restoredFlag = Astro.url.searchParams.get('restored') === '1';
+const removedDocs = await getRemovedDocumentsForCustomer(id!);
+const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
+function daysLeft(purgeAt: string) {
+  if (!purgeAt) return null;
+  const ms = new Date(purgeAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (1000*60*60*24)));
 }
 ---
 <!DOCTYPE html>
@@ -73,6 +91,17 @@ if (Astro.request.method === 'POST') {
     .btn-submit:active{opacity:.85;}
     .cancel{font-size:13px;color:var(--t2);text-decoration:none;padding:8px;}
     .cancel:active{color:var(--text);}
+
+    .trash-list{display:flex;flex-direction:column;gap:0;}
+    .trash-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);}
+    .trash-item:last-child{border-bottom:none;}
+    .trash-num{font-size:13.5px;font-weight:600;font-family:monospace;color:var(--text);}
+    .trash-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--t2);margin-top:3px;}
+    .trash-type{color:var(--t3);}
+    .trash-urgent{color:var(--red);font-weight:600;}
+    .btn-restore{flex-shrink:0;padding:8px 16px;background:var(--white);border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-weight:700;font-family:inherit;color:var(--text);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn-restore:active{background:var(--bg);}
+    .trash-note{font-size:11px;color:var(--t3);margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);}
 
     @media(max-width:600px){
       .topbar{padding:0 14px;}
@@ -142,6 +171,44 @@ if (Astro.request.method === 'POST') {
         </div>
       </form>
     </div>
+
+    {removedDocs.length > 0 && (
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;border-bottom:none;margin-bottom:14px;padding-bottom:0;">
+          <span>ถังขยะ ({removedDocs.length})</span>
+        </div>
+        {restoredFlag && <div class="alert-ok">✓ กู้คืนเอกสารสำเร็จ</div>}
+        <div class="trash-list">
+          {removedDocs.map((d: any) => {
+            const left = daysLeft(d.purge_at);
+            const typeCode = d.document_types?.code || '';
+            return (
+              <div class="trash-item">
+                <div class="trash-info">
+                  <div class="trash-num">{d.document_number}</div>
+                  <div class="trash-meta">
+                    <span class="trash-type">{typeLabels[typeCode] || typeCode}</span>
+                    <span>฿{Number(d.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span>
+                    {left !== null && (
+                      <span class={left <= 7 ? 'trash-urgent' : ''}>
+                        {left === 0 ? 'จะลบถาวรวันนี้' : `ลบถาวรใน ${left} วัน`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <form method="POST" style="margin:0;">
+                  <input type="hidden" name="action" value="restore"/>
+                  <input type="hidden" name="document_id" value={d.id}/>
+                  <button type="submit" class="btn-restore"
+                    onclick={`return confirm('กู้คืนเอกสาร ${d.document_number}?')`}>กู้คืน</button>
+                </form>
+              </div>
+            );
+          })}
+        </div>
+        <div class="trash-note">เอกสารในถังขยะจะถูกลบถาวรโดยอัตโนมัติหลังจาก 45 วัน หากไม่ได้กู้คืน</div>
+      </div>
+    )}
   </div>
 </body>
 </html>

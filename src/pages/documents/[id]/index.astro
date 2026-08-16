@@ -490,7 +490,7 @@ const hasInstallments = true; // always show — every project can have installm
             <form method="POST">
               <input type="hidden" name="action" value="delete"/>
               <button type="submit" class="aitem danger"
-                onclick={`return confirm('ลบเอกสาร ${doc.document_number}? ไม่สามารถกู้คืนได้')`}>
+                onclick={`return confirm('ลบเอกสาร ${doc.document_number}? จะย้ายไปที่ถังขยะของลูกค้า สามารถกู้คืนได้ภายใน 45 วัน')`}>
                 <div class="aicon aicon-del">🗑</div>
                 <div><div class="atext-title" style="color:var(--red);">ลบเอกสาร</div><div class="atext-sub">ย้ายไปถังขยะ กู้คืนได้ภายใน 45 วัน</div></div>
               </button>

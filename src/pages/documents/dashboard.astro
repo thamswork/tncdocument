@@ -1,8 +1,9 @@
 ---
-import { getDocuments } from '../../lib/documents';
+import { getDocuments, getDocumentTypes } from '../../lib/documents';
 import { Fragment } from 'astro/jsx-runtime'; // v2
 const user = Astro.locals.user;
 const { data: documents, count: totalCount } = await getDocuments({ limit: 50 });
+const allDocTypes = await getDocumentTypes();
 const linkedMap: Record<string, any[]> = {};
 for (const doc of documents) {
   if (doc.source_document_id) {
@@ -13,12 +14,31 @@ for (const doc of documents) {
 
 const visibleDocs = documents.filter((d: any) => !d.source_document_id);
 const total = visibleDocs.length;
-const drafts = visibleDocs.filter((d: any) => d.status === 'draft').length;
+// 'draft' (legacy) and 'in_progress' (current) are the same working state from the
+// user's point of view — no more separate draft/publish gate as of this session's
+// lifecycle change. Grouped together everywhere so old and new documents behave
+// identically instead of old ones silently falling into an unrecognized bucket.
+const active = visibleDocs.filter((d: any) => d.status === 'draft' || d.status === 'in_progress').length;
 const published = visibleDocs.filter((d: any) => d.status === 'published').length;
+const stale = visibleDocs.filter((d: any) => d.status === 'stale').length;
 const pendingAmt = documents
-  .filter((d: any) => d.status === 'draft')
+  .filter((d: any) => d.status === 'draft' || d.status === 'in_progress')
   .reduce((s: number, d: any) => s + (Number(d.total_amount)||0), 0);
 const pendingFmt = pendingAmt.toLocaleString('th-TH', {minimumFractionDigits:0, maximumFractionDigits:0});
+
+// Single source of truth for status label/styling — used by both server-rendered
+// rows below AND mirrored in the client-side loadMore() JS. If you add a new
+// status value, update BOTH this function and its JS twin near loadMore().
+function statusInfo(status: string) {
+  if (status === 'published') return { label: 'เผยแพร่แล้ว', cls: 'published' };
+  if (status === 'stale') return { label: 'ค้างนาน', cls: 'stale' };
+  return { label: 'กำลังดำเนินการ', cls: 'active' }; // draft, in_progress, or anything unrecognized
+}
+function statusGroup(status: string) {
+  if (status === 'published') return 'published';
+  if (status === 'stale') return 'stale';
+  return 'active';
+}
 const docTypes = [...new Set(documents.map((d: any) => d.document_types?.code).filter(Boolean))];
 const hasMore = (totalCount || 0) > documents.length;
 const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
@@ -106,7 +126,10 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
     .content{padding:24px;display:flex;flex-direction:column;gap:20px;flex:1;}
 
     /* ── Stats ── */
-    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+    .quick-cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+    .quick-cta{padding:10px 18px;background:var(--white);border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--text);text-decoration:none;transition:border-color .15s,background .15s;-webkit-tap-highlight-color:transparent;}
+    .quick-cta:hover,.quick-cta:active{border-color:var(--gold);background:var(--gbg);}
     .stat-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:18px 20px;cursor:pointer;transition:border-color .15s,transform .15s;-webkit-tap-highlight-color:transparent;}
     .stat-card:active{transform:scale(.98);}
     .stat-card.active{background:var(--gbg);border-color:var(--gold);}
@@ -160,10 +183,12 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
 
     .status{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;}
     .sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-    .status-draft .sdot{background:var(--t3);}
-    .status-draft{color:var(--t2);}
+    .status-active .sdot{background:var(--t3);}
+    .status-active{color:var(--t2);}
     .status-published .sdot{background:var(--green);}
     .status-published{color:var(--green);}
+    .status-stale .sdot{background:#C9822D;}
+    .status-stale{color:#C9822D;}
 
     .amt{font-weight:600;font-variant-numeric:tabular-nums;}
     .open-btn{color:var(--t3);font-size:12px;text-decoration:none;padding:6px 10px;border-radius:4px;transition:all .15s;white-space:nowrap;display:inline-block;-webkit-tap-highlight-color:transparent;}
@@ -266,22 +291,33 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
   </div>
 
   <div class="content">
+    <div class="quick-cta-row">
+      {allDocTypes.map((dt: any) => (
+        <a href={`/documents/new?type=${dt.code}`} class="quick-cta">+ {dt.name_th}</a>
+      ))}
+    </div>
+
     <div class="stats">
       <div class="stat-card active" id="stat-all" onclick="window.filterStatus('')">
         <div class="stat-n gold">{total}</div>
         <div class="stat-label">ทั้งหมด</div>
         <div class="stat-sub">ในระบบ</div>
       </div>
-      <div class="stat-card" id="stat-draft" onclick="window.filterStatus('draft')">
-        <div class="stat-n">{drafts}</div>
-        <div class="stat-label">DRAFT</div>
-        <div class="stat-sub">รอดำเนินการ</div>
+      <div class="stat-card" id="stat-active" onclick="window.filterStatus('active')">
+        <div class="stat-n">{active}</div>
+        <div class="stat-label">กำลังดำเนินการ</div>
+        <div class="stat-sub">ยังไม่เผยแพร่</div>
         {pendingAmt > 0 && <div class="stat-pending">฿{pendingFmt} รอยืนยัน</div>}
       </div>
       <div class="stat-card" id="stat-published" onclick="window.filterStatus('published')">
         <div class="stat-n">{published}</div>
-        <div class="stat-label">PUBLISHED</div>
+        <div class="stat-label">เผยแพร่แล้ว</div>
         <div class="stat-sub">ออกเอกสารแล้ว</div>
+      </div>
+      <div class="stat-card" id="stat-stale" onclick="window.filterStatus('stale')">
+        <div class="stat-n" style="color:#C9822D;">{stale}</div>
+        <div class="stat-label">ค้างนาน</div>
+        <div class="stat-sub">ไม่มีความเคลื่อนไหว 5+ วัน</div>
       </div>
     </div>
 
@@ -304,8 +340,9 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
         </div>
         <div class="filters" id="statusFilters">
           <button class="filter-pill active" data-status="" onclick="window.filterStatus('')">ทุกสถานะ</button>
-          <button class="filter-pill draft" data-status="draft" onclick="window.filterStatus('draft')">Draft</button>
-          <button class="filter-pill published" data-status="published" onclick="window.filterStatus('published')">Published</button>
+          <button class="filter-pill draft" data-status="active" onclick="window.filterStatus('active')">กำลังดำเนินการ</button>
+          <button class="filter-pill published" data-status="published" onclick="window.filterStatus('published')">เผยแพร่แล้ว</button>
+          <button class="filter-pill" data-status="stale" onclick="window.filterStatus('stale')" style="color:#C9822D;border-color:#E8C99B;">ค้างนาน</button>
         </div>
         <button class="expand-all-btn" id="expandAllBtn" onclick="window.toggleAllGroups()">ยุบทั้งหมด</button>
       </div>
@@ -357,6 +394,7 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
                           data-cust={custName}
                           data-type={typeCode}
                           data-status={doc.status}
+                          data-statusgroup={statusGroup(doc.status)}
                           data-date={doc.issue_date||''}
                           data-amt={rawAmt}>
                           <td>
@@ -375,7 +413,7 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
                           <td>{custName}</td>
                           <td>{issueDate}</td>
                           <td class="num"><span class="amt">{amt}</span></td>
-                          <td><span class={`status status-${doc.status}`}><span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}</span></td>
+                          <td><span class={`status status-${statusInfo(doc.status).cls}`}><span class="sdot"></span>{statusInfo(doc.status).label}</span></td>
                           <td style="font-size:11.5px;color:var(--t2);">{issuedBy}</td>
                           <td><a href={`/documents/${doc.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
                         </tr>
@@ -389,7 +427,7 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
                             <td style="font-size:11.5px;color:var(--t2);">{inv.payment_condition||'—'}</td>
                             <td style="font-size:11.5px;">{inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-'}</td>
                             <td class="num"><span class="amt" style="font-size:12px;">{Number(inv.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span></td>
-                            <td><span class={`status status-${inv.status}`}><span class="sdot"></span>{inv.status==='draft'?'Draft':'Published'}</span></td>
+                            <td><span class={`status status-${statusInfo(inv.status).cls}`}><span class="sdot"></span>{statusInfo(inv.status).label}</span></td>
                             <td></td>
                             <td><a href={`/documents/${inv.id}`} class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>
                           </tr>
@@ -480,13 +518,18 @@ window.loadMore = async function() {
       tr.setAttribute('data-cust',custName);
       tr.setAttribute('data-type',typeCode);
       tr.setAttribute('data-status',doc.status);
+      // Mirrors statusInfo()/statusGroup() in the frontmatter above — keep both in
+      // sync if a new status value is ever added (see comment near those functions).
+      var sGroup = doc.status==='published' ? 'published' : (doc.status==='stale' ? 'stale' : 'active');
+      var sLabel = doc.status==='published' ? 'เผยแพร่แล้ว' : (doc.status==='stale' ? 'ค้างนาน' : 'กำลังดำเนินการ');
+      tr.setAttribute('data-statusgroup', sGroup);
       tr.setAttribute('data-date',doc.issue_date||'');
       tr.setAttribute('data-amt',String(Number(doc.total_amount||0)));
       tr.innerHTML='<td><span class="doc-num">'+doc.document_number+'</span></td>'+
         '<td><span class="badge badge-'+typeCode+'">'+(labelMap[typeCode]||typeCode)+'</span></td>'+
         '<td>'+custName+'</td><td>'+issueDate+'</td>'+
         '<td class="num"><span class="amt">'+amt+'</span></td>'+
-        '<td><span class="status status-'+doc.status+'"><span class="sdot"></span>'+(doc.status==='draft'?'Draft':'Published')+'</span></td>'+
+        '<td><span class="status status-'+sGroup+'"><span class="sdot"></span>'+sLabel+'</span></td>'+
         '<td style="font-size:11.5px;color:var(--t2);">'+(doc.tnc_users?.full_name||'-')+'</td>'+
         '<td><a href="/documents/'+doc.id+'" class="open-btn" onclick="event.stopPropagation()">เปิด →</a></td>';
       tbody.appendChild(tr);
@@ -603,7 +646,7 @@ function applyFilters(){
   rows.forEach(function(row){
     var match = (!q || (row.dataset.num||'').toLowerCase().includes(q) || (row.dataset.cust||'').toLowerCase().includes(q) || (row.dataset.type||'').toLowerCase().includes(q))
       && (!typeVal || row.dataset.type === typeVal)
-      && (!statusVal || row.dataset.status === statusVal);
+      && (!statusVal || row.dataset.statusgroup === statusVal);
     row.classList.toggle('hidden', !match);
   });
   renderGroups();
@@ -662,7 +705,7 @@ window.filterType = function(el, type){
 
 window.filterStatus = function(status){
   statusVal=status;
-  ['all','draft','published'].forEach(function(s){
+  ['all','active','published','stale'].forEach(function(s){
     var el=document.getElementById('stat-'+s);
     if(el) el.classList.toggle('active',(s==='all'&&!status)||s===status);
   });

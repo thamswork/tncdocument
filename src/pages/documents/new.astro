@@ -4,6 +4,7 @@ const user = Astro.locals.user;
 const documentTypes = await getDocumentTypes();
 const customers = await getCustomers();
 const jobs = await getJobs();
+const preselectType = Astro.url.searchParams.get('type') || '';
 
 if (Astro.request.method === 'POST') {
   try {
@@ -204,7 +205,7 @@ if (Astro.request.method === 'POST') {
   <a href="/documents/dashboard" class="back">← กลับ</a>
   <div class="tb-title">สร้างเอกสารใหม่<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">กรอกข้อมูลและ BOQ</span></div>
   <div class="tb-status"><span class="sdot" id="sDot"></span><span id="sTxt">ยังไม่ได้บันทึก</span></div>
-  <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">DRAFT</button>
+  <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">บันทึกไว้ก่อน</button>
   <button class="btn btn-gold" onclick="window.savePreview()">PREVIEW PDF</button>
   <button class="btn btn-solid" onclick="window.saveOpen()">บันทึก + เปิด</button>
 </div>
@@ -218,13 +219,13 @@ if (Astro.request.method === 'POST') {
     <div class="card">
       <div class="card-hd">
         <div class="step-n">1</div>
-        <div class="card-title">ประเภทเอกสาร</div><div style="font-size:11px;color:var(--t3);margin-left:auto;">ขั้นตอนที่ 1</div>
+        <div class="card-title">ประเภทเอกสาร</div>
       </div>
       <div class="card-bd">
         <div class="fg">
           <div class="lbl">ประเภท</div>
           <select class="inp" id="docType">
-            {documentTypes.map((dt: any) => <option value={dt.id}>{dt.name_th}</option>)}
+            {documentTypes.map((dt: any) => <option value={dt.id} selected={dt.code === preselectType}>{dt.name_th}</option>)}
           </select>
         </div>
         <div class="fg2">
@@ -248,7 +249,7 @@ if (Astro.request.method === 'POST') {
     <div class="card" style="overflow:visible;">
       <div class="card-hd">
         <div class="step-n">2</div>
-        <div class="card-title">ข้อมูลลูกค้า</div><div style="font-size:11px;color:var(--t3);margin-left:auto;">ขั้นตอนที่ 2</div>
+        <div class="card-title">ข้อมูลลูกค้า</div>
         <a href="/documents/customers/new" class="card-sub">+ เพิ่มใหม่</a>
       </div>
       <div class="card-bd" style="overflow:visible;">
@@ -274,7 +275,7 @@ if (Astro.request.method === 'POST') {
     <div class="card">
       <div class="card-hd">
         <div class="step-n">3</div>
-        <div class="card-title">เงื่อนไขชำระเงิน</div><div style="font-size:11px;color:var(--t3);margin-left:auto;">ขั้นตอนที่ 3</div>
+        <div class="card-title">เงื่อนไขชำระเงิน</div>
       </div>
       <div class="card-bd">
         <textarea class="inp" id="payCond" style="min-height:80px;"
@@ -293,7 +294,7 @@ if (Astro.request.method === 'POST') {
   <div class="card" id="jobCard">
     <div class="card-hd">
       <div class="step-n">4</div>
-      <div class="card-title">ชื่องาน / Job<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">ขั้นตอนที่ 4</span></div>
+      <div class="card-title">ชื่องาน / Job</div>
     </div>
     <div class="card-bd">
       <div style="display:flex;gap:10px;align-items:flex-end;">
@@ -329,7 +330,7 @@ if (Astro.request.method === 'POST') {
   <div class="boq-card">
     <div class="boq-hd">
       <div class="step-n">5</div>
-      <div class="boq-title">รายการงาน (BOQ)<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px;">ขั้นตอนที่ 5</span></div>
+      <div class="boq-title">รายการงาน (BOQ)</div>
       <div class="boq-cnt" id="boqCnt">ยังไม่มีรายการ</div>
       <button class="btn btn-ol" style="font-size:11px;padding:5px 13px;margin-left:8px;" onclick="window.addCat()">+ เพิ่มหมวดงาน</button>
     </div>
@@ -365,7 +366,7 @@ if (Astro.request.method === 'POST') {
     <textarea class="notes-inp" id="docNotes" placeholder="หมายเหตุบน PDF..."></textarea>
   </div>
   <div class="act-btns">
-    <button class="act-btn btn-ol" onclick="window.saveDraft()">บันทึก Draft</button>
+    <button class="act-btn btn-ol" onclick="window.saveDraft()">บันทึกไว้ก่อน (ไม่เปิด)</button>
     <button class="act-btn btn-gold" onclick="window.savePreview()">บันทึก + Preview PDF</button>
     <button class="act-btn btn-solid" onclick="window.saveOpen()">บันทึก + เปิดเอกสาร</button>
   </div>

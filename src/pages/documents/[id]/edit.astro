@@ -206,14 +206,14 @@ const existingItems = doc.items || [];
   <div class="tb-title">แก้ไขเอกสาร{doc.status === "published" && <span style="font-size:10px;font-weight:700;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;margin-left:8px;letter-spacing:.04em;">PUBLISHED — SUPERADMIN EDIT</span>}</div>
   <div class="tb-docnum">{doc.document_number}</div>
   <div class="tb-status"><span class="sdot" id="sDot"></span><span id="sTxt">ยังไม่ได้บันทึก</span></div>
-  {doc.status === 'draft' ? (
+  {(doc.status === 'draft' || doc.status === 'in_progress') ? (
     <>
-      <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">DRAFT</button>
+      <button class="btn btn-ol draft-btn" onclick="window.saveDraft()">บันทึกไว้ก่อน</button>
       <button class="btn btn-gold" onclick="window.savePreview()">PREVIEW PDF</button>
       <button class="btn btn-solid" onclick="window.confirmSave()">บันทึก + เปิด</button>
     </>
   ) : (
-    <button class="btn btn-solid" onclick="window.confirmSave()" style="background:#B94040;">บันทึกการแก้ไข (Superadmin)</button>
+    <button class="btn btn-solid" onclick="window.confirmSave()" style="background:#B94040;">บันทึกการแก้ไขเอกสารที่เผยแพร่แล้ว</button>
   )}
 </div>
 
@@ -344,9 +344,9 @@ const existingItems = doc.items || [];
     <textarea class="notes-inp" id="docNotes">{existingDoc.notes}</textarea>
   </div>
   <div class="act-btns">
-    {doc.status === 'draft' && <button class="act-btn btn-ol" onclick="window.saveDraft()">บันทึก Draft</button>}
-    {doc.status === 'draft' && <button class="act-btn btn-gold-act" onclick="window.savePreview()">บันทึก + Preview PDF</button>}
-    <button class="act-btn btn-solid-act" onclick="window.confirmSave()">{doc.status === 'published' ? 'บันทึกการแก้ไข' : 'บันทึก + เปิดเอกสาร'}</button>
+    {(doc.status === 'draft' || doc.status === 'in_progress') && <button class="act-btn btn-ol" onclick="window.saveDraft()">บันทึกไว้ก่อน (ไม่เปิด)</button>}
+    {(doc.status === 'draft' || doc.status === 'in_progress') && <button class="act-btn btn-gold-act" onclick="window.savePreview()">บันทึก + Preview PDF</button>}
+    <button class="act-btn btn-solid-act" onclick="window.confirmSave()">{(doc.status === 'draft' || doc.status === 'in_progress') ? 'บันทึก + เปิดเอกสาร' : 'บันทึกการแก้ไข'}</button>
   </div>
 </div>
 </div>

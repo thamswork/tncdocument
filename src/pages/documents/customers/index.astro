@@ -60,10 +60,18 @@ const customers = await getCustomers();
 <body>
   <div class="topbar">
     <a href="/documents/dashboard" class="back">← กลับ</a>
-    <div class="topbar-title">รายชื่อลูกค้า ({customers.length})</div>
+    <div class="topbar-title">รายชื่อลูกค้า (<span id="visibleCount">{customers.length}</span>)</div>
     <a href="/documents/customers/new" class="btn-new">+ เพิ่มใหม่</a>
   </div>
   <div class="content">
+    {customers.length > 0 && (
+      <div class="search-wrap" style="margin-bottom:14px;position:relative;">
+        <input type="text" id="custSearchInp" placeholder="ค้นหาชื่อ, รหัสลูกค้า, เบอร์โทร..."
+          autocomplete="off" oninput="window.filterCustomers(this.value)"
+          style="width:100%;padding:11px 14px 11px 38px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;font-family:inherit;background:var(--white);box-sizing:border-box;"/>
+        <span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;">🔍</span>
+      </div>
+    )}
     <div class="card">
       {customers.length === 0 ? (
         <div class="empty">
@@ -85,9 +93,10 @@ const customers = await getCustomers();
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="custTbody">
                 {customers.map((c: any) => (
-                  <tr onclick={`window.location='/documents/customers/${c.id}'`}>
+                  <tr onclick={`window.location='/documents/customers/${c.id}'`}
+                    data-search={`${c.customer_code||''} ${c.company_name||''} ${c.contact_name||''} ${c.phone||''}`.toLowerCase()}>
                     <td class="mono">{c.customer_code}</td>
                     <td class="strong">{c.company_name}</td>
                     <td>{c.contact_name || '—'}</td>
@@ -99,9 +108,10 @@ const customers = await getCustomers();
               </tbody>
             </table>
           </div>
-          <div class="mob-list">
+          <div class="mob-list" id="custMobList">
             {customers.map((c: any) => (
-              <div class="mob-item" onclick={`window.location='/documents/customers/${c.id}'`}>
+              <div class="mob-item" onclick={`window.location='/documents/customers/${c.id}'`}
+                data-search={`${c.customer_code||''} ${c.company_name||''} ${c.contact_name||''} ${c.phone||''}`.toLowerCase()}>
                 <div class="mob-name">{c.company_name}</div>
                 <div class="mob-meta">
                   <span class="mob-code">{c.customer_code}</span>
@@ -111,9 +121,31 @@ const customers = await getCustomers();
               </div>
             ))}
           </div>
+          <div id="custNoResults" style="display:none;padding:32px 24px;text-align:center;color:var(--t3);font-size:13px;">ไม่พบลูกค้าที่ตรงกับคำค้นหา</div>
         </>
       )}
     </div>
   </div>
+  <script is:inline>
+    window.filterCustomers = function(q) {
+      q = (q||'').toLowerCase().trim();
+      var deskRows = document.querySelectorAll('#custTbody tr');
+      var mobRows = document.querySelectorAll('#custMobList .mob-item');
+      var visible = 0;
+      deskRows.forEach(function(r) {
+        var match = !q || (r.dataset.search||'').includes(q);
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      mobRows.forEach(function(r) {
+        var match = !q || (r.dataset.search||'').includes(q);
+        r.style.display = match ? '' : 'none';
+      });
+      var vc = document.getElementById('visibleCount');
+      if (vc) vc.textContent = q ? (visible + ' / ' + deskRows.length) : String(deskRows.length);
+      var noRes = document.getElementById('custNoResults');
+      if (noRes) noRes.style.display = (visible === 0 && q) ? '' : 'none';
+    };
+  </script>
 </body>
 </html>
