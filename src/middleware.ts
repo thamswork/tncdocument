@@ -23,6 +23,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return next();
   }
 
+  // Allow the cron sweep endpoints through — they're not user-facing, and
+  // are protected by their own shared-secret header check inside each route
+  // (see src/pages/documents/api/cron/*.ts), not by session cookies.
+  if (pathname.startsWith('/documents/api/cron/')) {
+    return next();
+  }
+
   // Check session cookie
   const token = context.cookies.get(SESSION_COOKIE)?.value;
   const user = await getSessionUser(token);
