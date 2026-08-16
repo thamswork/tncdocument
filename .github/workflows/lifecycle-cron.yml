@@ -2,8 +2,9 @@ name: Document Lifecycle Sweep
 
 on:
   schedule:
+    # Runs daily at 19:00 UTC = 02:00 Bangkok time (quiet hours, low traffic)
     - cron: '0 19 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch: {} # allows manually triggering from the GitHub Actions tab too
 
 jobs:
   flag-stale:
@@ -12,7 +13,8 @@ jobs:
       - name: Flag documents idle 5+ days
         run: |
           curl -s -X POST https://tncdocument.pages.dev/documents/api/cron/flag-stale \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "x-cron-secret: tnc-cron-8f3a1c9e2b7d4f6a0193" \
+            -H "Origin: https://tncdocument.pages.dev" \
             -w "\nHTTP status: %{http_code}\n"
 
   purge-expired:
@@ -22,5 +24,6 @@ jobs:
       - name: Permanently delete documents removed 45+ days ago
         run: |
           curl -s -X POST https://tncdocument.pages.dev/documents/api/cron/purge-expired \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "x-cron-secret: tnc-cron-8f3a1c9e2b7d4f6a0193" \
+            -H "Origin: https://tncdocument.pages.dev" \
             -w "\nHTTP status: %{http_code}\n"
