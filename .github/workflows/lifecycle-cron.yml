@@ -1,0 +1,26 @@
+name: Document Lifecycle Sweep
+
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  flag-stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flag documents idle 5+ days
+        run: |
+          curl -s -X POST https://tncdocument.pages.dev/documents/api/cron/flag-stale \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -w "\nHTTP status: %{http_code}\n"
+
+  purge-expired:
+    runs-on: ubuntu-latest
+    needs: flag-stale
+    steps:
+      - name: Permanently delete documents removed 45+ days ago
+        run: |
+          curl -s -X POST https://tncdocument.pages.dev/documents/api/cron/purge-expired \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -w "\nHTTP status: %{http_code}\n"
