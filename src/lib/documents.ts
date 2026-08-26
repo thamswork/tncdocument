@@ -126,7 +126,7 @@ export async function getDocument(id: string) {
   const [linkedResult, catsResult, itemsResult] = await Promise.all([
     supabaseAdmin
       .from('documents')
-      .select('id, document_number, status, total_amount, issue_date, due_date, payment_condition, document_type_id')
+      .select('id, document_number, status, total_amount, issue_date, due_date, payment_condition, document_type_id, document_types(code)')
       .eq('source_document_id', id)
       .order('created_at', { ascending: true }),
     supabaseAdmin.from('document_categories').select('*').eq('document_id', id).order('sort_order'),
@@ -349,6 +349,17 @@ export async function deleteDocument(id: string, userId: string) {
   await supabaseAdmin.from('export_logs').delete().eq('document_id', id);
   const { error } = await supabaseAdmin.from('documents').delete().eq('id', id);
   return { error };
+}
+
+// Shared status label/styling — single source of truth so this doesn't drift
+// across pages the way it did before (dashboard, document view, and the print
+// page each had their own copy-pasted version, some hardcoded to English
+// Published/Draft and blind to the newer in_progress/stale/removed statuses).
+export function statusInfo(status: string) {
+  if (status === 'published') return { label: 'เผยแพร่แล้ว', cls: 'published' };
+  if (status === 'stale') return { label: 'ค้างนาน', cls: 'stale' };
+  if (status === 'removed') return { label: 'ในถังขยะ', cls: 'removed' };
+  return { label: 'กำลังดำเนินการ', cls: 'active' }; // draft, in_progress, or unrecognized
 }
 
 export async function logAction(documentId: string, action: string, userId: string | null, notes?: string) {

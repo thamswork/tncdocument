@@ -11,7 +11,7 @@ export async function POST({ request, cookies }: any) {
 
   const { error } = await supabaseAdmin
     .from('documents')
-    .update({ issue_date, updated_at: new Date().toISOString() })
+    .update({ issue_date, updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString() })
     .eq('id', doc_id);
 
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });

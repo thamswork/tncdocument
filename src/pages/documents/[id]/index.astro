@@ -1,5 +1,5 @@
 ---
-import { getDocument, logAction, publishDocument, removeDocument, updateJob } from '../../../lib/documents';
+import { getDocument, logAction, publishDocument, removeDocument, updateJob, statusInfo } from '../../../lib/documents';
 import { canPublish, canDelete, canEdit } from '../../../lib/auth';
 const user = Astro.locals.user;
 const { id } = Astro.params;
@@ -435,11 +435,12 @@ const hasInstallments = true; // always show — every project can have installm
                 <a href={`/documents/${inv.id}`} style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--gborder);text-decoration:none;">
                   <div>
                     <div style="font-size:12px;font-weight:600;color:var(--text);font-family:monospace;">{inv.document_number}</div>
-                    <div style="font-size:10.5px;color:var(--t3);">{inv.payment_condition}</div>
+                    <div style="font-size:10.5px;color:var(--t3);">{inv.payment_condition || (inv.document_types?.code === 'TAX_INVOICE' ? 'ใบกำกับภาษี' : '')}</div>
+                    <div style="font-size:10.5px;color:var(--t3);">วันที่ออก: {thaiDate(inv.issue_date)}</div>
                   </div>
                   <div style="text-align:right;flex-shrink:0;padding-left:8px;">
                     <div style="font-size:12px;font-weight:600;color:var(--text);">฿{money(inv.total_amount)}</div>
-                    <div style={`font-size:10px;font-weight:600;color:${inv.status==='published'?'var(--green)':'var(--t3)'}`}>{inv.status==='published'?'Published':'Draft'}</div>
+                    <div style={`font-size:10px;font-weight:600;color:${statusInfo(inv.status).cls==='published'?'var(--green)':(statusInfo(inv.status).cls==='stale'?'#C9822D':'var(--t3)')}`}>{statusInfo(inv.status).label}</div>
                   </div>
                 </a>
               ))}
