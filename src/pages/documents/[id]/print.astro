@@ -395,10 +395,10 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
           <td>ผู้รับเงิน<br/><span style="font-size:6.5pt;opacity:.7;">Collector</span><div class="tx-sig-date">......./......./.......</div></td>
           <td>ผู้ส่งสินค้า<br/><span style="font-size:6.5pt;opacity:.7;">Sender</span><div class="tx-sig-date">......./......./.......</div></td>
           {(() => {
-              const now = new Date();
-              const d = now.getDate();
-              const m = now.getMonth() + 1;
-              const y = now.getFullYear() + 543;
+              const src = doc.issue_date ? new Date(doc.issue_date) : new Date();
+              const d = src.getDate();
+              const m = src.getMonth() + 1;
+              const y = src.getFullYear() + 543;
               const dateStr = (d<10?'0'+d:d) + '/' + (m<10?'0'+m:m) + '/' + y;
               return <td>ผู้มีอำนาจลงนาม<br/><span style="font-size:6.5pt;opacity:.7;">Authorized Signature</span><div class="tx-sig-date" style="color:#333;font-weight:600;">{dateStr}</div></td>;
             })()}
