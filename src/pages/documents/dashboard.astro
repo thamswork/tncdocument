@@ -347,7 +347,14 @@ const groupList = Object.values(customerGroups).sort((a: any, b: any) => (b.late
         <button class="expand-all-btn" id="expandAllBtn" onclick="window.toggleAllGroups()">ยุบทั้งหมด</button>
       </div>
 
-      <div class="tbl-wrap">
+      <div id="globalSearchPanel" style="display:none;background:var(--white);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;">
+        <div style="padding:10px 16px;font-size:11px;color:var(--t3);border-bottom:1px solid var(--b2);background:var(--bg);">
+          ผลค้นหาทั้งระบบ (ไม่จำกัดเฉพาะรายการที่โหลดไว้)
+        </div>
+        <div id="globalSearchResults"></div>
+      </div>
+
+      <div class="tbl-wrap" id="mainTblWrap">
         <table class="tbl" id="docTable">
           <thead>
             <tr>
@@ -714,7 +721,56 @@ function sortRows(){
   });
 }
 
-window.doSearch = function(v){ searchVal=v; applyFilters(); };
+var searchDebounceTimer = null;
+window.doSearch = function(v){
+  searchVal = v;
+  applyFilters();
+
+  clearTimeout(searchDebounceTimer);
+  var panel = document.getElementById('globalSearchPanel');
+  var resultsEl = document.getElementById('globalSearchResults');
+  var mainTbl = document.getElementById('mainTblWrap');
+  var q = (v||'').trim();
+  if (q.length < 2) {
+    if (panel) panel.style.display = 'none';
+    if (mainTbl) mainTbl.style.display = '';
+    return;
+  }
+  searchDebounceTimer = setTimeout(async function() {
+    try {
+      var res = await fetch('/documents/api/search?q=' + encodeURIComponent(q));
+      var json = await res.json();
+      var labelMap = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
+      var statusMap = {
+        published: {label:'เผยแพร่แล้ว', color:'var(--green)'},
+        stale: {label:'ค้างนาน', color:'#C9822D'},
+      };
+      if (!json.results || json.results.length === 0) {
+        resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">ไม่พบเอกสารที่ตรงกับ "'+q+'"</div>';
+      } else {
+        resultsEl.innerHTML = json.results.map(function(doc) {
+          var typeCode = doc.document_types?.code || '';
+          var custName = doc.customers?.company_name || '-';
+          var s = statusMap[doc.status] || {label:'กำลังดำเนินการ', color:'var(--t2)'};
+          var amt = Number(doc.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2});
+          var isLinked = !!doc.source_document_id;
+          return '<a href="/documents/'+doc.id+'" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--b2);text-decoration:none;color:inherit;">'+
+            '<div>'+(isLinked?'<span style="color:var(--gold);margin-right:4px;font-size:11px;">↳</span>':'')+
+            '<span style="font-family:monospace;font-size:12.5px;font-weight:600;color:var(--text);">'+doc.document_number+'</span>'+
+            '<span style="font-size:11px;color:var(--t3);margin-left:8px;">'+(labelMap[typeCode]||typeCode)+' · '+custName+'</span></div>'+
+            '<div style="text-align:right;"><span style="font-size:12.5px;font-weight:600;">฿'+amt+'</span>'+
+            '<span style="font-size:10.5px;color:'+s.color+';font-weight:600;margin-left:10px;">'+s.label+'</span></div></a>';
+        }).join('');
+      }
+      if (panel) panel.style.display = '';
+      if (mainTbl) mainTbl.style.display = 'none';
+    } catch(e) {
+      resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">เกิดข้อผิดพลาดในการค้นหา</div>';
+      if (panel) panel.style.display = '';
+      if (mainTbl) mainTbl.style.display = 'none';
+    }
+  }, 300);
+};
 
 window.filterType = function(el, type){
   typeVal=type;

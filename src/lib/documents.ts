@@ -355,6 +355,47 @@ export async function deleteDocument(id: string, userId: string) {
 // across pages the way it did before (dashboard, document view, and the print
 // page each had their own copy-pasted version, some hardcoded to English
 // Published/Draft and blind to the newer in_progress/stale/removed statuses).
+/** Real server-side search across the ENTIRE documents table — not limited to
+ *  whatever page happens to be loaded in the browser (unlike the dashboard's
+ *  client-side filter, which only searches already-loaded rows). Matches on
+ *  document number OR customer name/code, and finds a document regardless of
+ *  whether it's a top-level document or a nested Tax Invoice / installment. */
+export async function searchDocuments(rawQuery: string) {
+  const q = (rawQuery || '').trim();
+  if (q.length < 2) return [];
+
+  const selectShape = `
+    id, document_number, document_type_id, customer_id, status, issue_date, total_amount,
+    source_document_id,
+    document_types(code, name_th, prefix),
+    customers(customer_code, company_name)
+  `;
+
+  const [byNumber, matchingCustomers] = await Promise.all([
+    supabaseAdmin.from('documents').select(selectShape)
+      .ilike('document_number', `%${q}%`).neq('status', 'removed')
+      .order('created_at', { ascending: false }).limit(20),
+    supabaseAdmin.from('customers').select('id')
+      .or(`company_name.ilike.%${q}%,customer_code.ilike.%${q}%`).limit(10),
+  ]);
+
+  let byCustomer: any = { data: [] };
+  const custIds = (matchingCustomers.data || []).map((c: any) => c.id);
+  if (custIds.length > 0) {
+    byCustomer = await supabaseAdmin.from('documents').select(selectShape)
+      .in('customer_id', custIds).neq('status', 'removed')
+      .order('created_at', { ascending: false }).limit(20);
+  }
+
+  const merged = new Map<string, any>();
+  for (const d of (byNumber.data || [])) merged.set(d.id, d);
+  for (const d of (byCustomer.data || [])) merged.set(d.id, d);
+
+  return Array.from(merged.values())
+    .sort((a, b) => (a.document_number < b.document_number ? 1 : -1))
+    .slice(0, 30);
+}
+
 export function statusInfo(status: string) {
   if (status === 'published') return { label: 'เผยแพร่แล้ว', cls: 'published' };
   if (status === 'stale') return { label: 'ค้างนาน', cls: 'stale' };
