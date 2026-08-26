@@ -799,10 +799,7 @@ const hasInstallments = true; // always show — every project can have installm
       });
       var data = await res.json();
       if (!res.ok) { alert('บันทึกไม่สำเร็จ: ' + (data.error||'')); return; }
-      // Update displayed Thai date without reload
-      var hint = document.getElementById('txDateHint');
-      if (hint) hint.textContent = '✓ บันทึกแล้ว';
-      setTimeout(function(){ if(hint) hint.textContent=''; }, 2000);
+      window.location.reload();
     } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
   };
   window.copyLink = function() {
