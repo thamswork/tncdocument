@@ -465,7 +465,13 @@ function scaleSheet(){
   el.style.marginBottom=(sh.offsetHeight*(scale-1))+'px';
 }
 scaleSheet();
-window.addEventListener('resize',scaleSheet);
+window.addEventListener('orientationchange', scaleSheet);
+// NOTE: intentionally NOT listening to the generic 'resize' event here.
+// On iOS Safari, pinch-zooming can itself fire a resize event — if this
+// script re-ran scaleSheet() on every resize, it would recalculate and
+// reapply the fit-to-width transform scale on every pinch gesture, instantly
+// snapping the zoom back and making pinch-zoom feel completely broken. Only
+// an actual orientation change should trigger a re-fit.
 // Date rendered server-side
 </script>
 </body>
