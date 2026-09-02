@@ -326,16 +326,24 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
           </Fragment>
         );
       })}
-    {[...Array(10)].map((_:any,i:number) => {
-      const spMat = doc.items.some((it:any) => (it.material_cost||0)>0);
-      const spLab = doc.items.some((it:any) => (it.labor_cost||0)>0);
-      const spCols = 5 + (!spMat&&!spLab?1:0) + (spMat?2:0) + (spLab?2:0);
-      return (
-        <tr key={'sp'+i} style="height:24px;background:#fff;">
-          {[...Array(spCols)].map((_:any,j:number) => <td key={j} style="border:1px solid #C8D0DC;height:24px;background:#fff;"></td>)}
-        </tr>
-      );
-    })}
+    {(() => {
+      const realRowCount = doc.categories.reduce((sum: number, cat: any) => {
+        const items = itemsByCategory[cat.id] || [];
+        return sum + 1 + items.length;
+      }, 0);
+      const targetMinRows = 6;
+      const fillerCount = Math.max(0, Math.min(10, targetMinRows - realRowCount));
+      return [...Array(fillerCount)].map((_:any,i:number) => {
+        const spMat = doc.items.some((it:any) => (it.material_cost||0)>0);
+        const spLab = doc.items.some((it:any) => (it.labor_cost||0)>0);
+        const spCols = 5 + (!spMat&&!spLab?1:0) + (spMat?2:0) + (spLab?2:0);
+        return (
+          <tr key={'sp'+i} style="height:24px;background:#fff;">
+            {[...Array(spCols)].map((_:any,j:number) => <td key={j} style="border:1px solid #C8D0DC;height:24px;background:#fff;"></td>)}
+          </tr>
+        );
+      });
+    })()}
     </tbody>
   </table></div>
   {doc.document_types?.code !== 'TAX_INVOICE' && <div class="tot-wrap">
