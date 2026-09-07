@@ -283,7 +283,8 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
               const cCols = 4 + (cHasMat?2:0) + (cHasLab?2:0) + (!cHasMat&&!cHasLab?1:0);
               return (
                 <tr class="row-cat">
-                  <td colspan={cCols+1}>{cat.category_number}. {cat.name_th}</td>
+                  <td colspan={cCols}>{cat.category_number}. {cat.name_th}</td>
+                  <td class="tr" style="color:#fff;">{fmt(catTotal)}</td>
                 </tr>
               );
             })()}
