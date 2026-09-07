@@ -323,13 +323,24 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
                 </tr>
               );
             })}
+            {(() => {
+              const fHasMat = doc.items.some((i:any) => (i.material_cost||0)>0);
+              const fHasLab = doc.items.some((i:any) => (i.labor_cost||0)>0);
+              const fCols = 4 + (fHasMat?2:0) + (fHasLab?2:0) + (!fHasMat&&!fHasLab?1:0);
+              return (
+                <tr class="row-sub">
+                  <td colspan={fCols} class="sub-lbl">รวม{cat.name_th}</td>
+                  <td class="tr tw">{fmt(catTotal)}</td>
+                </tr>
+              );
+            })()}
           </Fragment>
         );
       })}
     {(() => {
       const realRowCount = doc.categories.reduce((sum: number, cat: any) => {
         const items = itemsByCategory[cat.id] || [];
-        return sum + 1 + items.length;
+        return sum + 2 + items.length; // +1 category header row, +1 new subtotal row
       }, 0);
       const targetMinRows = 6;
       const fillerCount = Math.max(0, Math.min(10, targetMinRows - realRowCount));
