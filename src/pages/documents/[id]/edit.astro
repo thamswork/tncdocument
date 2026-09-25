@@ -550,7 +550,7 @@ const existingItems = doc.items || [];
     markBOQModified();
     var cat=cats.find(function(c){ return c.tid===tid; });
     var ex=(ibc[tid]||[]).filter(function(i){ return !i.sub; });
-    ibc[tid].push({id:'i'+Date.now(), num:cat.num+'.'+(ex.length+1), code:'', desc:'', qty:1, unit:'งาน', price:0, amt:0, sub:false});
+    ibc[tid].push({id:'i'+Date.now(), num:cat.num+'.'+(ex.length+1), code:'', desc:'', qty:1, unit:'งาน', price:0, mat:0, matT:0, lab:0, labT:0, amt:0, sub:false});
     render();
   };
   window.addSub = function(tid) {
@@ -564,9 +564,15 @@ const existingItems = doc.items || [];
     var item=(ibc[tid]||[]).find(function(i){ return i.id===iid; });
     if(!item) return;
     item[f]=v;
-    if(f==='qty'||f==='price'||f==='mat'||f==='lab') {
-      item.amt=(parseFloat(item.qty)||0)*(parseFloat(item.price)||0);
-      var el=document.getElementById('a_'+iid); if(el) el.textContent='฿'+fmt(item.amt);
+    if(f==='qty'||f==='mat'||f==='lab') {
+      var q=parseFloat(item.qty)||0;
+      item.matT=q*(parseFloat(item.mat)||0);
+      item.labT=q*(parseFloat(item.lab)||0);
+      item.price=(parseFloat(item.mat)||0)+(parseFloat(item.lab)||0);
+      item.amt=item.matT+item.labT;
+      var elA=document.getElementById('a_'+iid); if(elA) elA.textContent='฿'+fmt(item.amt);
+      var elM=document.getElementById('mt_'+iid); if(elM) elM.textContent='฿'+fmt(item.matT);
+      var elL=document.getElementById('lt_'+iid); if(elL) elL.textContent='฿'+fmt(item.labT);
     }
     updSub(tid); window.recalc(); updCnt();
   };
