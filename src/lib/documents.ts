@@ -115,6 +115,23 @@ export async function getDocuments(filters?: any) {
   return { data: data || [], count: count || 0 };
 }
 
+/** Every non-removed document in ONE lightweight query, for the dashboard's
+ *  instant client-side search. The whole table is small (hundreds of rows), so
+ *  loading it all means search/filter can never miss a document just because it
+ *  wasn't in the first page, and nested installments / tax invoices (at any
+ *  depth: quotation → installment invoice → tax invoice) are always findable. */
+export async function getDocumentIndex() {
+  const { data } = await supabaseAdmin.from('documents').select(`
+    id, document_number, customer_id, job_id, status, issue_date, reference_po,
+    payment_condition, total_amount, created_at, updated_at, source_document_id,
+    document_types(code, name_th),
+    customers(customer_code, company_name),
+    jobs(name),
+    tnc_users!documents_issued_by_fkey(full_name)
+  `).neq('status', 'removed').order('created_at', { ascending: false }).limit(5000);
+  return data || [];
+}
+
 export async function getDocument(id: string) {
   const { data: doc } = await supabaseAdmin.from('documents').select(`
     *, document_types(code, name_th, name_en, prefix),
@@ -123,17 +140,22 @@ export async function getDocument(id: string) {
   `).eq('id', id).single();
   if (!doc) return null;
   // Parallel fetch — linked invoices, categories, items all at once
-  const [linkedResult, catsResult, itemsResult] = await Promise.all([
+  const [linkedResult, catsResult, itemsResult, sourceResult] = await Promise.all([
     supabaseAdmin
       .from('documents')
       .select('id, document_number, status, total_amount, issue_date, due_date, payment_condition, document_type_id, document_types(code)')
       .eq('source_document_id', id)
+      .neq('status', 'removed')
       .order('created_at', { ascending: true }),
     supabaseAdmin.from('document_categories').select('*').eq('document_id', id).order('sort_order'),
     supabaseAdmin.from('document_items').select('*').eq('document_id', id).order('sort_order'),
+    doc.source_document_id
+      ? supabaseAdmin.from('documents').select('id, document_number, status, document_types(code, name_th)').eq('id', doc.source_document_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   return {
     ...doc,
+    source_document: (sourceResult as any).data || null,
     categories: catsResult.data || [],
     items: itemsResult.data || [],
     linked_invoices: linkedResult.data || [],

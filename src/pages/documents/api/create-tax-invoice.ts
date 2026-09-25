@@ -19,6 +19,7 @@ export async function POST({ request, cookies }: any) {
     .select('id')
     .eq('source_document_id', source_doc_id)
     .eq('document_type_id', '574ecc98-dd0b-4a7a-8eb2-39dedbcb1011')
+    .neq('status', 'removed')
     .limit(1);
   if (existing && existing.length > 0) {
     return new Response(JSON.stringify({ error: 'มีใบกำกับภาษีสำหรับเอกสารนี้แล้ว' }), { status: 409 });

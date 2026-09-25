@@ -120,6 +120,7 @@ function daysLeft(purgeAt: string) {
   <div class="topbar">
     <a href="/documents/customers" class="back">← กลับ</a>
     <div class="topbar-title">แก้ไข: {customer.company_name}</div>
+    <a href={`/documents/dashboard?cust=${customer.id}&view=cust`} class="back" style="background:var(--text);color:var(--bg);border-color:var(--text);font-weight:700;">เอกสารของลูกค้า →</a>
   </div>
   <div class="content">
     <div class="card">

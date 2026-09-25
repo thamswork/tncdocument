@@ -61,6 +61,15 @@ function parseInstallments(cond: string, total: number) {
 }
 
 const installments = parseInstallments(doc.payment_condition || '', doc.total_amount || 0);
+// Tax invoice can be issued from ANY live invoice (in_progress / stale / draft /
+// published). It used to require 'published', but since the lifecycle change new
+// invoices start as 'in_progress' and never reach 'published', so the button
+// silently never appeared.
+const existingTx = ((doc as any).linked_invoices || []).filter((i: any) => i.document_types?.code === 'TAX_INVOICE');
+const canIssueTx = doc.document_types?.code === 'INVOICE' && doc.status !== 'removed' && existingTx.length === 0;
+const canMarkPublished = doc.status === 'draft' && canPublish(user); // legacy drafts only — unchanged behaviour
+const sInfo = statusInfo(doc.status);
+const sourceDoc = (doc as any).source_document;
 const hasInstallments = true; // always show — every project can have installments
 ---
 <!DOCTYPE html>
@@ -96,6 +105,16 @@ const hasInstallments = true; // always show — every project can have installm
     .spill-draft .sdot{background:var(--t3);}
     .spill-pub{background:var(--grbg);color:var(--green);border:1px solid var(--grborder);}
     .spill-pub .sdot{background:var(--green);}
+    .spill-stale{background:#FDF4E8;color:#C9822D;border:1px solid #EFD2A8;}
+    .spill-stale .sdot{background:#C9822D;}
+    .chain{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--t2);}
+    .chain a{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--text);text-decoration:none;font-weight:600;}
+    .chain a:hover{border-color:var(--text);}
+    .chain a.tx{background:var(--grbg);border-color:var(--grborder);color:var(--green);}
+    .chain .mono{font-family:monospace;}
+    .aitem.tx-cta{background:var(--grbg);border-color:var(--grborder);}
+    .aitem.tx-cta.pulse{animation:txpulse 1.2s ease-in-out 3;box-shadow:0 0 0 0 rgba(45,122,79,.5);}
+    @keyframes txpulse{0%{box-shadow:0 0 0 0 rgba(45,122,79,.55);}70%{box-shadow:0 0 0 12px rgba(45,122,79,0);}100%{box-shadow:0 0 0 0 rgba(45,122,79,0);}}
     .layout{display:grid;grid-template-columns:1fr 270px;min-height:calc(100dvh - 54px);}
     .main{padding:24px;border-right:1px solid var(--border);min-width:0;}
     .aside{padding:20px;background:var(--white);}
@@ -216,15 +235,15 @@ const hasInstallments = true; // always show — every project can have installm
 </head>
 <body>
   <div class="topbar">
-    <a href="/documents/dashboard" class="back">← กลับ</a>
+    <a href="/documents/dashboard" class="back" id="backLink">← กลับ</a>
     <div class="tb-docnum">{doc.document_number}</div>
     <div class="tb-cust">— {doc.customers?.company_name}</div>
     <div class="tb-actions">
-      <span class={`spill spill-${doc.status === 'published' ? 'pub' : 'draft'}`}>
-        <span class="sdot"></span>{doc.status === 'draft' ? 'Draft' : 'Published'}
+      <span class={`spill spill-${sInfo.cls === 'published' ? 'pub' : (sInfo.cls === 'stale' ? 'stale' : 'draft')}`}>
+        <span class="sdot"></span>{sInfo.label}
       </span>
       <a href={`/documents/${id}/print`} target="_blank" class="btn btn-ol">PDF</a>
-      {doc.status === 'draft' && canPublish(user) && (
+      {canMarkPublished && (
         <form method="POST" style="display:inline;">
           <input type="hidden" name="action" value="publish"/>
           <button type="submit" class="btn btn-green"
@@ -243,6 +262,16 @@ const hasInstallments = true; // always show — every project can have installm
 
   <div class="layout">
     <div class="main">
+      {(sourceDoc || existingTx.length > 0) && (
+        <div class="chain">
+          {sourceDoc && (
+            <span>สร้างจาก <a href={`/documents/${sourceDoc.id}`}><span class="mono">{sourceDoc.document_number}</span> · {sourceDoc.document_types?.name_th}</a></span>
+          )}
+          {existingTx.map((t: any) => (
+            <span>ใบกำกับภาษี <a class="tx" href={`/documents/${t.id}`}>✓ <span class="mono">{t.document_number}</span></a></span>
+          ))}
+        </div>
+      )}
       <div class={`info-grid${(doc as any).jobs ? ' cols-3' : ''}`}>
         <div class="icard">
           <div class="icard-lbl">ลูกค้า</div>
@@ -465,8 +494,14 @@ const hasInstallments = true; // always show — every project can have installm
             <div class="aicon aicon-url">URL</div>
             <div><div class="atext-title">คัดลอกลิงก์</div><div class="atext-sub" id="copy-hint">ส่งให้ลูกค้าดูเอกสาร</div></div>
           </button>
-          {doc.status==='published' && doc.document_types?.code==='INVOICE' && !(doc as any).linked_invoices?.some((i:any)=>i.document_types?.code==='TAX_INVOICE' || i.source_document_id===id) && (
-            <button onclick="createTaxInvoice()" class="aitem" id="txBtn">
+          {existingTx.map((t: any) => (
+            <a href={`/documents/${t.id}`} class="aitem tx-cta">
+              <div class="aicon" style="background:#fff;color:#2D7A4F;font-size:11px;font-weight:700;">TX</div>
+              <div><div class="atext-title">ดูใบกำกับภาษี</div><div class="atext-sub" style="font-family:monospace;">{t.document_number}</div></div>
+            </a>
+          ))}
+          {canIssueTx && (
+            <button onclick="createTaxInvoice()" class="aitem tx-cta" id="txBtn">
               <div class="aicon" style="background:#EDF7F0;color:#2D7A4F;font-size:11px;font-weight:700;">TX</div>
               <div><div class="atext-title">ออกใบกำกับภาษี</div><div class="atext-sub" id="tx-hint">สร้างใบเสร็จรับเงิน/ใบกำกับภาษี</div></div>
             </button>
@@ -477,13 +512,13 @@ const hasInstallments = true; // always show — every project can have installm
               <div><div class="atext-title">แก้ไขเอกสาร</div><div class="atext-sub">แก้ไขรายการและข้อมูล</div></div>
             </a>
           )}
-          {doc.status==='draft' && canPublish(user) && (
+          {canMarkPublished && (
             <form method="POST">
               <input type="hidden" name="action" value="publish"/>
               <button type="submit" class="aitem" style="background:var(--grbg);border-color:var(--grborder);"
                 onclick="return confirm('ออกเอกสารนี้?')">
                 <div class="aicon aicon-pub">✓</div>
-                <div><div class="atext-title" style="color:var(--green);">ออกเอกสาร</div><div class="atext-sub">เปลี่ยนสถานะเป็น Published</div></div>
+                <div><div class="atext-title" style="color:var(--green);">ออกเอกสาร</div><div class="atext-sub">เปลี่ยนสถานะเป็น "เผยแพร่แล้ว"</div></div>
               </button>
             </form>
           )}
@@ -762,7 +797,20 @@ const hasInstallments = true; // always show — every project can have installm
       else { alert('บันทึกไม่สำเร็จ'); }
     } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
   };
+  // Back returns to the exact dashboard search/filter the user came from
+  try {
+    var dashUrl = sessionStorage.getItem('tnc_dash_url');
+    var back = document.getElementById('backLink');
+    if (dashUrl && back && dashUrl.indexOf('/documents/dashboard') === 0) back.setAttribute('href', dashUrl);
+  } catch(e) {}
+  // Arrived via the dashboard's "+ ออกใบกำกับภาษี" shortcut → bring the button into view
+  if (new URLSearchParams(location.search).get('tx') === '1') {
+    var txb = document.getElementById('txBtn');
+    if (txb) { txb.scrollIntoView({behavior:'smooth', block:'center'}); txb.classList.add('pulse'); }
+    history.replaceState(null, '', location.pathname);
+  }
   window.createTaxInvoice = async function() {
+    if (!confirm('ออกใบกำกับภาษีสำหรับ ' + docNum + ' ยอด ฿' + Number(docTotal).toLocaleString('th-TH',{minimumFractionDigits:2}) + ' ?')) return;
     var btn = document.getElementById('txBtn');
     var hint = document.getElementById('tx-hint');
     if (btn) btn.style.opacity = '0.6';
