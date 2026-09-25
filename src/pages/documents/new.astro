@@ -394,7 +394,7 @@ if (Astro.request.method === 'POST') {
     var dD = parseFloat(document.getElementById('dD').value)||0;
     var dT = parseFloat(document.getElementById('dT').value)||0;
     var bv = sub - dD - dT;
-    var vat = bv * 0.07;
+    var vat = Math.round(bv * 7 + Number.EPSILON) / 100; // same satang rounding as the saved document
     document.getElementById('rSub').textContent = '฿'+fmt(sub);
     document.getElementById('rBV').textContent  = '฿'+fmt(bv);
     document.getElementById('rVAT').textContent = '฿'+fmt(vat);
@@ -804,7 +804,7 @@ if (Astro.request.method === 'POST') {
       sumDiv.style.cssText = 'background:var(--gbg);border:1px solid var(--gborder);border-radius:6px;padding:12px 14px;margin-bottom:12px;font-size:12px;';
       sumDiv.innerHTML = '<div style="font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;margin-bottom:8px;">สรุปงวดชำระ</div>'+
         '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--gborder);"><span style="color:var(--t2);">งวด '+instPct+'%</span><span style="font-weight:600;">฿'+Number(instAmt).toLocaleString('th-TH',{minimumFractionDigits:2})+'</span></div>'+
-        '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--t2);">ก่อน VAT</span><span>฿'+Math.round(parseFloat(instAmt)/1.07*100/100).toLocaleString('th-TH',{minimumFractionDigits:2})+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:var(--t2);">ก่อน VAT</span><span>฿'+(Math.round(parseFloat(instAmt)/1.07*100)/100).toLocaleString('th-TH',{minimumFractionDigits:2})+'</span></div>'+
         '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--gborder);margin-top:2px;"><span style="font-weight:700;">รวม VAT 7%</span><span style="font-weight:700;font-size:14px;">฿'+Number(instAmt).toLocaleString('th-TH',{minimumFractionDigits:2})+'</span></div>';
       rside.insertBefore(sumDiv, rside.firstChild);
     }

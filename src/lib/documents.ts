@@ -162,12 +162,40 @@ export async function getDocument(id: string) {
   };
 }
 
+/** Round to satang (2 decimals) the way a Thai tax invoice is written. */
+export function round2(n: number) {
+  return Math.round((Number(n) || 0) * 100 + Number.EPSILON) / 100;
+}
+
+// Every stored money figure is rounded to 2 decimals, and total is ALWAYS
+// exactly price_before_vat + vat_amount (the DB used to round VAT and total
+// separately, which can leave a 0.01 gap on the printed tax invoice).
+/** Single source of truth for a BOQ row's amount (same rule the save uses). */
+export function computeItemAmount(item: any) {
+  const q = Number(item.quantity) || 0;
+  const mc = Number(item.material_cost) || 0, lc = Number(item.labor_cost) || 0;
+  if (mc + lc > 0) return round2(q * mc) + round2(q * lc);
+  const mt = Number(item.material_total) || 0, lt = Number(item.labor_total) || 0;
+  if (mt + lt > 0) return round2(mt + lt);
+  const up = Number(item.unit_price) || 0;
+  if (up > 0) return round2(q * up);
+  return round2(Number(item.amount) || 0);
+}
+
 export function calculateTotals(items: any[], discountDesign: number, discountTrade: number) {
-  const subtotal = items.filter(i => !i.is_subtotal_row).reduce((s, i) => s + (Number(i.amount) || 0), 0);
-  const priceBeforeVat = subtotal - discountDesign - discountTrade;
-  const vatAmount = priceBeforeVat * 0.07;
-  const totalAmount = priceBeforeVat + vatAmount;
+  const subtotal = round2(items.filter(i => !i.is_subtotal_row).reduce((s, i) => s + computeItemAmount(i), 0));
+  const priceBeforeVat = round2(subtotal - (Number(discountDesign) || 0) - (Number(discountTrade) || 0));
+  const vatAmount = round2(priceBeforeVat * 0.07);
+  const totalAmount = round2(priceBeforeVat + vatAmount);
   return { subtotal, price_before_vat: priceBeforeVat, vat_amount: vatAmount, total_amount: totalAmount };
+}
+
+/** 3% withholding and net-payable, computed once so every page shows the same
+ *  numbers and the lines visibly add up (net = total − rounded WHT). */
+export function whtInfo(doc: any) {
+  const applies = doc?.apply_wht !== false;
+  const wht = applies ? round2(Number(doc?.price_before_vat || 0) * 0.03) : 0;
+  return { applies, wht, net: round2(Number(doc?.total_amount || 0) - wht) };
 }
 
 export async function saveDocument(docData: any, categories: any[], items: any[], userId: string, skipBOQ: boolean = false) {
@@ -249,6 +277,7 @@ export async function flagStaleDocuments() {
     .update({ status: 'stale' })
     .lt('last_activity_at', fiveDaysAgo)
     .in('status', ['in_progress'])
+    .neq('document_type_id', '574ecc98-dd0b-4a7a-8eb2-39dedbcb1011') // TAX_INVOICE
     .select('id');
   if (!error && data) {
     for (const d of data) await logAction(d.id, 'auto_flagged_stale', null);
@@ -331,13 +360,17 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
         unit_th: item.unit_th || '',
         unit_price: Number(item.unit_price) || 0,
         material_cost: Number(item.material_cost) || 0,
-        material_total: Number(item.material_total) || 0,
+        // Row totals are recomputed here from qty × unit cost, so a stale value
+        // sent by the browser can never be saved (the SV0087 / SV0031 bug).
+        material_total: round2((Number(item.quantity) || 0) * (Number(item.material_cost) || 0)) || round2(Number(item.material_total) || 0),
         labor_cost: Number(item.labor_cost) || 0,
-        labor_total: Number(item.labor_total) || 0,
-        amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (
-          (Number(item.material_total) || 0) + (Number(item.labor_total) || 0) > 0
-            ? (Number(item.material_total) || 0) + (Number(item.labor_total) || 0)
-            : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0)
+        labor_total: round2((Number(item.quantity) || 0) * (Number(item.labor_cost) || 0)) || round2(Number(item.labor_total) || 0),
+        amount: item.is_subtotal_row ? round2(Number(item.amount) || 0) : (
+          (Number(item.material_cost) || 0) + (Number(item.labor_cost) || 0) > 0
+            ? round2((Number(item.quantity) || 0) * (Number(item.material_cost) || 0)) + round2((Number(item.quantity) || 0) * (Number(item.labor_cost) || 0))
+            : (Number(item.material_total) || 0) + (Number(item.labor_total) || 0) > 0
+              ? round2((Number(item.material_total) || 0) + (Number(item.labor_total) || 0))
+              : round2((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))
         ),
         is_subtotal_row: item.is_subtotal_row || false,
         sort_order: i,
@@ -355,7 +388,7 @@ async function saveDocumentDetails(documentId: string, categories: any[], items:
       quantity: Number(item.quantity) || 0,
       unit_th: item.unit_th || '',
       unit_price: Number(item.unit_price) || 0,
-      amount: item.is_subtotal_row ? (Number(item.amount) || 0) : (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+      amount: item.is_subtotal_row ? round2(Number(item.amount) || 0) : round2((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)),
       is_subtotal_row: item.is_subtotal_row || false,
       sort_order: i,
     }));

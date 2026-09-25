@@ -55,6 +55,29 @@ function statusGroup(s: string) {
   return 'active';
 }
 
+// One plain-language "where is this job at" state per document, replacing the
+// technical draft/published/in_progress labels on the dashboard:
+//   todo  – invoice with no tax invoice yet (needs action)
+//   open  – quotation still being billed / document still being worked on
+//   stale – untouched 5+ days and not finished
+//   done  – tax invoice issued, invoice paid (has TX), or quotation fully billed & taxed
+function workflow(d: any, code: string) {
+  if (code === 'TAX_INVOICE') {
+    return d.status === 'draft' ? { ws: 'open', wl: 'ร่าง ยังไม่ออก' } : { ws: 'done', wl: 'ออกใบกำกับแล้ว' };
+  }
+  if (code === 'INVOICE') {
+    return hasTxBelow(d) ? { ws: 'done', wl: 'ออกใบกำกับแล้ว' } : { ws: 'todo', wl: 'รอออกใบกำกับภาษี' };
+  }
+  const invs = (kids[d.id] || []).filter((k: any) => k.document_types?.code === 'INVOICE');
+  const total = Number(d.total_amount || 0);
+  const billed = invs.reduce((s: number, k: any) => s + Number(k.total_amount || 0), 0);
+  const pct = total > 0 ? Math.min(100, Math.round(billed / total * 100)) : 0;
+  if (invs.length && pct >= 100 && invs.every((k: any) => hasTxBelow(k))) return { ws: 'done', wl: 'เก็บเงินครบแล้ว', bp: 100 };
+  if (invs.length) return { ws: d.status === 'stale' && pct < 100 ? 'stale' : 'open', wl: `เรียกเก็บแล้ว ${pct}%`, bp: pct };
+  if (d.status === 'stale') return { ws: 'stale', wl: 'ค้างนาน', bp: 0 };
+  return { ws: 'open', wl: 'กำลังดำเนินการ', bp: 0 };
+}
+
 const index = rows.map((d: any) => {
   const code = d.document_types?.code || '';
   const anc = ancestors(d);
@@ -86,6 +109,7 @@ const index = rows.map((d: any) => {
     ni: invKids.length,
     needTx: code === 'INVOICE' && !hasTxBelow(d),
     o: order[d.id],
+    ...workflow(d, code),
   };
 });
 
@@ -168,6 +192,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     .seg button .cnt{font-size:10.5px;color:var(--t3);font-weight:600;margin-left:4px;}
     .sel{padding:9px 30px 9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B6860' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat right 11px center;appearance:none;-webkit-appearance:none;font-size:12.5px;font-weight:600;font-family:inherit;color:var(--text);cursor:pointer;}
     .sel.on{border-color:var(--gold);background-color:var(--gbg);}
+    #monthSel{max-width:190px;} #statusSel{max-width:200px;}
     .spacer{flex:1;}
     .reset-btn{border:none;background:none;color:var(--t2);font-size:12px;font-family:inherit;text-decoration:underline;cursor:pointer;display:none;}
     .reset-btn.show{display:inline;}
@@ -200,7 +225,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     .grid-head button.on{color:var(--text);}
     .grid-head span{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
 
-    .row{padding-top:12px;padding-bottom:12px;border-bottom:1px solid var(--b2);cursor:pointer;transition:background .1s;-webkit-tap-highlight-color:transparent;}
+    .row{padding-top:10px;padding-bottom:10px;border-bottom:1px solid var(--b2);cursor:pointer;transition:background .1s;-webkit-tap-highlight-color:transparent;}
     .row:hover{background:#FCFBF8;}
     .row:last-child{border-bottom:none;}
     .row.ctx{opacity:.55;}
@@ -234,6 +259,25 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     .status-active{color:var(--t2);} .status-active .sdot{background:var(--t3);}
     .status-published{color:var(--green);} .status-published .sdot{background:var(--green);}
     .status-stale{color:var(--amber);} .status-stale .sdot{background:var(--amber);}
+    .row{border-left:3px solid transparent;}
+    .row.ws-todo{border-left-color:var(--gold);}
+    .row.ws-stale{border-left-color:var(--amber);}
+    .row.ws-done{border-left-color:var(--green);background:#FBFDFB;}
+    .row.ws-done .doc-num,.row.ws-done .c-amt{color:#44634F;}
+    .wpill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap;}
+    .wpill-todo{background:var(--gbg);color:var(--gdark);border:1px solid var(--gborder);}
+    .wpill-open{background:var(--bg);color:var(--t2);border:1px solid var(--border);}
+    .wpill-stale{background:var(--ambg);color:var(--amber);border:1px solid var(--amborder);}
+    .wpill-done{background:var(--grbg);color:var(--green);border:1px solid var(--grborder);}
+    .bar{height:4px;border-radius:2px;background:var(--b2);width:110px;overflow:hidden;margin-top:2px;}
+    .bar i{display:block;height:100%;background:var(--green);}
+    .toggle{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--t2);cursor:pointer;user-select:none;white-space:nowrap;}
+    .toggle input{width:16px;height:16px;accent-color:var(--green);}
+    .stat-sum{font-size:12px;font-weight:700;color:var(--t2);margin-top:4px;font-variant-numeric:tabular-nums;}
+    .stat-card.todo .stat-n{color:var(--gdark);}
+    .stat-card.todo.on{background:var(--gbg);border-color:var(--gold);}
+    .stat-card.done .stat-n{color:var(--green);}
+    .stat-card.done.on{background:var(--grbg);border-color:var(--green);}
     .tx-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:6px;background:var(--text);color:var(--bg);font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;}
     .tx-btn:hover{opacity:.85;}
     mark{background:#FBE7A8;color:inherit;border-radius:2px;padding:0 1px;}
@@ -288,7 +332,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       .search-inp{font-size:16px;padding:13px 48px 13px 44px;}
       .kbd{display:none;}
       .filter-row{gap:8px;}
-      .filter-row .sel{flex:1 1 40%;min-width:0;}
+      .filter-row .sel{flex:1 1 40%;min-width:0;max-width:none;}
       .filter-row .spacer{display:none;}
       #typeSeg{width:100%;}
       #typeSeg button{flex:1 0 auto;padding:8px 9px;}
@@ -297,7 +341,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       .stat-card{padding:10px 12px;display:flex;align-items:center;gap:10px;}
       .stat-n{font-size:22px;min-width:30px;}
       .stat-label{margin-top:0;font-size:12px;line-height:1.3;}
-      .stat-sub{display:none;}
+      .stat-sub,.stat-sum{display:none;}
       .grid-head{display:none;}
       .row{grid-template-columns:1fr auto;grid-template-areas:"doc amt" "cust cust" "status status";gap:6px 10px;padding:14px;}
       .grp-body .row{grid-template-columns:1fr auto;}
@@ -366,11 +410,12 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
         <select class="sel" id="monthSel" aria-label="เดือน"></select>
         <select class="sel" id="statusSel" aria-label="สถานะ">
           <option value="">ทุกสถานะ</option>
-          <option value="needtx">ใบแจ้งหนี้ที่ยังไม่ออกใบกำกับภาษี</option>
-          <option value="active">กำลังดำเนินการ</option>
+          <option value="todo">รอออกใบกำกับภาษี</option>
+          <option value="open">กำลังดำเนินการ</option>
           <option value="stale">ค้างนาน (5+ วัน)</option>
-          <option value="published">เผยแพร่แล้ว</option>
+          <option value="done">เสร็จแล้ว</option>
         </select>
+        <label class="toggle"><input type="checkbox" id="hideDone"/> ซ่อนที่เสร็จแล้ว</label>
         <span class="spacer"></span>
         <button class="reset-btn" id="resetBtn">ล้างตัวกรอง</button>
         <div class="seg" id="viewSeg" style="width:auto;">
@@ -381,25 +426,25 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     </div>
 
     <div class="stats" id="stats">
-      <button class="stat-card" data-st="">
-        <div class="stat-top"><div class="stat-n" id="n-all">0</div></div>
-        <div class="stat-label">เอกสารทั้งหมด</div>
-        <div class="stat-sub">ทุกประเภท ทุกงวด</div>
-      </button>
-      <button class="stat-card tx" data-st="needtx">
-        <div class="stat-top"><div class="stat-n" id="n-needtx">0</div></div>
+      <button class="stat-card todo" data-st="todo">
+        <div class="stat-top"><div class="stat-n" id="n-todo">0</div></div>
         <div class="stat-label">รอออกใบกำกับภาษี</div>
-        <div class="stat-sub">ใบแจ้งหนี้ที่ยังไม่มีใบกำกับ</div>
+        <div class="stat-sum" id="s-todo"></div>
       </button>
-      <button class="stat-card" data-st="active">
-        <div class="stat-top"><div class="stat-n" id="n-active">0</div></div>
+      <button class="stat-card" data-st="open">
+        <div class="stat-top"><div class="stat-n" id="n-open">0</div></div>
         <div class="stat-label">กำลังดำเนินการ</div>
-        <div class="stat-sub">ยังเปิดอยู่</div>
+        <div class="stat-sum" id="s-open"></div>
       </button>
       <button class="stat-card stale" data-st="stale">
         <div class="stat-top"><div class="stat-n" id="n-stale">0</div></div>
-        <div class="stat-label">ค้างนาน</div>
-        <div class="stat-sub">ไม่ขยับ 5+ วัน</div>
+        <div class="stat-label">ค้างนาน 5+ วัน</div>
+        <div class="stat-sum" id="s-stale"></div>
+      </button>
+      <button class="stat-card done" data-st="done">
+        <div class="stat-top"><div class="stat-n" id="n-done">0</div></div>
+        <div class="stat-label">เสร็จแล้ว</div>
+        <div class="stat-sum" id="s-done"></div>
       </button>
     </div>
 
@@ -454,16 +499,18 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       d.n, numAliases(d.n), d.tn, d.t, d.c, d.cc, d.j, d.pc, d.by,
       d.p ? d.p.n : '', d.tx.map(function(t){ return t.n + ' ' + numAliases(t.n); }).join(' '),
       thDate(d.d), money(d.a), d.a.toFixed(2), String(Math.round(d.a)),
-      d.needTx ? 'รอออกใบกำกับ' : ''
+      d.needTx ? 'รอออกใบกำกับ' : '', d.wl
     ].join(' | ');
     d._h = norm(hay);
     d._hs = d._h.replace(/\s+/g,'');
   });
 
   // ── state (mirrored into the URL so Back returns to the same search) ──
-  var S = { q:'', type:'', status:'', month:'', view:'list', sort:'date', dir:'desc', limit:PAGE };
+  var S = { q:'', type:'', status:'', month:'', view:'list', sort:'date', dir:'desc', limit:PAGE, hide:'' };
   var params = new URLSearchParams(location.search);
-  ['q','type','status','month','view','sort','dir'].forEach(function(k){ if(params.get(k)) S[k]=params.get(k); });
+  ['q','type','status','month','view','sort','dir','hide'].forEach(function(k){ if(params.get(k)) S[k]=params.get(k); });
+  // old links used different status names
+  S.status = ({needtx:'todo', active:'open', published:'done'})[S.status] || S.status;
   // legacy deep link from the customer page: ?cust=<id>
   S.cust = params.get('cust') || '';
   var collapsed = {};
@@ -475,6 +522,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     if(S.status) p.set('status',S.status);
     if(S.month) p.set('month',S.month);
     if(S.cust) p.set('cust',S.cust);
+    if(S.hide) p.set('hide','1');
     if(S.view!=='list') p.set('view',S.view);
     if(S.sort!=='date'||S.dir!=='desc'){ p.set('sort',S.sort); p.set('dir',S.dir); }
     var qs = p.toString();
@@ -498,10 +546,8 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     if(S.cust && d.cid!==S.cust) return false;
     if(ignore!=='type' && S.type && d.t!==S.type) return false;
     if(ignore!=='month' && S.month && monthKey(d.d)!==S.month) return false;
-    if(ignore!=='status' && S.status){
-      if(S.status==='needtx'){ if(!d.needTx) return false; }
-      else if(d.sg!==S.status) return false;
-    }
+    if(ignore!=='status' && S.status && d.ws!==S.status) return false;
+    if(ignore!=='status' && S.hide && !S.status && d.ws==='done') return false;
     return true;
   }
   function filtered(){
@@ -544,7 +590,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     d.tx.forEach(function(t){ chips.push('<a class="chip tx" href="/documents/'+t.id+'">✓ ใบกำกับ <span class="mono">'+hl(t.n)+'</span></a>'); });
     if(d.ni && !opts.tree) chips.push('<a class="chip" href="/documents/'+d.id+'">ใบแจ้งหนี้งวด '+d.ni+' ใบ</a>');
     var action = d.needTx ? '<a class="tx-btn" href="/documents/'+d.id+'?tx=1">+ ออกใบกำกับภาษี</a>' : '';
-    return '<div class="row'+(opts.ctx?' ctx':'')+'" data-id="'+d.id+'">'+
+    return '<div class="row ws-'+d.ws+(opts.ctx?' ctx':'')+'" data-id="'+d.id+'">'+
       '<div class="c-doc"><div class="doc-line">'+indent+
         '<a class="doc-num" href="/documents/'+d.id+'">'+hl(d.n)+'</a>'+
         '<span class="badge badge-'+(d.t||'x')+'">'+esc(d.tn)+'</span></div>'+
@@ -554,7 +600,8 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       '<div class="c-cust"><div class="cust-name">'+hl(d.c)+'</div>'+(d.cc?'<div class="cust-code">'+hl(d.cc)+'</div>':'')+'</div>'+
       '<div class="c-date">'+thDate(d.d)+'</div>'+
       '<div class="c-amt">฿'+hl(money(d.a))+'</div>'+
-      '<div class="c-status"><span class="status status-'+si.cls+'"><span class="sdot"></span>'+si.label+'</span>'+action+'</div>'+
+      '<div class="c-status"><span class="wpill wpill-'+d.ws+'">'+(d.ws==='done'?'✓ ':'')+esc(d.wl)+'</span>'+
+        (d.t==='QUOTATION' && d.bp>0 && d.bp<100 ? '<span class="bar"><i style="width:'+d.bp+'%"></i></span>' : '')+action+'</div>'+
     '</div>';
   }
   function headHtml(){
@@ -565,7 +612,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   function render(){
     var list = filtered();
     var total = list.reduce(function(s,d){ return s+d.a; },0);
-    var hasFilter = !!(S.q||S.type||S.status||S.month||S.cust);
+    var hasFilter = !!(S.q||S.type||S.status||S.month||S.cust||S.hide);
     document.getElementById('resCount').textContent = (hasFilter ? 'พบ ' : 'ทั้งหมด ') + list.length + ' เอกสาร';
     var custLabel = S.cust && BY && DOCS.find(function(d){return d.cid===S.cust;});
     document.getElementById('resSum').innerHTML = list.length ? (S.type ? 'ยอดรวม <b>฿'+money(total)+'</b>' : '<span style="color:var(--t3)">เลือกประเภทเอกสารเพื่อดูยอดรวม</span>') + (custLabel ? ' · ลูกค้า <b>'+esc(custLabel.c)+'</b> <a href="#" id="clearCust" style="color:var(--t2);">(ดูทุกลูกค้า)</a>' : '') : '';
@@ -628,10 +675,13 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     // "how many of the current search are in each state".
     var toks = tokens();
     var base = DOCS.filter(function(d){ return passFilters(d,'status') && (!toks.length || matchText(d,toks)); });
-    document.getElementById('n-all').textContent = base.length;
-    document.getElementById('n-needtx').textContent = base.filter(function(d){return d.needTx;}).length;
-    document.getElementById('n-active').textContent = base.filter(function(d){return d.sg==='active';}).length;
-    document.getElementById('n-stale').textContent = base.filter(function(d){return d.sg==='stale';}).length;
+    ['todo','open','stale','done'].forEach(function(w){
+      var l = base.filter(function(d){ return d.ws===w; });
+      document.getElementById('n-'+w).textContent = l.length;
+      var sum = l.reduce(function(s,d){ return s+d.a; },0);
+      document.getElementById('s-'+w).textContent = w==='todo' ? (l.length ? 'ยอดรวม ฿'+money(sum) : 'ไม่มีค้าง') : (l.length ? l.length+' เอกสาร' : '—');
+    });
+    document.getElementById('hideDone').checked = !!S.hide;
     document.querySelectorAll('.stat-card').forEach(function(c){ c.classList.toggle('on', (c.dataset.st||'')===S.status); });
 
     // Type counts
@@ -676,7 +726,8 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   mSel.addEventListener('change', function(){ S.month=mSel.value; S.limit=PAGE; render(); });
   document.getElementById('statusSel').addEventListener('change', function(e){ S.status=e.target.value; S.limit=PAGE; render(); });
   document.getElementById('stats').addEventListener('click', function(e){ var c=e.target.closest('.stat-card'); if(!c) return; var st=c.dataset.st||''; S.status = (S.status===st && st) ? '' : st; S.limit=PAGE; render(); });
-  function resetAll(){ S.q='';S.type='';S.status='';S.month='';S.cust='';S.limit=PAGE; qInp.value=''; render(); }
+  function resetAll(){ S.q='';S.type='';S.status='';S.month='';S.cust='';S.hide='';S.limit=PAGE; qInp.value=''; render(); }
+  document.getElementById('hideDone').addEventListener('change', function(e){ S.hide = e.target.checked ? '1' : ''; S.limit=PAGE; render(); });
   document.getElementById('resetBtn').addEventListener('click', resetAll);
 
   document.getElementById('resBody').addEventListener('click', function(e){

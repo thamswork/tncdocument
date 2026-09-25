@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../../../lib/supabase';
 import { getSessionUser, SESSION_COOKIE } from '../../../lib/auth';
+import { round2 } from '../../../lib/documents';
 
 export async function POST({ request, cookies }: any) {
   const token = cookies.get(SESSION_COOKIE)?.value;
@@ -40,8 +41,17 @@ export async function POST({ request, cookies }: any) {
   const parentBase = source_doc_num ? source_doc_num.replace('/'+buddhistYear,'') : ('IV'+String(nextNum).padStart(4,'0'));
   const docNumber = parentBase + '-' + nextNum + '/' + buddhistYear;
 
-  const beforeVat = Math.round(amount / 1.07 * 100) / 100;
-  const vatAmt = Math.round((amount - beforeVat) * 100) / 100;
+  // Work from the source document's before-VAT figure (pct × price_before_vat),
+  // then VAT = 7% of that, total = before-VAT + VAT. Back-calculating from a
+  // VAT-inclusive amount (÷1.07) made installments drift by a satang or two.
+  let beforeVat = round2(amount / 1.07);
+  const pctNum = Number(pct);
+  if (source_doc_id && pctNum > 0 && pctNum <= 100) {
+    const { data: src } = await supabaseAdmin.from('documents').select('price_before_vat').eq('id', source_doc_id).single();
+    if (src && Number(src.price_before_vat) > 0) beforeVat = round2(Number(src.price_before_vat) * pctNum / 100);
+  }
+  const vatAmt = round2(beforeVat * 0.07);
+  const totalAmt = round2(beforeVat + vatAmt);
 
   // Insert document
   const { data: doc, error: docErr } = await supabaseAdmin
@@ -50,7 +60,8 @@ export async function POST({ request, cookies }: any) {
       document_number: docNumber,
       document_type_id: dtData.id,
       customer_id,
-      status: 'draft',
+      status: 'in_progress', // lifecycle: new documents start in progress (no draft gate)
+      last_activity_at: new Date().toISOString(),
       language: 'th',
       issue_date: issue_date || new Date().toISOString().split('T')[0],
       due_date: due_date || null,
@@ -62,7 +73,7 @@ export async function POST({ request, cookies }: any) {
       discount_trade: 0,
       price_before_vat: beforeVat,
       vat_amount: vatAmt,
-      total_amount: amount,
+      total_amount: totalAmt,
       notes: '',
       created_by: user.id,
       issued_by: user.id,
