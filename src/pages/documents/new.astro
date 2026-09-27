@@ -689,9 +689,9 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
     it[f] = el.value;
     if (f === 'qty' || f === 'mat' || f === 'lab') {
       var q = num(it.qty);
-      it.matT = q * num(it.mat);
-      it.labT = q * num(it.lab);
-      it.amt = (num(it.mat) > 0 || num(it.lab) > 0) ? it.matT + it.labT : q * num(it.price);
+      it.matT = r2(q * num(it.mat)); // round each part like computeItemAmount() on the server
+      it.labT = r2(q * num(it.lab));
+      it.amt = (num(it.mat) > 0 || num(it.lab) > 0) ? it.matT + it.labT : r2(q * num(it.price));
       $('a_' + iid).innerHTML = amtHtml(it);
       refreshSubs(tid); recalc(); updCnt();
     }
