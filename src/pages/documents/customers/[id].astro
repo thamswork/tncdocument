@@ -4,7 +4,7 @@ import { getRemovedDocumentsForCustomer, restoreDocument } from '../../../lib/do
 const user = Astro.locals.user;
 const { id } = Astro.params;
 
-const { data: customer, error: fetchError } = await supabaseAdmin
+let { data: customer } = await supabaseAdmin
   .from('customers').select('*').eq('id', id).single();
 
 if (!customer) return Astro.redirect('/documents/customers');
@@ -21,7 +21,7 @@ if (Astro.request.method === 'POST') {
     return Astro.redirect(`/documents/customers/${id}?restored=1`);
   }
 
-  const { error: updateError } = await supabaseAdmin
+  const { data: updated, error: updateError } = await supabaseAdmin
     .from('customers')
     .update({
       customer_code: (form.get('customer_code') as string || '').trim().toUpperCase(),
@@ -34,20 +34,53 @@ if (Astro.request.method === 'POST') {
       email: (form.get('email') as string || '') || null,
       notes: (form.get('notes') as string || '') || null,
     })
-    .eq('id', id);
+    .eq('id', id)
+    .select()
+    .single();
 
   if (updateError) { error = updateError.message; }
-  else { success = 'บันทึกข้อมูลสำเร็จ'; }
+  else {
+    success = 'บันทึกข้อมูลลูกค้าแล้ว';
+    if (updated) customer = updated; // show what was just saved
+  }
 }
 
 const restoredFlag = Astro.url.searchParams.get('restored') === '1';
 const removedDocs = await getRemovedDocumentsForCustomer(id!);
-const typeLabels: Record<string,string> = {QUOTATION:'ใบเสนอราคา',INVOICE:'ใบแจ้งหนี้',TAX_INVOICE:'ใบกำกับภาษี',BOQ:'BOQ'};
+const { data: activeDocs } = await supabaseAdmin
+  .from('documents').select('id, status, document_types(code)')
+  .eq('customer_id', id).neq('status', 'removed');
+
+const typeLabels: Record<string, string> = { QUOTATION: 'ใบเสนอราคา', INVOICE: 'ใบแจ้งหนี้', TAX_INVOICE: 'ใบกำกับภาษี', BOQ: 'BOQ' };
+const counts: Record<string, number> = {};
+for (const d of (activeDocs || []) as any[]) {
+  const c = d.document_types?.code || 'OTHER';
+  counts[c] = (counts[c] || 0) + 1;
+}
+const docTotal = (activeDocs || []).length;
+const countRows = ['QUOTATION', 'INVOICE', 'TAX_INVOICE', 'BOQ'].filter(c => counts[c]).map(c => ({ label: typeLabels[c], n: counts[c], code: c }));
+
 function daysLeft(purgeAt: string) {
   if (!purgeAt) return null;
   const ms = new Date(purgeAt).getTime() - Date.now();
-  return Math.max(0, Math.ceil(ms / (1000*60*60*24)));
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
+const money = (n: any) => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Thai tax ID: 13 digits, last digit is a checksum of the first 12.
+function taxState(raw: string | null | undefined) {
+  const t = String(raw || '').replace(/\D/g, '');
+  if (!t) return 'none';
+  if (t.length !== 13) return 'bad';
+  let s = 0;
+  for (let i = 0; i < 12; i++) s += Number(t[i]) * (13 - i);
+  return (11 - (s % 11)) % 10 === Number(t[12]) ? 'ok' : 'bad';
+}
+const tx = taxState(customer.tax_id);
+const miss: string[] = [];
+if (tx === 'none') miss.push('ไม่มีเลขผู้เสียภาษี');
+if (tx === 'bad') miss.push('เลขผู้เสียภาษีไม่ถูกต้อง');
+if (!String(customer.address || '').trim()) miss.push('ไม่มีที่อยู่');
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -57,161 +90,320 @@ function daysLeft(purgeAt: string) {
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <meta name="robots" content="noindex,nofollow"/>
-  <title>แก้ไขลูกค้า — TNC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-  <style>
+  <title>{customer.company_name} — TNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;--text:#1A1814;--t2:#6B6860;--t3:#AEABA4;--red:#B94040;--green:#2D7A4F;--gbg:#EDF7F0;--gborder:#C5E8D2;}
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
+    :root{
+      --bg:#F6F5F2;--white:#fff;--border:#E3E0DA;--line:#EEECE7;
+      --text:#1A1814;--t2:#66635C;--t3:#A9A69F;
+      --gold:#B8955A;--gbg:#FAF6EE;
+      --green:#2D7A4F;--grbg:#EEF6F1;--red:#B23B3B;--redbg:#FBF0F0;--amber:#B97A26;--blue:#2D5A9E;
+    }
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;}
+    a{color:inherit;}
+    button,input,textarea,select{font-family:inherit;}
+    button:focus{outline:none;} button:focus-visible,a:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+    .ic{width:16px;height:16px;flex-shrink:0;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
 
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
-    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 12px;border:1px solid var(--border);border-radius:5px;white-space:nowrap;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
-    .back:active{background:var(--bg);}
-    .topbar-title{font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    /* Top bar (same as document page) */
+    .top{position:sticky;top:0;z-index:40;background:rgba(246,245,242,.92);backdrop-filter:saturate(1.4) blur(8px);-webkit-backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--line);}
+    .top-in{max-width:1200px;margin:0 auto;padding:0 28px;height:58px;display:flex;align-items:center;gap:12px;}
+    .back{display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 10px 0 6px;border-radius:7px;font-size:13px;color:var(--t2);text-decoration:none;white-space:nowrap;}
+    .back:hover{background:var(--white);color:var(--text);}
+    .crumb{font-size:13px;color:var(--t3);display:flex;align-items:center;gap:8px;min-width:0;}
+    .crumb b{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .spacer{flex:1;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);white-space:nowrap;}
+    .btn:hover{border-color:var(--text);}
+    .btn-dark{background:var(--text);border-color:var(--text);color:var(--white);}
+    .btn-dark:hover{opacity:.88;}
+    .btn-sm{height:30px;padding:0 11px;font-size:12.5px;font-weight:500;border-radius:7px;}
+    .btn-block{width:100%;height:42px;}
+    .btn[disabled]{opacity:.55;cursor:default;}
+    .linkbtn{border:none;background:none;padding:0;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+    .linkbtn:hover{color:var(--text);}
 
-    .content{padding:20px 16px;max-width:680px;margin:0 auto;}
-    .card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:24px;}
+    /* Page */
+    .wrap{max-width:1200px;margin:0 auto;padding:28px 28px 64px;}
+    .hero{display:flex;align-items:flex-end;gap:24px;margin-bottom:24px;}
+    .hero-main{flex:1;min-width:0;}
+    .eyebrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--t2);margin-bottom:8px;}
+    .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:600;color:var(--text);font-size:14px;}
+    .pill{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;border-radius:13px;background:var(--white);border:1px solid var(--border);font-size:12.5px;font-weight:500;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--t3);flex-shrink:0;}
+    .pill.ok .dot{background:var(--green);} .pill.warn .dot{background:var(--amber);} .pill.warn{color:#8A5A12;}
+    .h1{font-size:26px;font-weight:700;letter-spacing:-.015em;line-height:1.25;}
+    .sub-h{font-size:14px;color:var(--t2);margin-top:6px;}
+    .hero-amt{text-align:right;flex-shrink:0;}
+    .hero-amt .l{font-size:12.5px;color:var(--t2);}
+    .hero-amt .v{font-size:30px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2;}
+    .hero-amt .s{font-size:12.5px;color:var(--t2);margin-top:2px;}
 
-    .card-title{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--b2);}
+    .grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start;}
+    .content,.side{min-width:0;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:12px;}
+    .card + .card{margin-top:16px;}
+    .card-h{display:flex;align-items:center;gap:12px;padding:16px 20px 0;}
+    .card-t{font-size:13px;font-weight:700;flex:1;}
+    .card-n{font-size:12.5px;color:var(--t3);}
+    .card-b{padding:14px 20px 20px;}
 
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}
-    .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
-    .fg.full{grid-column:span 2;}
+    /* Fields */
+    .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;}
+    .fields .full{grid-column:1 / -1;}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .field label{font-size:12px;color:var(--t2);font-weight:500;}
+    .field label .req{color:var(--red);margin-left:2px;}
+    .inp{height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);background:var(--white);outline:none;width:100%;}
+    .inp:hover{border-color:#CFCBC3;}
+    .inp:focus{border-color:var(--text);}
+    .inp::placeholder{color:var(--t3);}
+    .inp.bad{border-color:var(--amber);}
+    textarea.inp{height:auto;padding:10px 12px;line-height:1.7;resize:vertical;min-height:84px;}
+    .fhint{font-size:12px;color:var(--t3);line-height:1.5;min-height:18px;}
+    .fhint.ok{color:var(--green);} .fhint.warn{color:var(--amber);}
 
-    label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t2);}
-    label span{color:var(--red);margin-left:2px;}
+    .msg{display:none;margin:0 0 16px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6;}
+    .msg.show{display:block;}
+    .msg.warn{background:#FDF6EA;color:#8A5A12;}
+    .msg.ok{background:var(--grbg);color:var(--green);}
+    .msg.err{background:var(--redbg);color:var(--red);}
+    .form-f{display:flex;align-items:center;gap:12px;padding:0 20px 20px;}
 
-    input,textarea{padding:11px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:100%;-webkit-appearance:none;appearance:none;}
-    input:focus,textarea:focus{border-color:var(--text);background:var(--white);}
-    textarea{resize:vertical;min-height:80px;line-height:1.6;}
+    /* Trash list */
+    .trow{display:flex;align-items:center;gap:14px;padding:12px 20px;border-top:1px solid var(--line);}
+    .trow-main{flex:1;min-width:0;}
+    .tnum{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;font-weight:600;}
+    .tmeta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--t2);margin-top:3px;font-variant-numeric:tabular-nums;}
+    .t-QUOTATION{color:var(--blue);} .t-INVOICE{color:var(--green);} .t-TAX_INVOICE{color:var(--red);}
+    .urgent{color:var(--red);font-weight:600;}
+    .tnote{font-size:12px;color:var(--t3);padding:12px 20px 16px;border-top:1px solid var(--line);line-height:1.6;}
 
-    .alert-ok{background:var(--gbg);border:1px solid var(--gborder);border-radius:5px;padding:12px 14px;font-size:13px;color:var(--green);margin-bottom:18px;}
-    .alert-err{background:#FEF2F2;border:1px solid #FECACA;border-radius:5px;padding:12px 14px;font-size:13px;color:var(--red);margin-bottom:18px;}
+    /* Side */
+    .side{position:sticky;top:78px;}
+    .sumrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .sumrow span:last-child{color:var(--text);font-weight:500;}
+    .sumrow.total{border-top:1px solid var(--border);margin-top:6px;padding-top:12px;color:var(--text);font-weight:600;}
+    .checks{display:flex;flex-direction:column;gap:8px;}
+    .chk{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t2);}
+    .chk .dot{background:var(--green);}
+    .chk.miss .dot{background:var(--amber);} .chk.miss{color:#8A5A12;}
+    .acts{display:flex;flex-direction:column;gap:8px;padding:0 20px 20px;}
+    .side .hint{font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;}
 
-    .actions{display:flex;gap:12px;margin-top:20px;align-items:center;}
-    .btn-submit{padding:13px 24px;background:var(--text);color:var(--bg);border:none;border-radius:5px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;-webkit-tap-highlight-color:transparent;min-height:48px;}
-    .btn-submit:active{opacity:.85;}
-    .cancel{font-size:13px;color:var(--t2);text-decoration:none;padding:8px;}
-    .cancel:active{color:var(--text);}
-
-    .trash-list{display:flex;flex-direction:column;gap:0;}
-    .trash-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--b2);}
-    .trash-item:last-child{border-bottom:none;}
-    .trash-num{font-size:13.5px;font-weight:600;font-family:monospace;color:var(--text);}
-    .trash-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--t2);margin-top:3px;}
-    .trash-type{color:var(--t3);}
-    .trash-urgent{color:var(--red);font-weight:600;}
-    .btn-restore{flex-shrink:0;padding:8px 16px;background:var(--white);border:1.5px solid var(--border);border-radius:5px;font-size:12px;font-weight:700;font-family:inherit;color:var(--text);cursor:pointer;-webkit-tap-highlight-color:transparent;}
-    .btn-restore:active{background:var(--bg);}
-    .trash-note{font-size:11px;color:var(--t3);margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);}
-
-    @media(max-width:600px){
-      .topbar{padding:0 14px;}
-      .topbar-title{font-size:13px;}
-      .content{padding:14px 12px;}
-      .card{padding:18px 16px;}
-      .grid{grid-template-columns:1fr;}
-      .fg.full{grid-column:auto;}
-      .actions{flex-direction:column;align-items:stretch;}
-      .btn-submit{width:100%;text-align:center;}
-      .cancel{text-align:center;}
+    @media(max-width:1020px){
+      .grid{grid-template-columns:minmax(0,1fr);}
+      .side{position:static;}
+    }
+    @media(max-width:640px){
+      .top-in{padding:0 12px;height:54px;gap:8px;}
+      .crumb,.top .btn-docs{display:none;}
+      .wrap{padding:18px 12px 48px;}
+      .hero{flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:18px;}
+      .hero-amt{text-align:left;}
+      .h1{font-size:21px;}
+      .hero-amt .v{font-size:24px;}
+      .fields{grid-template-columns:1fr;gap:14px;}
+      .card-h{padding:14px 16px 0;} .card-b{padding:12px 16px 16px;}
+      .form-f{padding:0 16px 16px;flex-direction:column;align-items:stretch;}
+      .form-f .btn{width:100%;height:42px;}
+      .form-f .linkbtn{align-self:center;}
+      .trow{padding:12px 16px;} .tnote{padding:12px 16px 14px;}
+      .acts{padding:0 16px 16px;}
+      input,select,textarea{font-size:16px!important;}
     }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <a href="/documents/customers" class="back">← กลับ</a>
-    <div class="topbar-title">แก้ไข: {customer.company_name}</div>
-    <a href={`/documents/dashboard?cust=${customer.id}&view=cust`} class="back" style="background:var(--text);color:var(--bg);border-color:var(--text);font-weight:700;">เอกสารของลูกค้า →</a>
-  </div>
-  <div class="content">
-    <div class="card">
-      <div class="card-title">ข้อมูลลูกค้า</div>
-      {success && <div class="alert-ok">✓ {success}</div>}
-      {error && <div class="alert-err">⚠ {error}</div>}
-      <form method="POST">
-        <div class="grid">
-          <div class="fg">
-            <label>รหัสลูกค้า <span>*</span></label>
-            <input type="text" name="customer_code" value={customer.customer_code} required/>
-          </div>
-          <div class="fg">
-            <label>ชื่อผู้ติดต่อ</label>
-            <input type="text" name="contact_name" value={customer.contact_name || ''}/>
-          </div>
-          <div class="fg full">
-            <label>ชื่อบริษัท / ลูกค้า <span>*</span></label>
-            <input type="text" name="company_name" value={customer.company_name} required/>
-          </div>
-          <div class="fg full">
-            <label>ที่อยู่</label>
-            <textarea name="address">{customer.address || ''}</textarea>
-          </div>
-          <div class="fg">
-            <label>โทรศัพท์</label>
-            <input type="tel" name="phone" value={customer.phone || ''}/>
-          </div>
-          <div class="fg">
-            <label>แฟกซ์</label>
-            <input type="tel" name="fax" value={customer.fax || ''}/>
-          </div>
-          <div class="fg">
-            <label>เลขประจำตัวผู้เสียภาษี</label>
-            <input type="text" name="tax_id" value={customer.tax_id || ''}/>
-          </div>
-          <div class="fg">
-            <label>อีเมล</label>
-            <input type="email" name="email" value={customer.email || ''} autocapitalize="none"/>
-          </div>
-          <div class="fg full">
-            <label>หมายเหตุ</label>
-            <textarea name="notes">{customer.notes || ''}</textarea>
-          </div>
-        </div>
-        <div class="actions">
-          <button type="submit" class="btn-submit">บันทึกการแก้ไข</button>
-          <a href="/documents/customers" class="cancel">ยกเลิก</a>
-        </div>
-      </form>
+  <header class="top">
+    <div class="top-in">
+      <a href="/documents/customers" class="back"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>ลูกค้า</a>
+      <div class="crumb"><span>/</span><b>{customer.company_name}</b></div>
+      <span class="spacer"></span>
+      <a href={`/documents/dashboard?cust=${customer.id}&view=cust`} class="btn btn-docs">เอกสารของลูกค้า</a>
+      <button type="submit" form="custForm" class="btn btn-dark">บันทึก</button>
     </div>
+  </header>
 
-    {removedDocs.length > 0 && (
-      <div class="card" style="margin-top:16px;">
-        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;border-bottom:none;margin-bottom:14px;padding-bottom:0;">
-          <span>ถังขยะ ({removedDocs.length})</span>
+  <main class="wrap">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow">
+          <span class="code">{customer.customer_code}</span>
+          {miss.length
+            ? <span class="pill warn"><span class="dot"></span>ข้อมูลภาษีไม่ครบ</span>
+            : <span class="pill ok"><span class="dot"></span>พร้อมออกใบกำกับภาษี</span>}
         </div>
-        {restoredFlag && <div class="alert-ok">✓ กู้คืนเอกสารสำเร็จ</div>}
-        <div class="trash-list">
-          {removedDocs.map((d: any) => {
-            const left = daysLeft(d.purge_at);
-            const typeCode = d.document_types?.code || '';
-            return (
-              <div class="trash-item">
-                <div class="trash-info">
-                  <div class="trash-num">{d.document_number}</div>
-                  <div class="trash-meta">
-                    <span class="trash-type">{typeLabels[typeCode] || typeCode}</span>
-                    <span>฿{Number(d.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})}</span>
-                    {left !== null && (
-                      <span class={left <= 7 ? 'trash-urgent' : ''}>
-                        {left === 0 ? 'จะลบถาวรวันนี้' : `ลบถาวรใน ${left} วัน`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <form method="POST" style="margin:0;">
-                  <input type="hidden" name="action" value="restore"/>
-                  <input type="hidden" name="document_id" value={d.id}/>
-                  <button type="submit" class="btn-restore"
-                    onclick={`return confirm('กู้คืนเอกสาร ${d.document_number}?')`}>กู้คืน</button>
-                </form>
-              </div>
-            );
-          })}
-        </div>
-        <div class="trash-note">เอกสารในถังขยะจะถูกลบถาวรโดยอัตโนมัติหลังจาก 45 วัน หากไม่ได้กู้คืน</div>
+        <h1 class="h1">{customer.company_name}</h1>
+        {customer.contact_name && <div class="sub-h">ผู้ติดต่อ {customer.contact_name}</div>}
       </div>
-    )}
-  </div>
+      <div class="hero-amt">
+        <div class="l">เอกสารของลูกค้า</div>
+        <div class="v">{docTotal} ฉบับ</div>
+        <div class="s">{removedDocs.length ? `ในถังขยะ ${removedDocs.length} ฉบับ` : ''}</div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="content">
+        <section class="card">
+          <div class="card-h"><div class="card-t">ข้อมูลลูกค้า</div><span class="card-n">ใช้พิมพ์บนใบเสนอราคาและใบกำกับภาษี</span></div>
+          <div class="card-b">
+            {success && <div class="msg ok show">{success}</div>}
+            {error && <div class="msg err show">บันทึกไม่สำเร็จ: {error}</div>}
+            <form method="POST" id="custForm">
+              <div class="fields">
+                <div class="field">
+                  <label for="f_code">รหัสลูกค้า<span class="req">*</span></label>
+                  <input class="inp mono" id="f_code" type="text" name="customer_code" value={customer.customer_code} required/>
+                </div>
+                <div class="field">
+                  <label for="f_contact">ชื่อผู้ติดต่อ</label>
+                  <input class="inp" id="f_contact" type="text" name="contact_name" value={customer.contact_name || ''} placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field full">
+                  <label for="f_name">ชื่อบริษัท / ลูกค้า<span class="req">*</span></label>
+                  <input class="inp" id="f_name" type="text" name="company_name" value={customer.company_name} required/>
+                  <div class="fhint">ใช้ชื่อตามที่จดทะเบียน เช่น บริษัท … จำกัด (สำนักงานใหญ่)</div>
+                </div>
+                <div class="field">
+                  <label for="f_tax">เลขประจำตัวผู้เสียภาษี</label>
+                  <input class="inp mono" id="f_tax" type="text" name="tax_id" value={customer.tax_id || ''} inputmode="numeric" placeholder="13 หลัก"/>
+                  <div class="fhint" id="taxHint"></div>
+                </div>
+                <div class="field">
+                  <label for="f_email">อีเมล</label>
+                  <input class="inp" id="f_email" type="email" name="email" value={customer.email || ''} autocapitalize="none" placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field full">
+                  <label for="f_addr">ที่อยู่</label>
+                  <textarea class="inp" id="f_addr" name="address" rows="3" placeholder="ที่อยู่ตามที่จดทะเบียน (แสดงบนใบกำกับภาษี)">{customer.address || ''}</textarea>
+                </div>
+                <div class="field">
+                  <label for="f_phone">โทรศัพท์</label>
+                  <input class="inp" id="f_phone" type="tel" name="phone" value={customer.phone || ''} placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field">
+                  <label for="f_fax">แฟกซ์</label>
+                  <input class="inp" id="f_fax" type="tel" name="fax" value={customer.fax || ''} placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field full">
+                  <label for="f_notes">หมายเหตุ</label>
+                  <textarea class="inp" id="f_notes" name="notes" rows="3" placeholder="ไม่บังคับ">{customer.notes || ''}</textarea>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="form-f">
+            <button type="submit" form="custForm" class="btn btn-dark">บันทึกการแก้ไข</button>
+            <a href="/documents/customers" class="linkbtn">ยกเลิก</a>
+          </div>
+        </section>
+
+        {removedDocs.length > 0 && (
+          <section class="card" id="trash">
+            <div class="card-h" style="padding-bottom:12px;"><div class="card-t">ถังขยะ</div><span class="card-n">{removedDocs.length} ฉบับ</span></div>
+            {restoredFlag && <div class="msg ok show" style="margin:0 20px 12px;">กู้คืนเอกสารแล้ว</div>}
+            {removedDocs.map((d: any) => {
+              const left = daysLeft(d.purge_at);
+              const code = d.document_types?.code || '';
+              return (
+                <div class="trow">
+                  <div class="trow-main">
+                    <div class="tnum">{d.document_number}</div>
+                    <div class="tmeta">
+                      <span class={`t-${code}`}>{typeLabels[code] || code}</span>
+                      <span>฿{money(d.total_amount)}</span>
+                      {left !== null
+                        ? <span class={left <= 7 ? 'urgent' : ''}>{left === 0 ? 'จะลบถาวรวันนี้' : `ลบถาวรใน ${left} วัน`}</span>
+                        : <span>เก็บไว้ ไม่ลบอัตโนมัติ</span>}
+                    </div>
+                  </div>
+                  <form method="POST" style="margin:0;">
+                    <input type="hidden" name="action" value="restore"/>
+                    <input type="hidden" name="document_id" value={d.id}/>
+                    <button type="submit" class="btn btn-sm" data-restore={d.document_number}>กู้คืน</button>
+                  </form>
+                </div>
+              );
+            })}
+            <div class="tnote">เอกสารในถังขยะจะถูกลบถาวรโดยอัตโนมัติหลังจาก 45 วัน หากไม่ได้กู้คืน</div>
+          </section>
+        )}
+      </div>
+
+      <aside class="side">
+        <section class="card">
+          <div class="card-h"><div class="card-t">ความพร้อมออกใบกำกับภาษี</div></div>
+          <div class="card-b">
+            <div class="checks">
+              <div class={`chk${tx === 'ok' ? '' : ' miss'}`}><span class="dot"></span>{tx === 'ok' ? 'เลขผู้เสียภาษีถูกต้อง' : tx === 'bad' ? 'เลขผู้เสียภาษีไม่ถูกต้อง' : 'ยังไม่มีเลขผู้เสียภาษี'}</div>
+              <div class={`chk${String(customer.address || '').trim() ? '' : ' miss'}`}><span class="dot"></span>{String(customer.address || '').trim() ? 'มีที่อยู่แล้ว' : 'ยังไม่มีที่อยู่'}</div>
+            </div>
+            {miss.length > 0 && <div class="hint">กรอกให้ครบก่อนออกใบกำกับภาษีให้ลูกค้ารายนี้</div>}
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-h"><div class="card-t">เอกสาร</div><span class="card-n">{docTotal} ฉบับ</span></div>
+          <div class="card-b">
+            {countRows.length
+              ? countRows.map((r: any) => <div class="sumrow"><span class={`t-${r.code}`}>{r.label}</span><span>{r.n}</span></div>)
+              : <div class="sumrow"><span>ยังไม่มีเอกสาร</span><span></span></div>}
+          </div>
+          <div class="acts">
+            <a href={`/documents/dashboard?cust=${customer.id}&view=cust`} class="btn btn-block">ดูเอกสารทั้งหมด</a>
+            <a href={`/documents/new`} class="btn btn-block">สร้างเอกสารใหม่</a>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+<script is:inline>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var form = $('custForm'), dirty = false, submitting = false;
+
+  // Thai tax ID check digit
+  function taxState(v){
+    var t = String(v || '').replace(/\D/g, '');
+    if (!t) return 'none';
+    if (t.length !== 13) return 'len';
+    var s = 0; for (var i = 0; i < 12; i++) s += Number(t[i]) * (13 - i);
+    return (11 - (s % 11)) % 10 === Number(t[12]) ? 'ok' : 'sum';
+  }
+  function showTax(){
+    var v = $('f_tax').value, st = taxState(v), h = $('taxHint'), n = v.replace(/\D/g, '').length;
+    $('f_tax').classList.toggle('bad', st === 'len' || st === 'sum');
+    if (st === 'none') { h.className = 'fhint'; h.textContent = 'ต้องมีก่อนออกใบกำกับภาษี'; }
+    else if (st === 'ok') { h.className = 'fhint ok'; h.textContent = 'เลขถูกต้อง'; }
+    else if (st === 'len') { h.className = 'fhint warn'; h.textContent = 'ต้องมี 13 หลัก (ตอนนี้ ' + n + ' หลัก)'; }
+    else { h.className = 'fhint warn'; h.textContent = 'เลขหลักสุดท้ายไม่ตรง กรุณาตรวจสอบอีกครั้ง'; }
+    return st;
+  }
+  $('f_tax').addEventListener('input', showTax);
+  showTax();
+
+  form.addEventListener('input', function(){ dirty = true; });
+  form.addEventListener('submit', function(e){
+    var st = showTax();
+    if ((st === 'len' || st === 'sum') && !confirm('เลขประจำตัวผู้เสียภาษีดูไม่ถูกต้อง ต้องการบันทึกต่อหรือไม่?')) { e.preventDefault(); $('f_tax').focus(); return; }
+    // Save 13-digit IDs without spaces or dashes so they print cleanly
+    var d = $('f_tax').value.replace(/\D/g, '');
+    if (d.length === 13) $('f_tax').value = d;
+    submitting = true;
+  });
+  window.addEventListener('beforeunload', function(e){ if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
+
+  document.querySelectorAll('[data-restore]').forEach(function(b){
+    b.addEventListener('click', function(e){
+      if (!confirm('กู้คืนเอกสาร ' + b.getAttribute('data-restore') + '?')) e.preventDefault();
+      else submitting = true;
+    });
+  });
+})();
+</script>
 </body>
 </html>
