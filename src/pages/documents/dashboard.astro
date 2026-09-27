@@ -74,7 +74,7 @@ function workflow(d: any, code: string) {
   const pct = total > 0 ? Math.min(100, Math.round(billed / total * 100)) : 0;
   if (invs.length && pct >= 100 && invs.every((k: any) => hasTxBelow(k))) return { ws: 'done', wl: 'เก็บเงินครบแล้ว', bp: 100 };
   if (invs.length) return { ws: d.status === 'stale' && pct < 100 ? 'stale' : 'open', wl: `เรียกเก็บแล้ว ${pct}%`, bp: pct };
-  if (d.status === 'stale') return { ws: 'stale', wl: 'ค้างนาน', bp: 0 };
+  if (d.status === 'stale') return { ws: 'stale', wl: 'ไม่เคลื่อนไหว 5+ วัน', bp: 0 };
   return { ws: 'open', wl: 'กำลังดำเนินการ', bp: 0 };
 }
 
@@ -108,6 +108,9 @@ const index = rows.map((d: any) => {
     tx: txKids.map((k: any) => ({ id: k.id, n: k.document_number })),
     ni: invKids.length,
     needTx: code === 'INVOICE' && !hasTxBelow(d),
+    pbv: Number(d.price_before_vat || 0),
+    wht: d.apply_wht !== false,
+    bill: invKids.filter((k: any) => k.document_types?.code === 'INVOICE').reduce((s: number, k: any) => s + Number(k.total_amount || 0), 0),
     o: order[d.id],
     ...workflow(d, code),
   };
@@ -312,6 +315,40 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     .quick-cta{padding:8px 14px;background:var(--white);border:1.5px dashed var(--border);border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text);text-decoration:none;-webkit-tap-highlight-color:transparent;}
     .quick-cta:hover{border-color:var(--gold);background:var(--gbg);}
 
+    /* ── งานค้าง panel ── */
+    .owe{background:var(--white);border:1.5px solid var(--gborder);border-radius:12px;overflow:hidden;}
+    .owe-head{display:flex;align-items:center;gap:12px;padding:12px 16px;flex-wrap:wrap;background:var(--gbg);border-bottom:1px solid var(--gborder);}
+    .owe-title{font-size:16px;font-weight:700;}
+    .owe-sum{font-size:12.5px;color:var(--t2);margin-left:auto;font-variant-numeric:tabular-nums;}
+    .owe-sum b{color:var(--text);}
+    .owe-toggle{border:none;background:none;font-family:inherit;font-size:12px;color:var(--t2);text-decoration:underline;cursor:pointer;}
+    .owe-note{font-size:12px;color:var(--t2);padding:8px 16px;border-bottom:1px solid var(--b2);}
+    .owe.closed .owe-note,.owe.closed #oweBody{display:none;}
+    .owe.closed .owe-head{border-bottom:none;}
+    .orow{display:grid;grid-template-columns:62px minmax(0,1fr) 200px 150px;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--b2);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .orow:hover{background:#FCFBF8;}
+    .o-age{text-align:center;border-radius:8px;padding:6px 0;background:var(--bg);border:1px solid var(--border);line-height:1.15;}
+    .o-age b{display:block;font-size:18px;font-weight:700;}
+    .o-age span{font-size:10px;}
+    .o-age.mid{background:var(--ambg);border-color:var(--amborder);color:var(--amber);}
+    .o-age.old{background:#FBEDED;border-color:#EBC5C5;color:var(--red);}
+    .o-age.pct{background:var(--grbg);border-color:var(--grborder);color:var(--green);}
+    .o-main{min-width:0;}
+    .o-cust{font-size:12.5px;font-weight:600;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .o-amt{text-align:right;}
+    .o-big{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
+    .o-small{font-size:11px;color:var(--t3);margin-top:2px;}
+    .o-act{text-align:right;}
+    .o-more{display:block;width:100%;padding:11px;border:none;border-top:1px solid var(--b2);background:var(--bg);font-family:inherit;font-size:12.5px;font-weight:600;color:var(--t2);cursor:pointer;}
+    .o-empty{padding:26px;text-align:center;color:var(--green);font-weight:600;}
+    @media(max-width:768px){
+      .owe-head{padding:10px 12px;gap:8px;}
+      .owe-sum{margin-left:0;width:100%;}
+      .owe-note{padding:8px 12px;}
+      .orow{grid-template-columns:52px minmax(0,1fr);gap:6px 10px;padding:12px;}
+      .o-amt,.o-act{grid-column:2;text-align:left;}
+    }
+
     /* ── Tablet ── */
     @media(max-width:1100px){
       .grid-head,.row{grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) 124px 160px;}
@@ -397,6 +434,20 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   </div>
 
   <div class="content">
+    <section class="owe" id="owe">
+      <div class="owe-head">
+        <div class="owe-title">งานค้าง</div>
+        <div class="seg" id="oweSeg">
+          <button data-o="pay">ค้างรับเงิน<span class="cnt" id="oc-pay"></span></button>
+          <button data-o="bill">ยังวางบิลไม่ครบ<span class="cnt" id="oc-bill"></span></button>
+        </div>
+        <div class="owe-sum" id="oweSum"></div>
+        <button class="owe-toggle" id="oweToggle">ย่อ</button>
+      </div>
+      <div class="owe-note" id="oweNote"></div>
+      <div id="oweBody"></div>
+    </section>
+
     <div class="search-hero">
       <div class="search-box">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -414,7 +465,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
           <option value="">ทุกสถานะ</option>
           <option value="todo">รอออกใบกำกับภาษี</option>
           <option value="open">กำลังดำเนินการ</option>
-          <option value="stale">ค้างนาน (5+ วัน)</option>
+          <option value="stale">ไม่เคลื่อนไหว 5+ วัน</option>
           <option value="done">เสร็จแล้ว</option>
         </select>
         <label class="toggle"><input type="checkbox" id="hideDone"/> ซ่อนที่เสร็จแล้ว</label>
@@ -440,7 +491,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       </button>
       <button class="stat-card stale" data-st="stale">
         <div class="stat-top"><div class="stat-n" id="n-stale">0</div></div>
-        <div class="stat-label">ค้างนาน 5+ วัน</div>
+        <div class="stat-label">ไม่เคลื่อนไหว 5+ วัน</div>
         <div class="stat-sum" id="s-stale"></div>
       </button>
       <button class="stat-card done" data-st="done">
@@ -491,7 +542,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   }
   var STATUS = {
     published:{label:'เผยแพร่แล้ว',cls:'published'},
-    stale:{label:'ค้างนาน',cls:'stale'},
+    stale:{label:'ไม่เคลื่อนไหว 5+ วัน',cls:'stale'},
   };
   function statusInfo(s){ return STATUS[s] || {label:'กำลังดำเนินการ',cls:'active'}; }
 
@@ -754,6 +805,66 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   document.getElementById('hamburger').addEventListener('click', toggleSidebar);
   document.getElementById('overlay').addEventListener('click', toggleSidebar);
 
+  // ── งานค้าง: what is still owed, oldest first (independent of search) ──
+  function r2(n){ return Math.round(n*100+(n>=0?1:-1)*1e-9)/100; }
+  function ageDays(s){ if(!s) return 0; var p=s.split('-'); var t=new Date(+p[0],(+p[1])-1,+p[2]); var n=new Date(); n.setHours(0,0,0,0); return Math.max(0,Math.round((n-t)/86400000)); }
+  function netOf(d){ return d.wht ? r2(d.a - r2(d.pbv*0.03)) : d.a; }
+  function byOld(a,b){ return (a.d||'').localeCompare(b.d||'') || (a.ca||'').localeCompare(b.ca||''); }
+  var OWE = {
+    pay: DOCS.filter(function(d){ return d.needTx; }).sort(byOld),
+    bill: DOCS.filter(function(d){ return d.t==='QUOTATION' && d.bill>0 && d.a-d.bill>1; }).sort(byOld)
+  };
+  var oweTab = OWE.pay.length || !OWE.bill.length ? 'pay' : 'bill';
+  var oweAll = false, OWE_SHOW = 6;
+  var oweClosed = false; try{ oweClosed = localStorage.getItem('tnc_owe_closed')==='1'; }catch(e){}
+  function oweRow(d){
+    var main = '<div class="o-main"><div class="doc-line"><a class="doc-num" href="/documents/'+d.id+'">'+esc(d.n)+'</a><span class="badge badge-'+(d.t||'x')+'">'+esc(d.tn)+'</span></div>'+
+      '<div class="o-cust">'+esc(d.c)+'</div>'+
+      ((d.j||d.pc)?'<div class="doc-meta">'+(d.j?'<span class="job">'+esc(d.j)+'</span>':'')+(d.j&&d.pc?' · ':'')+esc(d.pc)+'</div>':'')+'</div>';
+    if(oweTab==='pay'){
+      var n = ageDays(d.d);
+      return '<div class="orow" data-id="'+d.id+'">'+
+        '<div class="o-age '+(n>60?'old':n>30?'mid':'')+'"><b>'+n+'</b><span>วัน</span></div>'+main+
+        '<div class="o-amt"><div class="o-big">฿'+money(netOf(d))+'</div><div class="o-small">'+(d.wht?'โอนสุทธิ (หัก 3%) · รวม ฿'+money(d.a):'ยอดรวม')+'</div><div class="o-small">วางบิล '+thDate(d.d)+'</div></div>'+
+        '<div class="o-act"><a class="tx-btn" href="/documents/'+d.id+'?tx=1">+ ออกใบกำกับภาษี</a></div></div>';
+    }
+    var pct = d.a>0 ? Math.min(99, Math.floor(d.bill/d.a*100)) : 0;
+    return '<div class="orow" data-id="'+d.id+'">'+
+      '<div class="o-age pct"><b>'+pct+'%</b><span>วางบิลแล้ว</span></div>'+main+
+      '<div class="o-amt"><div class="o-big">฿'+money(r2(d.a-d.bill))+'</div><div class="o-small">ยังไม่วางบิล · จาก ฿'+money(d.a)+'</div></div>'+
+      '<div class="o-act"><a class="chip" href="/documents/'+d.id+'">วางบิลงวดถัดไป →</a></div></div>';
+  }
+  function renderOwe(){
+    var box = document.getElementById('owe');
+    box.classList.toggle('closed', oweClosed);
+    document.getElementById('oweToggle').textContent = oweClosed ? 'แสดง' : 'ย่อ';
+    document.getElementById('oc-pay').textContent = OWE.pay.length;
+    document.getElementById('oc-bill').textContent = OWE.bill.length;
+    document.querySelectorAll('#oweSeg button').forEach(function(b){ b.classList.toggle('on', b.dataset.o===oweTab); });
+    var list = OWE[oweTab];
+    if(oweTab==='pay'){
+      var tot = list.reduce(function(s,d){ return s+d.a; },0), nt = list.reduce(function(s,d){ return s+netOf(d); },0);
+      document.getElementById('oweSum').innerHTML = list.length ? 'รวม <b>฿'+money(tot)+'</b> · ลูกค้าโอนสุทธิ <b>฿'+money(nt)+'</b>' : '';
+      document.getElementById('oweNote').textContent = 'ใบแจ้งหนี้ที่วางบิลแล้วแต่ยังไม่ออกใบกำกับภาษี เรียงจากเก่าสุด — ลูกค้าโอนแล้ว กด “ออกใบกำกับภาษี” รายการจะหายไปจากที่นี่';
+    } else {
+      var rem = list.reduce(function(s,d){ return s+(d.a-d.bill); },0);
+      document.getElementById('oweSum').innerHTML = list.length ? 'ยังไม่วางบิลรวม <b>฿'+money(r2(rem))+'</b>' : '';
+      document.getElementById('oweNote').textContent = 'ใบเสนอราคาที่วางบิลไปแล้วบางงวด ยังเหลือยอดที่ต้องวางบิลงวดถัดไป';
+    }
+    var shown = oweAll ? list : list.slice(0, OWE_SHOW);
+    document.getElementById('oweBody').innerHTML = !list.length ? '<div class="o-empty">✓ ไม่มีรายการค้าง</div>' :
+      shown.map(oweRow).join('') + (list.length>shown.length ? '<button class="o-more" data-omore>ดูทั้งหมด '+list.length+' รายการ ▾</button>' : (oweAll && list.length>OWE_SHOW ? '<button class="o-more" data-omore>ย่อ ▴</button>' : ''));
+  }
+  document.getElementById('oweSeg').addEventListener('click', function(e){ var b=e.target.closest('button'); if(!b) return; oweTab=b.dataset.o; oweAll=false; if(oweClosed){ oweClosed=false; try{ localStorage.removeItem('tnc_owe_closed'); }catch(x){} } renderOwe(); });
+  document.getElementById('oweToggle').addEventListener('click', function(){ oweClosed=!oweClosed; try{ oweClosed ? localStorage.setItem('tnc_owe_closed','1') : localStorage.removeItem('tnc_owe_closed'); }catch(x){} renderOwe(); });
+  document.getElementById('oweBody').addEventListener('click', function(e){
+    if(e.target.closest('[data-omore]')){ oweAll=!oweAll; return renderOwe(); }
+    if(e.target.closest('a,button')) return;
+    var row = e.target.closest('.orow');
+    if(row){ if(e.metaKey||e.ctrlKey) window.open('/documents/'+row.dataset.id); else location.href='/documents/'+row.dataset.id; }
+  });
+
+  renderOwe();
   render();
   if(window.innerWidth > 768 && !S.q) qInp.focus();
 })();

@@ -123,7 +123,7 @@ export async function getDocuments(filters?: any) {
 export async function getDocumentIndex() {
   const { data } = await supabaseAdmin.from('documents').select(`
     id, document_number, customer_id, job_id, status, issue_date, reference_po,
-    payment_condition, total_amount, created_at, updated_at, source_document_id,
+    payment_condition, total_amount, price_before_vat, apply_wht, created_at, updated_at, source_document_id,
     document_types(code, name_th),
     customers(customer_code, company_name),
     jobs(name),
@@ -453,7 +453,7 @@ export async function searchDocuments(rawQuery: string) {
 
 export function statusInfo(status: string) {
   if (status === 'published') return { label: 'เผยแพร่แล้ว', cls: 'published' };
-  if (status === 'stale') return { label: 'ค้างนาน', cls: 'stale' };
+  if (status === 'stale') return { label: 'ไม่เคลื่อนไหว 5+ วัน', cls: 'stale' };
   if (status === 'removed') return { label: 'ในถังขยะ', cls: 'removed' };
   return { label: 'กำลังดำเนินการ', cls: 'active' }; // draft, in_progress, or unrecognized
 }

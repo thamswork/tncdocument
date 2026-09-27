@@ -42,6 +42,7 @@ doc.categories.forEach((cat: any) => {
 const isQuotation = ['SV','QT','QUOTATION'].includes(doc.document_types?.code);
 const isInvoice = ['IV','IN','INVOICE'].includes(doc.document_types?.code);
 const LOGO = 'https://res.cloudinary.com/dynjnftnu/image/upload/v1780740967/LOGO_50mm20mm_thuhqd.png';
+const showCopy = ['TAX_INVOICE','INVOICE','IV','IN'].includes(doc.document_types?.code);
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -94,6 +95,14 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 .doc-type{font-size:15pt;font-weight:700;color:#0D1B2A;display:block;line-height:1.3;}
 .doc-bar{background:#112D5E;color:#fff;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:inline-block;padding:3px 12px;margin-top:5px;}
 .doc-bar-light{background:#4A7DB5;color:#fff;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:inline-block;padding:3px 12px;margin-top:5px;}
+.copy-lbl{display:inline-block;margin-top:7px;border:1.5px solid #112D5E;color:#112D5E;padding:2px 12px;font-size:10pt;font-weight:700;letter-spacing:.03em;}
+.copy-lbl.is-copy{border-color:#777;color:#555;}
+.t-seg{display:inline-flex;border:1px solid #444;border-radius:4px;overflow:hidden;margin-right:6px;}
+.t-seg button{background:transparent;color:#aaa;border:none;padding:7px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;}
+.t-seg button.on{background:#fff;color:#0D1B2A;}
+.sheet-scaler + .sheet-scaler{margin-top:24px;}
+@media screen{.sheet-scaler.is-clone .wm{display:none;}}
+@media print{.sheet-scaler + .sheet-scaler{margin-top:0!important;page-break-before:always;break-before:page;}}
 .draft-stamp{display:inline-block;margin-top:10px;border:3px solid #C0392B;color:#C0392B;padding:3px 14px;font-size:13pt;font-weight:900;letter-spacing:.18em;transform:rotate(-8deg);border-radius:3px;}
 /* info grid */
 .info-tbl{width:100%;border-collapse:collapse;border:2px solid #112D5E;margin-bottom:14px;font-size:9pt;}
@@ -203,6 +212,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
 <div class="toolbar">
   <div class="tb-t"><strong style="color:#fff;">{doc.document_number}</strong><span style="color:#555;margin:0 8px;">—</span><span style="color:#888;font-size:12px;">{doc.customers?.company_name}</span></div>
   {user && <a href={`/documents/${id}`} class="tbtn t-back">← กลับ</a>}
+  {showCopy && <div class="t-seg" id="copySeg"><button data-m="original">ต้นฉบับ</button><button data-m="copy">สำเนา</button><button data-m="both">ต้นฉบับ + สำเนา</button></div>}
   <button class="tbtn t-print" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
   <span style="color:#666;font-size:11px;margin-left:8px;">⚠ ก่อนพิมพ์: ยกเลิกติ๊ก "Headers and footers" ในหน้าต่างพิมพ์</span>
 </div>
@@ -226,6 +236,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
     <div class="hdr-doc">
       <span class="doc-type">{doc.document_types?.name_th}</span>
       <span class={doc.document_types?.code==='TAX_INVOICE'?'doc-bar-light':'doc-bar'}>{doc.document_types?.name_en || doc.document_types?.code}</span>
+      {showCopy && <div><span class="copy-lbl" data-copy-lbl>ต้นฉบับ / ORIGINAL</span></div>}
       {doc.status==='draft' && <div style="margin-top:8px;"><div class="draft-stamp">DRAFT</div></div>}
     </div>
   </div>
@@ -457,14 +468,15 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         </div>
       </div>
     </div>
-  </div>
+  </div>}
 </div>
 </div></div>
-<script>
+<script is:inline>
 function printDoc(){ window.print(); }
 function scaleSheet(){
-  var el=document.querySelector('.sheet-scaler');
-  var sh=document.querySelector('.sheet');
+  document.querySelectorAll('.sheet-scaler').forEach(function(el){ scaleOne(el, el.querySelector('.sheet')); });
+}
+function scaleOne(el, sh){
   if(!el||!sh)return;
   if(window.innerWidth>820){
     el.style.transform='';
@@ -482,6 +494,34 @@ function scaleSheet(){
   // collapse the extra space the unscaled element takes
   el.style.marginBottom=(sh.offsetHeight*(scale-1))+'px';
 }
+// ต้นฉบับ / สำเนา: "both" clones the sheet so one PDF has the original then the copy
+(function(){
+  var seg=document.getElementById('copySeg');
+  var first=document.querySelector('.sheet-scaler');
+  if(!seg||!first||!first.querySelector('[data-copy-lbl]'))return;
+  var baseTitle=document.title;
+  function label(root, isCopy){
+    var l=root.querySelector('[data-copy-lbl]');
+    l.textContent=isCopy?'สำเนา / COPY':'ต้นฉบับ / ORIGINAL';
+    l.classList.toggle('is-copy', isCopy);
+  }
+  function setMode(m){
+    if(['original','copy','both'].indexOf(m)<0)m='original';
+    document.querySelectorAll('.sheet-scaler.is-clone').forEach(function(e){ e.remove(); });
+    label(first, m==='copy');
+    if(m==='both'){
+      var c=first.cloneNode(true); c.classList.add('is-clone'); label(c, true);
+      first.parentNode.insertBefore(c, first.nextSibling);
+    }
+    document.title=baseTitle+(m==='copy'?' (สำเนา)':m==='both'?' (ต้นฉบับ+สำเนา)':'');
+    seg.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.dataset.m===m); });
+    var u=new URL(location.href); if(m==='original')u.searchParams.delete('copy'); else u.searchParams.set('copy',m);
+    history.replaceState(null,'',u.toString());
+    scaleSheet();
+  }
+  seg.addEventListener('click', function(e){ var b=e.target.closest('button'); if(b)setMode(b.dataset.m); });
+  setMode(new URLSearchParams(location.search).get('copy')||'original');
+})();
 scaleSheet();
 window.addEventListener('orientationchange', scaleSheet);
 // NOTE: intentionally NOT listening to the generic 'resize' event here.
