@@ -394,6 +394,25 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       .grp-tot{min-width:0;margin-left:auto;}
       .quick-create{display:none;}
     }
+    /* ── by-month view + customer dropdown ── */
+    #custSel{max-width:240px;}
+    .mchips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;justify-content:flex-end;}
+    .mchip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--white);border:1px solid var(--border);color:var(--t2);white-space:nowrap;font-variant-numeric:tabular-nums;}
+    .mchip.q{color:var(--blue);} .mchip.iv{color:var(--green);} .mchip.tx{color:var(--red);}
+    .mchip.todo{background:var(--gbg);border-color:var(--gborder);color:var(--gdark);}
+    .mon-head .grp-name{font-size:15px;}
+    .mon-head .grp-meta{margin-left:4px;}
+    .grp-body.mon-body .grid-head,.grp-body.mon-body .row{grid-template-columns:minmax(0,2.4fr) minmax(0,1.5fr) 108px 130px 168px;}
+    .grp-body.mon-body .c-cust{display:block;}
+    .grp-body.mon-body .h-cust{display:inline;}
+    @media(max-width:1100px){
+      .grp-body.mon-body .grid-head,.grp-body.mon-body .row{grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) 124px 160px;}
+    }
+    @media(max-width:768px){
+      .grp-body.mon-body .row{grid-template-columns:1fr auto;}
+      .mchips{margin-left:0;width:100%;justify-content:flex-start;}
+      #custSel{flex:1 1 100%;}
+    }
   </style>
 </head>
 <body>
@@ -468,10 +487,12 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
           <option value="stale">ไม่เคลื่อนไหว 5+ วัน</option>
           <option value="done">เสร็จแล้ว</option>
         </select>
+        <select class="sel" id="custSel" aria-label="ลูกค้า"></select>
         <label class="toggle"><input type="checkbox" id="hideDone"/> ซ่อนที่เสร็จแล้ว</label>
         <span class="spacer"></span>
         <button class="reset-btn" id="resetBtn">ล้างตัวกรอง</button>
         <div class="seg" id="viewSeg" style="width:auto;">
+          <button data-v="month">ตามเดือน</button>
           <button data-v="list">รายการ</button>
           <button data-v="cust">ตามลูกค้า</button>
         </div>
@@ -559,7 +580,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   });
 
   // ── state (mirrored into the URL so Back returns to the same search) ──
-  var S = { q:'', type:'', status:'', month:'', view:'list', sort:'date', dir:'desc', limit:PAGE, hide:'' };
+  var S = { q:'', type:'', status:'', month:'', view:'month', sort:'date', dir:'desc', limit:PAGE, hide:'' };
   var params = new URLSearchParams(location.search);
   ['q','type','status','month','view','sort','dir','hide'].forEach(function(k){ if(params.get(k)) S[k]=params.get(k); });
   // old links used different status names
@@ -576,7 +597,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     if(S.month) p.set('month',S.month);
     if(S.cust) p.set('cust',S.cust);
     if(S.hide) p.set('hide','1');
-    if(S.view!=='list') p.set('view',S.view);
+    if(S.view!=='month') p.set('view',S.view);
     if(S.sort!=='date'||S.dir!=='desc'){ p.set('sort',S.sort); p.set('dir',S.dir); }
     var qs = p.toString();
     var url = location.pathname + (qs ? '?'+qs : '');
@@ -676,6 +697,8 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     if(!list.length){
       body.innerHTML = '<div class="empty"><div class="empty-title">ไม่พบเอกสาร</div><div>ลองพิมพ์เลขที่เอกสารสั้นลง เช่น "TX5" หรือ "0012" หรือชื่อลูกค้าบางส่วน</div>'+
         (hasFilter?'<button class="btn btn-ol" data-reset>ล้างตัวกรองทั้งหมด</button>':'')+'</div>';
+    } else if(S.view==='month'){
+      body.innerHTML = renderMonths(list);
     } else if(S.view==='cust'){
       body.innerHTML = renderGroups(list);
     } else {
@@ -723,6 +746,40 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     }).join('');
   }
 
+  var TH_MF = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  var mOpen = {};
+  function renderMonths(list){
+    // Every document grouped by the month of its date, newest month first.
+    // Without a search/filter only the 2 latest months start open.
+    var filtering = !!(S.q||S.type||S.status||S.month||S.cust);
+    var groups = {};
+    list.forEach(function(d){ var k=monthKey(d.d)||'none'; (groups[k]||(groups[k]=[])).push(d); });
+    var keys = Object.keys(groups).filter(function(k){ return k!=='none'; }).sort();
+    if(!(S.sort==='date' && S.dir==='asc')) keys.reverse();
+    if(groups.none) keys.push('none');
+    return keys.map(function(k, i){
+      var docs = sorted(groups[k]);
+      var open = filtering || (k in mOpen ? mOpen[k] : i<2);
+      var sum = {QUOTATION:0,INVOICE:0,TAX_INVOICE:0}, cnt = {QUOTATION:0,INVOICE:0,TAX_INVOICE:0}, todo = 0;
+      docs.forEach(function(d){ if(d.t in sum && !(d.t==='TAX_INVOICE' && d.s==='draft')){ sum[d.t]+=d.a; cnt[d.t]++; } if(d.ws==='todo') todo++; });
+      var chips = [];
+      if(cnt.QUOTATION) chips.push('<span class="mchip q">ใบเสนอราคา '+cnt.QUOTATION+' · ฿'+money(sum.QUOTATION)+'</span>');
+      if(cnt.INVOICE) chips.push('<span class="mchip iv">ใบแจ้งหนี้ '+cnt.INVOICE+' · ฿'+money(sum.INVOICE)+'</span>');
+      if(cnt.TAX_INVOICE) chips.push('<span class="mchip tx">ใบกำกับภาษี '+cnt.TAX_INVOICE+' · ฿'+money(sum.TAX_INVOICE)+'</span>');
+      if(todo) chips.push('<span class="mchip todo">ค้างรับเงิน '+todo+' ใบ</span>');
+      var label = k==='none' ? 'ไม่ระบุวันที่' : TH_MF[(+k.slice(5,7))-1]+' '+((+k.slice(0,4))+543);
+      return '<div class="grp'+(open?'':' closed')+'">'+
+        '<div class="grp-head mon-head" data-mon="'+esc(k)+'">'+
+          '<span class="grp-chev">'+(open?'▾':'▸')+'</span>'+
+          '<span class="grp-name">'+label+'</span>'+
+          '<span class="grp-meta">'+docs.length+' เอกสาร</span>'+
+          '<span class="mchips">'+chips.join('')+'</span>'+
+        '</div>'+
+        (open ? '<div class="grp-body mon-body">'+headHtml()+docs.map(function(d){ return rowHtml(d); }).join('')+'</div>' : '')+
+      '</div>';
+    }).join('');
+  }
+
   function renderCounts(){
     // Counts respect every filter EXCEPT status, so the cards read as
     // "how many of the current search are in each state".
@@ -747,6 +804,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     });
     document.querySelectorAll('#viewSeg button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===S.view); });
     var ms = document.getElementById('monthSel'); ms.value = S.month; ms.classList.toggle('on', !!S.month);
+    var cs = document.getElementById('custSel'); cs.value = S.cust; cs.classList.toggle('on', !!S.cust);
     var ss = document.getElementById('statusSel'); ss.value = S.status; ss.classList.toggle('on', !!S.status);
   }
 
@@ -782,12 +840,21 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   function resetAll(){ S.q='';S.type='';S.status='';S.month='';S.cust='';S.hide='';S.limit=PAGE; qInp.value=''; render(); }
   document.getElementById('hideDone').addEventListener('change', function(e){ S.hide = e.target.checked ? '1' : ''; S.limit=PAGE; render(); });
   document.getElementById('resetBtn').addEventListener('click', resetAll);
+  var custSel = document.getElementById('custSel');
+  (function(){
+    var cm = {}; DOCS.forEach(function(d){ var c = cm[d.cid] || (cm[d.cid] = { id:d.cid, name:d.c, n:0 }); c.n++; });
+    var arr = Object.keys(cm).map(function(k){ return cm[k]; }).sort(function(a,b){ return a.name.localeCompare(b.name,'th'); });
+    custSel.innerHTML = '<option value="">ทุกลูกค้า</option>' + arr.map(function(c){ return '<option value="'+esc(c.id)+'">'+esc(c.name)+' — '+c.n+'</option>'; }).join('');
+  })();
+  custSel.addEventListener('change', function(){ S.cust = custSel.value; S.limit = PAGE; render(); });
 
   document.getElementById('resBody').addEventListener('click', function(e){
     if(e.target.closest('[data-reset]')) return resetAll();
     if(e.target.closest('[data-more]')){ S.limit+=PAGE; return render(); }
     var sb = e.target.closest('[data-sort]');
     if(sb){ var k=sb.dataset.sort; if(S.sort===k) S.dir=S.dir==='asc'?'desc':'asc'; else { S.sort=k; S.dir=(k==='amt'||k==='date')?'desc':'asc'; } return render(); }
+    var mh = e.target.closest('[data-mon]');
+    if(mh){ var mk=mh.dataset.mon; var idx=[].indexOf.call(document.querySelectorAll('[data-mon]'), mh); mOpen[mk] = !(mk in mOpen ? mOpen[mk] : idx<2); return render(); }
     var gh = e.target.closest('.grp-head');
     if(gh && !e.target.closest('a')){ var id=gh.dataset.grp; collapsed[id]=!collapsed[id]; return render(); }
     if(e.target.closest('a,button')) return;
