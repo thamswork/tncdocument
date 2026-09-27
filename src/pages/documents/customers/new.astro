@@ -1,12 +1,15 @@
 ---
-import { createCustomer, getNextCustomerCode } from '../../../lib/documents';
+import { createCustomer, getNextCustomerCode, getCustomers } from '../../../lib/documents';
 const user = Astro.locals.user;
 let error = '';
 let codeValue = '';
+// Keep what was typed if the save fails
+let v: Record<string, string> = { contact_name: '', company_name: '', address: '', phone: '', fax: '', tax_id: '', email: '', notes: '' };
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   codeValue = (form.get('customer_code') as string || '').trim().toUpperCase();
+  for (const k of Object.keys(v)) v[k] = (form.get(k) as string) || '';
   const result = await createCustomer({
     customer_code: codeValue,
     company_name: (form.get('company_name') as string || '').trim(),
@@ -24,99 +27,301 @@ if (Astro.request.method === 'POST') {
 } else {
   codeValue = await getNextCustomerCode();
 }
+
+// Existing customers, only to warn about a possible duplicate while typing
+const existing = (await getCustomers()).map((c: any) => ({ id: c.id, n: c.company_name || '', c: c.customer_code || '', t: c.tax_id || '' }));
+const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
 ---
 <!DOCTYPE html>
 <html lang="th">
 <head>
   <link rel="icon" type="image/png" href="https://res.cloudinary.com/dynjnftnu/image/upload/v1781103809/LOGO_TNC-02_xhpu0t.png"/>
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dynjnftnu/image/upload/v1781103809/LOGO_TNC-02_xhpu0t.png"/>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="robots" content="noindex, nofollow" />
-  <title>เพิ่มลูกค้าใหม่ — TNC Documents</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>เพิ่มลูกค้า — TNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#F8F7F4;--white:#fff;--border:#E2DFD8;--text:#1A1814;--text2:#6B6860;--text3:#AEABA4;--red:#B94040;}
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 40px;height:60px;display:flex;align-items:center;gap:14px;position:sticky;top:0;}
-    .back{font-size:12.5px;color:var(--text2);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:4px;}
-    .back:hover{border-color:var(--text);color:var(--text);}
-    .topbar-title{font-size:15px;font-weight:600;flex:1;}
-    .content{padding:32px 40px;max-width:700px;}
-    .card{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:32px;}
-    .card-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #EDE9E3;}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-    .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
-    .fg.full{grid-column:span 2;}
-    .hint{font-size:10.5px;color:var(--text3);margin-top:-2px;}
-    label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
-    label span{color:var(--red);margin-left:2px;}
-    input,textarea{padding:10px 13px;background:var(--bg);border:1.5px solid var(--border);border-radius:4px;font-size:13.5px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;}
-    input:focus,textarea:focus{border-color:var(--text);}
-    textarea{resize:vertical;min-height:72px;}
-    .error{background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;padding:12px 14px;font-size:13px;color:var(--red);margin-bottom:20px;}
-    .actions{display:flex;gap:12px;margin-top:24px;align-items:center;}
-    .btn-submit{padding:11px 24px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:12.5px;font-weight:700;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;}
-    .btn-submit:hover{opacity:.85;}
-    .cancel{font-size:13px;color:var(--text2);text-decoration:none;}
-    .cancel:hover{color:var(--text);}
+    :root{
+      --bg:#F6F5F2;--white:#fff;--border:#E3E0DA;--line:#EEECE7;
+      --text:#1A1814;--t2:#66635C;--t3:#A9A69F;
+      --gold:#B8955A;--gbg:#FAF6EE;
+      --green:#2D7A4F;--grbg:#EEF6F1;--red:#B23B3B;--redbg:#FBF0F0;--amber:#B97A26;--blue:#2D5A9E;
+    }
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;}
+    a{color:inherit;}
+    button,input,textarea,select{font-family:inherit;}
+    button:focus{outline:none;} button:focus-visible,a:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+    .ic{width:16px;height:16px;flex-shrink:0;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+
+    /* Top bar (same as document page) */
+    .top{position:sticky;top:0;z-index:40;background:rgba(246,245,242,.92);backdrop-filter:saturate(1.4) blur(8px);-webkit-backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--line);}
+    .top-in{max-width:1200px;margin:0 auto;padding:0 28px;height:58px;display:flex;align-items:center;gap:12px;}
+    .back{display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 10px 0 6px;border-radius:7px;font-size:13px;color:var(--t2);text-decoration:none;white-space:nowrap;}
+    .back:hover{background:var(--white);color:var(--text);}
+    .crumb{font-size:13px;color:var(--t3);display:flex;align-items:center;gap:8px;min-width:0;}
+    .crumb b{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .spacer{flex:1;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);white-space:nowrap;}
+    .btn:hover{border-color:var(--text);}
+    .btn-dark{background:var(--text);border-color:var(--text);color:var(--white);}
+    .btn-dark:hover{opacity:.88;}
+    .btn-sm{height:30px;padding:0 11px;font-size:12.5px;font-weight:500;border-radius:7px;}
+    .btn-block{width:100%;height:42px;}
+    .btn[disabled]{opacity:.55;cursor:default;}
+    .linkbtn{border:none;background:none;padding:0;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+    .linkbtn:hover{color:var(--text);}
+
+    /* Page */
+    .wrap{max-width:1200px;margin:0 auto;padding:28px 28px 64px;}
+    .hero{display:flex;align-items:flex-end;gap:24px;margin-bottom:24px;}
+    .hero-main{flex:1;min-width:0;}
+    .eyebrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--t2);margin-bottom:8px;}
+    .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:600;color:var(--text);font-size:14px;}
+    .pill{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;border-radius:13px;background:var(--white);border:1px solid var(--border);font-size:12.5px;font-weight:500;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--t3);flex-shrink:0;}
+    .pill.ok .dot{background:var(--green);} .pill.warn .dot{background:var(--amber);} .pill.warn{color:#8A5A12;}
+    .h1{font-size:26px;font-weight:700;letter-spacing:-.015em;line-height:1.25;}
+    .sub-h{font-size:14px;color:var(--t2);margin-top:6px;}
+    .hero-amt{text-align:right;flex-shrink:0;}
+    .hero-amt .l{font-size:12.5px;color:var(--t2);}
+    .hero-amt .v{font-size:30px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2;}
+    .hero-amt .s{font-size:12.5px;color:var(--t2);margin-top:2px;}
+
+    .grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start;}
+    .content,.side{min-width:0;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:12px;}
+    .card + .card{margin-top:16px;}
+    .card-h{display:flex;align-items:center;gap:12px;padding:16px 20px 0;}
+    .card-t{font-size:13px;font-weight:700;flex:1;}
+    .card-n{font-size:12.5px;color:var(--t3);}
+    .card-b{padding:14px 20px 20px;}
+
+    /* Fields */
+    .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;}
+    .fields .full{grid-column:1 / -1;}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .field label{font-size:12px;color:var(--t2);font-weight:500;}
+    .field label .req{color:var(--red);margin-left:2px;}
+    .inp{height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);background:var(--white);outline:none;width:100%;}
+    .inp:hover{border-color:#CFCBC3;}
+    .inp:focus{border-color:var(--text);}
+    .inp::placeholder{color:var(--t3);}
+    .inp.bad{border-color:var(--amber);}
+    textarea.inp{height:auto;padding:10px 12px;line-height:1.7;resize:vertical;min-height:84px;}
+    .fhint{font-size:12px;color:var(--t3);line-height:1.5;min-height:18px;}
+    .fhint.ok{color:var(--green);} .fhint.warn{color:var(--amber);}
+
+    .msg{display:none;margin:0 0 16px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6;}
+    .msg.show{display:block;}
+    .msg.warn{background:#FDF6EA;color:#8A5A12;}
+    .msg.ok{background:var(--grbg);color:var(--green);}
+    .msg.err{background:var(--redbg);color:var(--red);}
+    .form-f{display:flex;align-items:center;gap:12px;padding:0 20px 20px;}
+
+    /* Trash list */
+    .trow{display:flex;align-items:center;gap:14px;padding:12px 20px;border-top:1px solid var(--line);}
+    .trow-main{flex:1;min-width:0;}
+    .tnum{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;font-weight:600;}
+    .tmeta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--t2);margin-top:3px;font-variant-numeric:tabular-nums;}
+    .t-QUOTATION{color:var(--blue);} .t-INVOICE{color:var(--green);} .t-TAX_INVOICE{color:var(--red);}
+    .urgent{color:var(--red);font-weight:600;}
+    .tnote{font-size:12px;color:var(--t3);padding:12px 20px 16px;border-top:1px solid var(--line);line-height:1.6;}
+
+    /* Side */
+    .side{position:sticky;top:78px;}
+    .sumrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .sumrow span:last-child{color:var(--text);font-weight:500;}
+    .sumrow.total{border-top:1px solid var(--border);margin-top:6px;padding-top:12px;color:var(--text);font-weight:600;}
+    .checks{display:flex;flex-direction:column;gap:8px;}
+    .chk{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t2);}
+    .chk .dot{background:var(--green);}
+    .chk.miss .dot{background:var(--amber);} .chk.miss{color:#8A5A12;}
+    .acts{display:flex;flex-direction:column;gap:8px;padding:0 20px 20px;}
+    .side .hint{font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;}
+
+    .msg.dup{margin:4px 0 0;}
+    .dup a{font-weight:600;}
+
+    @media(max-width:1020px){
+      .grid{grid-template-columns:minmax(0,1fr);}
+      .side{position:static;}
+    }
+    @media(max-width:640px){
+      .top-in{padding:0 12px;height:54px;gap:8px;}
+      .crumb,.top .btn-docs{display:none;}
+      .wrap{padding:18px 12px 48px;}
+      .hero{flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:18px;}
+      .hero-amt{text-align:left;}
+      .h1{font-size:21px;}
+      .hero-amt .v{font-size:24px;}
+      .fields{grid-template-columns:1fr;gap:14px;}
+      .card-h{padding:14px 16px 0;} .card-b{padding:12px 16px 16px;}
+      .form-f{padding:0 16px 16px;flex-direction:column;align-items:stretch;}
+      .form-f .btn{width:100%;height:42px;}
+      .form-f .linkbtn{align-self:center;}
+      .trow{padding:12px 16px;} .tnote{padding:12px 16px 14px;}
+      .acts{padding:0 16px 16px;}
+      input,select,textarea{font-size:16px!important;}
+    }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <a href="/documents/customers" class="back">← กลับ</a>
-    <div class="topbar-title">เพิ่มลูกค้าใหม่</div>
-  </div>
-  <div class="content">
-    <div class="card">
-      <div class="card-title">ข้อมูลลูกค้า</div>
-      {error && <div class="error">{error}</div>}
-      <form method="POST">
-        <div class="grid">
-          <div class="fg">
-            <label>รหัสลูกค้า <span>*</span></label>
-            <input type="text" name="customer_code" value={codeValue} placeholder="เช่น TNC2026_0013" required />
-            <div class="hint">สร้างให้อัตโนมัติ — แก้ไขได้หากต้องการ</div>
-          </div>
-          <div class="fg">
-            <label>ชื่อผู้ติดต่อ</label>
-            <input type="text" name="contact_name" placeholder="คุณ..." />
-          </div>
-          <div class="fg full">
-            <label>ชื่อบริษัท / ลูกค้า <span>*</span></label>
-            <input type="text" name="company_name" placeholder="บริษัท ... จำกัด" required />
-          </div>
-          <div class="fg full">
-            <label>ที่อยู่</label>
-            <textarea name="address" placeholder="ที่อยู่สำหรับออกเอกสาร..."></textarea>
-          </div>
-          <div class="fg">
-            <label>โทรศัพท์</label>
-            <input type="text" name="phone" placeholder="02-XXX-XXXX" />
-          </div>
-          <div class="fg">
-            <label>แฟกซ์</label>
-            <input type="text" name="fax" placeholder="02-XXX-XXXX" />
-          </div>
-          <div class="fg">
-            <label>เลขประจำตัวผู้เสียภาษี</label>
-            <input type="text" name="tax_id" placeholder="0XXXXXXXXXX" />
-          </div>
-          <div class="fg">
-            <label>อีเมล</label>
-            <input type="email" name="email" placeholder="email@company.com" />
-          </div>
-          <div class="fg full">
-            <label>หมายเหตุ</label>
-            <textarea name="notes" placeholder="หมายเหตุเพิ่มเติม..."></textarea>
-          </div>
-        </div>
-        <div class="actions">
-          <button type="submit" class="btn-submit">บันทึกลูกค้า</button>
-          <a href="/documents/customers" class="cancel">ยกเลิก</a>
-        </div>
-      </form>
+  <header class="top">
+    <div class="top-in">
+      <a href="/documents/customers" class="back"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>ลูกค้า</a>
+      <div class="crumb"><span>/</span><b>เพิ่มลูกค้า</b></div>
+      <span class="spacer"></span>
+      <a href="/documents/customers" class="btn btn-docs">ยกเลิก</a>
+      <button type="submit" form="custForm" class="btn btn-dark">บันทึกลูกค้า</button>
     </div>
-  </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow"><span>รหัสลูกค้าจะเป็น</span><span class="code" id="codeEcho">{codeValue}</span></div>
+        <h1 class="h1">เพิ่มลูกค้า</h1>
+        <div class="sub-h">ข้อมูลนี้จะพิมพ์บนใบเสนอราคา ใบแจ้งหนี้ และใบกำกับภาษี</div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="content">
+        <section class="card">
+          <div class="card-h"><div class="card-t">ข้อมูลลูกค้า</div></div>
+          <div class="card-b">
+            {error && <div class="msg err show">บันทึกไม่สำเร็จ: {error}</div>}
+            <form method="POST" id="custForm">
+              <div class="fields">
+                <div class="field">
+                  <label for="f_code">รหัสลูกค้า<span class="req">*</span></label>
+                  <input class="inp mono" id="f_code" type="text" name="customer_code" value={codeValue} placeholder="เช่น TNC2026_0039" required/>
+                  <div class="fhint">สร้างให้อัตโนมัติ แก้ไขได้หากต้องการ</div>
+                </div>
+                <div class="field">
+                  <label for="f_contact">ชื่อผู้ติดต่อ</label>
+                  <input class="inp" id="f_contact" type="text" name="contact_name" value={v.contact_name} placeholder="เช่น คุณสมชาย"/>
+                </div>
+                <div class="field full">
+                  <label for="f_name">ชื่อบริษัท / ลูกค้า<span class="req">*</span></label>
+                  <input class="inp" id="f_name" type="text" name="company_name" value={v.company_name} placeholder="บริษัท … จำกัด (สำนักงานใหญ่)" required autofocus/>
+                  <div class="fhint">ใช้ชื่อตามที่จดทะเบียน เช่น บริษัท … จำกัด (สำนักงานใหญ่)</div>
+                  <div class="msg warn dup" id="dupName"></div>
+                </div>
+                <div class="field">
+                  <label for="f_tax">เลขประจำตัวผู้เสียภาษี</label>
+                  <input class="inp mono" id="f_tax" type="text" name="tax_id" value={v.tax_id} inputmode="numeric" placeholder="13 หลัก"/>
+                  <div class="fhint" id="taxHint"></div>
+                  <div class="msg warn dup" id="dupTax"></div>
+                </div>
+                <div class="field">
+                  <label for="f_email">อีเมล</label>
+                  <input class="inp" id="f_email" type="email" name="email" value={v.email} autocapitalize="none" placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field full">
+                  <label for="f_addr">ที่อยู่</label>
+                  <textarea class="inp" id="f_addr" name="address" rows="3" placeholder="ที่อยู่ตามที่จดทะเบียน (แสดงบนใบกำกับภาษี)">{v.address}</textarea>
+                </div>
+                <div class="field">
+                  <label for="f_phone">โทรศัพท์</label>
+                  <input class="inp" id="f_phone" type="tel" name="phone" value={v.phone} placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field">
+                  <label for="f_fax">แฟกซ์</label>
+                  <input class="inp" id="f_fax" type="tel" name="fax" value={v.fax} placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field full">
+                  <label for="f_notes">หมายเหตุ</label>
+                  <textarea class="inp" id="f_notes" name="notes" rows="3" placeholder="ไม่บังคับ">{v.notes}</textarea>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="form-f">
+            <button type="submit" form="custForm" class="btn btn-dark">บันทึกลูกค้า</button>
+            <a href="/documents/customers" class="linkbtn">ยกเลิก</a>
+          </div>
+        </section>
+      </div>
+
+      <aside class="side">
+        <section class="card">
+          <div class="card-h"><div class="card-t">ความพร้อมออกใบกำกับภาษี</div></div>
+          <div class="card-b">
+            <div class="checks">
+              <div class="chk miss" id="chkTax"><span class="dot"></span><span>ยังไม่มีเลขผู้เสียภาษี</span></div>
+              <div class="chk miss" id="chkAddr"><span class="dot"></span><span>ยังไม่มีที่อยู่</span></div>
+            </div>
+            <div class="hint">บันทึกได้แม้ข้อมูลยังไม่ครบ แต่ต้องกรอกให้ครบก่อนออกใบกำกับภาษี</div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script type="application/json" id="custData" set:html={dataJson}></script>
+<script is:inline>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var EX = JSON.parse($('custData').textContent);
+  var form = $('custForm'), dirty = false, submitting = false;
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  // Compare names without spaces, "บริษัท", "จำกัด" and "(สำนักงานใหญ่)"
+  function key(s){ return String(s || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/บริษัท|จำกัด|มหาชน|ห้างหุ้นส่วน|co\.?|ltd\.?|limited|company/g, '').replace(/[\s\.,\-]/g, ''); }
+
+  function taxState(v){
+    var t = String(v || '').replace(/\D/g, '');
+    if (!t) return 'none';
+    if (t.length !== 13) return 'len';
+    var s = 0; for (var i = 0; i < 12; i++) s += Number(t[i]) * (13 - i);
+    return (11 - (s % 11)) % 10 === Number(t[12]) ? 'ok' : 'sum';
+  }
+  function setChk(id, ok, text){ var el = $(id); el.classList.toggle('miss', !ok); el.lastChild.textContent = text; }
+  function link(c){ return '<a href="/documents/customers/' + esc(c.id) + '" target="_blank">' + esc(c.n) + ' (' + esc(c.c) + ')</a>'; }
+
+  function update(){
+    var v = $('f_tax').value, st = taxState(v), h = $('taxHint'), n = v.replace(/\D/g, '').length;
+    $('f_tax').classList.toggle('bad', st === 'len' || st === 'sum');
+    if (st === 'none') { h.className = 'fhint'; h.textContent = 'ต้องมีก่อนออกใบกำกับภาษี'; }
+    else if (st === 'ok') { h.className = 'fhint ok'; h.textContent = 'เลขถูกต้อง'; }
+    else if (st === 'len') { h.className = 'fhint warn'; h.textContent = 'ต้องมี 13 หลัก (ตอนนี้ ' + n + ' หลัก)'; }
+    else { h.className = 'fhint warn'; h.textContent = 'เลขหลักสุดท้ายไม่ตรง กรุณาตรวจสอบอีกครั้ง'; }
+    setChk('chkTax', st === 'ok', st === 'ok' ? 'เลขผู้เสียภาษีถูกต้อง' : st === 'none' ? 'ยังไม่มีเลขผู้เสียภาษี' : 'เลขผู้เสียภาษีไม่ถูกต้อง');
+    var hasAddr = !!$('f_addr').value.trim();
+    setChk('chkAddr', hasAddr, hasAddr ? 'มีที่อยู่แล้ว' : 'ยังไม่มีที่อยู่');
+
+    // Possible duplicates (a different legal entity can share a name, so this only warns)
+    var k = key($('f_name').value), d = $('dupName');
+    var sameName = k.length >= 3 ? EX.filter(function(c){ return key(c.n) === k; }) : [];
+    d.innerHTML = sameName.length ? 'มีลูกค้าชื่อนี้แล้ว: ' + sameName.map(link).join(', ') + ' ถ้าเป็นบริษัทเดียวกันให้ใช้รายเดิม' : '';
+    d.classList.toggle('show', !!sameName.length);
+    var t = v.replace(/\D/g, ''), dt = $('dupTax');
+    var sameTax = t.length === 13 ? EX.filter(function(c){ return String(c.t).replace(/\D/g, '') === t; }) : [];
+    dt.innerHTML = sameTax.length ? 'เลขนี้ใช้กับ ' + sameTax.map(link).join(', ') + ' แล้ว' : '';
+    dt.classList.toggle('show', !!sameTax.length);
+    $('codeEcho').textContent = $('f_code').value.trim().toUpperCase() || '—';
+    return st;
+  }
+  form.addEventListener('input', function(){ dirty = true; update(); });
+  update();
+
+  form.addEventListener('submit', function(e){
+    var st = update();
+    if ((st === 'len' || st === 'sum') && !confirm('เลขประจำตัวผู้เสียภาษีดูไม่ถูกต้อง ต้องการบันทึกต่อหรือไม่?')) { e.preventDefault(); $('f_tax').focus(); return; }
+    // Save 13-digit IDs without spaces or dashes so they print cleanly
+    var d = $('f_tax').value.replace(/\D/g, '');
+    if (d.length === 13) $('f_tax').value = d;
+    if (submitting) { e.preventDefault(); return; } // one customer per click
+    submitting = true;
+    document.querySelectorAll('button[form="custForm"]').forEach(function(b){ b.disabled = true; });
+  });
+  window.addEventListener('beforeunload', function(e){ if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
+})();
+</script>
 </body>
 </html>
