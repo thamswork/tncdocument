@@ -155,34 +155,51 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     .sum.hot .sum-v{color:var(--red);}
 
     /* Search + filters */
-    .panel{background:var(--white);border:1px solid var(--border);border-radius:10px;}
-    .search{position:relative;display:flex;align-items:center;padding:14px 16px;gap:10px;border-bottom:1px solid var(--line);}
-    .search .ic{color:var(--t3);width:18px;height:18px;}
-    .q{flex:1;min-width:0;border:none;outline:none;font-size:16px;color:var(--text);background:none;padding:4px 0;}
+    button:focus{outline:none;}
+    button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+    .panel{background:var(--white);border:1px solid var(--border);border-radius:12px;position:relative;z-index:20;}
+    .search{position:relative;padding:14px 14px 12px;}
+    .sbox{display:flex;align-items:center;gap:8px;min-height:50px;padding:6px 8px 6px 14px;background:var(--bg);border:1px solid transparent;border-radius:10px;transition:border-color .15s,background .15s;flex-wrap:wrap;}
+    .sbox:focus-within{background:var(--white);border-color:var(--text);}
+    .sbox > .ic{color:var(--t3);width:18px;height:18px;}
+    .q{flex:1;min-width:150px;border:none;outline:none;font-size:15.5px;color:var(--text);background:none;padding:6px 2px;}
     .q::placeholder{color:var(--t3);}
     .q::-webkit-search-cancel-button{display:none;}
-    .icon-btn{display:none;align-items:center;justify-content:center;width:26px;height:26px;border:none;border-radius:50%;background:var(--line);color:var(--t2);cursor:pointer;}
+    #chips{display:contents;}
+    .chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 5px 0 11px;border-radius:15px;background:var(--text);color:var(--white);font-size:12.5px;font-weight:600;max-width:300px;}
+    .chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .chip small{font-weight:400;opacity:.65;font-size:11.5px;}
+    .chip button{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;flex-shrink:0;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:var(--white);cursor:pointer;}
+    .chip button .ic{width:10px;height:10px;}
+    .icon-btn{display:none;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:50%;background:var(--line);color:var(--t2);cursor:pointer;flex-shrink:0;}
     .icon-btn.show{display:inline-flex;}
-    .icon-btn .ic{width:12px;height:12px;color:var(--t2);}
-    .help-btn{border:none;background:none;font-size:12.5px;color:var(--t2);cursor:pointer;white-space:nowrap;text-decoration:underline;text-underline-offset:3px;}
-    .help{display:none;padding:14px 16px;border-bottom:1px solid var(--line);background:#FBFAF8;}
-    .help.show{display:block;}
-    .help-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 28px;font-size:12.5px;color:var(--t2);}
-    .help code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--text);background:var(--white);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-right:4px;cursor:pointer;}
-    .help code:hover{border-color:var(--text);}
-    .controls{display:flex;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap;}
-    .sel{height:36px;padding:0 30px 0 12px;border:1px solid var(--border);border-radius:7px;background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2366635C' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat right 11px center;appearance:none;-webkit-appearance:none;font-size:13px;color:var(--text);cursor:pointer;max-width:260px;}
-    .sel.on{border-color:var(--text);}
-    .monthnav{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:7px;height:36px;overflow:hidden;}
-    .monthnav.on{border-color:var(--text);}
-    .monthnav button{height:100%;width:34px;border:none;background:var(--white);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--t2);}
-    .monthnav button:hover:not(:disabled){background:var(--bg);color:var(--text);}
-    .monthnav button:disabled{color:var(--line);cursor:default;}
-    .monthnav select{height:100%;border:none;border-left:1px solid var(--line);border-right:1px solid var(--line);padding:0 12px;font-size:13px;font-weight:600;color:var(--text);background:var(--white);appearance:none;-webkit-appearance:none;cursor:pointer;text-align:center;min-width:150px;}
+    .icon-btn .ic{width:12px;height:12px;}
+    .sugg{display:none;position:absolute;z-index:60;left:14px;right:14px;top:calc(100% - 8px);background:var(--white);border:1px solid var(--border);border-radius:10px;box-shadow:0 14px 36px rgba(26,24,20,.13);max-height:min(460px,70vh);overflow-y:auto;padding:6px;}
+    .sugg.show{display:block;}
+    .sg-h{font-size:11px;font-weight:600;color:var(--t3);padding:9px 10px 4px;letter-spacing:.02em;}
+    .sg{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:7px;cursor:pointer;}
+    .sg.on,.sg:hover{background:var(--bg);}
+    .sg-main{flex:1;min-width:0;}
+    .sg-t{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .sg-t.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;}
+    .sg-s{font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+    .sg-r{font-size:12.5px;color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;}
+    .sg-r.red{color:var(--red);}
+    .sg-empty{padding:14px 10px;font-size:12.5px;color:var(--t3);}
+    .toolbar{display:flex;align-items:center;gap:10px;padding:0 14px 14px;flex-wrap:wrap;}
+    .seg{display:inline-flex;background:var(--bg);border-radius:8px;padding:3px;gap:2px;max-width:100%;overflow-x:auto;}
+    .seg button{height:30px;padding:0 12px;border:none;border-radius:6px;background:none;font-size:12.5px;font-weight:500;color:var(--t2);cursor:pointer;white-space:nowrap;}
+    .seg button:hover{color:var(--text);}
+    .seg button.on{background:var(--white);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08);}
+    .monthnav{display:inline-flex;align-items:center;background:var(--bg);border-radius:8px;height:36px;padding:3px;gap:2px;}
+    .monthnav button{height:30px;width:30px;border:none;border-radius:6px;background:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--t2);}
+    .monthnav button:hover:not(:disabled){background:var(--white);color:var(--text);}
+    .monthnav button:disabled{color:var(--border);cursor:default;}
+    .monthnav select{height:30px;border:none;border-radius:6px;padding:0 12px;font-size:12.5px;font-weight:600;color:var(--text);background:var(--white);appearance:none;-webkit-appearance:none;cursor:pointer;text-align:center;text-align-last:center;min-width:140px;box-shadow:0 1px 2px rgba(0,0,0,.08);}
     .spacer{flex:1;}
     .reset{border:none;background:none;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;display:none;}
     .reset.show{display:inline;}
-    .tabs{display:flex;gap:4px;padding:0 12px;border-top:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .tabs{display:flex;gap:4px;padding:0 10px;border-top:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
     .tab{position:relative;border:none;background:none;padding:13px 10px;font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;white-space:nowrap;}
     .tab:hover{color:var(--text);}
     .tab.on{color:var(--text);font-weight:700;}
@@ -244,6 +261,24 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     .pg button:disabled{color:var(--t3);cursor:default;}
     .pg .gap{padding:0 4px;color:var(--t3);align-self:center;}
 
+    /* Grouped by customer */
+    .grp{border-bottom:1px solid var(--line);}
+    .grp:last-child{border-bottom:none;}
+    .grp-h{display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;}
+    .grp-h:hover{background:#FBFAF8;}
+    .grp-chev{color:var(--t3);transition:transform .15s;display:inline-flex;}
+    .grp.open .grp-chev{transform:rotate(90deg);color:var(--text);}
+    .grp-main{flex:1;min-width:0;}
+    .grp-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .grp-sub{font-size:12px;color:var(--t3);margin-top:2px;}
+    .grp-fig{text-align:right;font-size:12px;color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums;}
+    .grp-fig b{display:block;font-size:14px;color:var(--text);font-weight:600;}
+    .grp-fig.red b{color:var(--red);}
+    .grp-body{display:none;border-top:1px solid var(--line);background:#FDFCFA;}
+    .grp.open .grp-body{display:block;}
+    .grp-body .row,.grp-body .cols{padding-left:46px;}
+    .grp-body .cols{background:transparent;}
+
     @media(max-width:1100px){
       .cols,.row{grid-template-columns:minmax(0,1.2fr) minmax(0,1.8fr) 124px 170px;}
       .date,.h-date{display:none;}
@@ -260,17 +295,18 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       .sum:first-child{border-top:none;}
       .sum-v{font-size:16px;margin-top:0;grid-row:1 / span 2;grid-column:2;align-self:center;}
       .sum-s{margin-top:1px;}
-      .search{padding:12px;}
-      .help-btn{display:none;}
-      .controls{padding:10px 12px;gap:8px;}
-      .controls .sel{flex:1 1 calc(50% - 4px);max-width:none;min-width:0;}
-      .monthnav{flex:1 1 100%;}
-      .monthnav select{flex:1;}
+      .search{padding:10px;}
+      .sugg{left:10px;right:10px;}
+      .toolbar{padding:0 10px 10px;gap:8px;}
+      #typeSeg{width:100%;} #typeSeg button{flex:1 0 auto;}
+      .monthnav{flex:1;} .monthnav select{flex:1;min-width:0;}
       .spacer{display:none;}
       .cols{display:none;}
       .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"doc amt" "cust cust" "stat stat";gap:8px 12px;padding:14px;}
       .c-doc{grid-area:doc;} .amt{grid-area:amt;} .c-cust{grid-area:cust;} .stat{grid-area:stat;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 12px;}
       .stat .act{margin-left:auto;}
+      .grp-h{padding:12px;gap:10px;}
+      .grp-body .row{padding-left:14px;}
       .pager{padding:12px;}
       .pg-info{flex:1 1 100%;}
       .pg .num-btn{display:none;} .pg .num-btn.on{display:inline-block;}
@@ -328,29 +364,19 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       </button>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="panel">
       <div class="search">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <input type="search" class="q" id="q" autocomplete="off" enterkeyhint="search" spellcheck="false"
-          placeholder="ค้นหาเลขที่ ลูกค้า งาน รายการ หรือยอดเงิน"/>
-        <button class="icon-btn" id="qClear" aria-label="ล้างคำค้นหา"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-        <button class="help-btn" id="helpBtn">วิธีค้นหา</button>
-      </div>
-      <div class="help" id="help">
-        <div class="help-grid">
-          <div><code>tx24</code><code>sv92</code> เลขที่เอกสาร พิมพ์สั้นๆ ได้</div>
-          <div><code>วีฟีลด์</code><code>babycakes</code> ลูกค้า งาน หรือรายการในเอกสาร</div>
-          <div><code>ก.ย. 2569</code><code>25/9</code> วันที่ หรือเดือน</div>
-          <div><code>&gt;100000</code><code>10000..50000</code> ช่วงยอดเงิน</div>
-          <div><code>ลูกค้า:เขียนอ่าน</code><code>รายการ:กระจก</code> ค้นเฉพาะช่อง (ลูกค้า งาน เลข รายการ)</div>
-          <div><code>"ติดตั้ง ประตู"</code> คำติดกัน <code>-ร่าง</code> ไม่เอาคำนี้</div>
-          <div><code>ค้าง</code><code>เสร็จ</code> ค้นตามสถานะ</div>
-          <div>ลูกศรขึ้น/ลง เลือกแถว, Enter เปิดเอกสาร, กด / เพื่อค้นหา</div>
+        <div class="sbox" id="sbox">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span id="chips"></span>
+          <input type="search" class="q" id="q" autocomplete="off" enterkeyhint="search" spellcheck="false"
+            placeholder="ค้นหาเลขที่ ลูกค้า งาน หรือของในรายการ"/>
+          <button class="icon-btn" id="qClear" aria-label="ล้างคำค้นหา"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
+        <div class="sugg" id="sugg"></div>
       </div>
-      <div class="controls">
-        <select class="sel" id="typeSel" aria-label="ประเภท"></select>
-        <select class="sel" id="custSel" aria-label="ลูกค้า"></select>
+      <div class="toolbar">
+        <div class="seg" id="typeSeg"></div>
         <div class="monthnav" id="monthNav">
           <button id="mPrev" aria-label="เดือนก่อนหน้า"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
           <select id="monthSel" aria-label="เดือน"></select>
@@ -358,6 +384,10 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
         </div>
         <span class="spacer"></span>
         <button class="reset" id="resetBtn">ล้างตัวกรอง</button>
+        <div class="seg" id="viewSeg">
+          <button data-v="list">รายการ</button>
+          <button data-v="cust">ตามลูกค้า</button>
+        </div>
       </div>
       <div class="tabs" id="tabs">
         <button class="tab" data-ws="">ทั้งหมด<span class="n"></span></button>
@@ -390,8 +420,10 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   var EN_M = ['jan january','feb february','mar march','apr april','may','jun june','jul july','aug august','sep sept september','oct october','nov november','dec december'];
   var TYPE_WORDS = { QUOTATION:'sv qt quotation quote ใบเสนอราคา เสนอราคา', INVOICE:'iv invoice ใบแจ้งหนี้ แจ้งหนี้ วางบิล', TAX_INVOICE:'tx tax receipt ใบกำกับ ใบกำกับภาษี ใบเสร็จ' };
   var WS_WORDS = { todo:'ค้าง ค้างรับเงิน ค้างชำระ ยังไม่จ่าย unpaid', partial:'ค้าง วางบิลไม่ครบ บางงวด partial', open:'ดำเนินการ กำลังทำ open', done:'เสร็จ เสร็จแล้ว จ่ายแล้ว paid done' };
-  var PAGE = 25;
+  var PAGE = 25, GPAGE = 15;
   var SHORT = { QUOTATION:'ใบเสนอราคา', INVOICE:'ใบแจ้งหนี้', TAX_INVOICE:'ใบกำกับภาษี' };
+  var X_ICON = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  var CHEV = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
 
   // ── helpers ──────────────────────────────────────────────
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -402,7 +434,8 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   function monthKey(s){ return s ? s.slice(0,7) : ''; }
   function monthLabel(k){ var p=k.split('-'); return TH_MF[(+p[1])-1]+' '+((+p[0])+543); }
   function norm(s){ return String(s||'').toLowerCase().replace(/[\u200b-\u200d\ufeff]/g,'').replace(/\s+/g,' ').trim(); }
-  function squash(s){ return s.replace(/[\s.,\-\/()]+/g,''); }
+  // spacing/punctuation/Thai-tone-mark insensitive form: "วี ฟีลด์" = "วีฟิลด" = "วีฟีลด์"
+  function squash(s){ return s.replace(/[\s.,\-\/()"']+/g,'').replace(/[\u0e47-\u0e4e]/g,'').replace(/\u0e35/g,'\u0e34').replace(/\u0e37/g,'\u0e36'); }
   function ageDays(s){ if(!s) return 0; var p=s.split('-'); var t=new Date(+p[0],(+p[1])-1,+p[2]); var n=new Date(); n.setHours(0,0,0,0); return Math.max(0,Math.round((n-t)/86400000)); }
   function netOf(d){ return d.wht ? r2(d.a - r2(d.pbv*0.03)) : d.a; }
   function numAliases(n){
@@ -415,6 +448,20 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     var p=s.split('-'), y=+p[0], m=+p[1], d=+p[2], be=y+543, mm=p[1], dd=p[2];
     return [s, p[0]+'-'+mm, d+'/'+m+'/'+be, dd+'/'+mm+'/'+be, d+'/'+m+'/'+String(be).slice(2), d+'/'+m, dd+'/'+mm, m+'/'+be, mm+'/'+be,
       d+' '+TH_M[m-1]+' '+be, d+' '+TH_MF[m-1]+' '+be, TH_M[m-1]+' '+be, TH_MF[m-1]+' '+be, TH_M[m-1].replace(/\./g,''), EN_M[m-1], String(be), String(y)].join(' ');
+  }
+  // fuzzy similarity (0..1): best bigram overlap of the query against any same-length window of the text
+  function bigr(s){ var o={}, n=0; for(var i=0;i<s.length-1;i++){ var b=s.substr(i,2); o[b]=(o[b]||0)+1; n++; } return { m:o, n:n }; }
+  function fuzzy(q, text){
+    q = squash(norm(q)); text = squash(norm(text));
+    if(q.length<3 || !text) return 0;
+    var Q = bigr(q), best = 0, w = Math.min(text.length, q.length+2);
+    for(var i=0;i<=Math.max(0,text.length-w);i++){
+      var T = bigr(text.substr(i,w)), hit = 0;
+      for(var k in Q.m){ if(T.m[k]) hit += Math.min(Q.m[k], T.m[k]); }
+      var sc = Q.n+T.n ? 2*hit/(Q.n+T.n) : 0;
+      if(sc>best) best = sc;
+    }
+    return best;
   }
 
   // ── search fields, built once per document ───────────────
@@ -441,6 +488,20 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   var MAIN_FIELDS = ['num','cust','job','type','date','amt','stat'];
   var WEIGHT = { num:6, cust:4, job:3, type:1, date:1, amt:2, stat:1, note:1, items:1 };
 
+  // customers and jobs, for suggestions, chips and grouping
+  var CUST = {}, JOBS = {};
+  DOCS.forEach(function(d){
+    var c = CUST[d.cid] || (CUST[d.cid] = { id:d.cid, name:d.c, code:d.cc, tid:d.tid, n:0, latest:'', todo:0, todoAmt:0 });
+    c.n++; if((d.d||'') > c.latest) c.latest = d.d||'';
+    if(d.ws==='todo'){ c.todo++; c.todoAmt += d.net; }
+    if(d.j){
+      var jk = d.j+'|'+d.cid, j = JOBS[jk] || (JOBS[jk] = { name:d.j, cid:d.cid, c:d.c, n:0, latest:'' });
+      j.n++; if((d.d||'') > j.latest) j.latest = d.d||'';
+    }
+  });
+  var CUST_L = Object.keys(CUST).map(function(k){ var c=CUST[k]; c._n = norm([c.name,c.code,c.tid].join(' ')); c._s = squash(c._n); return c; });
+  var JOB_L = Object.keys(JOBS).map(function(k){ var j=JOBS[k]; j._n = norm(j.name); j._s = squash(j._n); return j; });
+
   function parseAmount(s){
     var m = String(s).replace(/[฿,\s]/g,'').match(/^(\d+(?:\.\d+)?)(k|m|พัน|หมื่น|แสน|ล้าน)?$/i);
     if(!m) return null;
@@ -458,17 +519,18 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       if(rng && parseAmount(rng[1])!=null && parseAmount(rng[2])!=null){ out.push({ kind:'rng', lo:parseAmount(rng[1]), hi:parseAmount(rng[2]), neg:neg }); continue; }
       var t = norm(raw).replace(/,(?=\d{3})/g,'');
       if(!t) continue;
-      // squashed (space/dot-insensitive) matching only for words, not bare numbers/dates
+      // squashed matching only for words, not bare numbers/dates
       out.push({ kind:'text', t:t, ts:/[^\d\s.,\-\/]/.test(t) ? squash(t) : '', field:field, neg:neg });
     }
     return out;
   }
-  function inField(d, k, tok){
-    var v = d._f[k]; if(!v) return false;
+  function inStr(v, vs, tok){
+    if(!v) return false;
     if(v.indexOf(tok.t)!==-1) return true;
-    if(tok.ts && tok.ts.length>1 && d._f[k+'_s'].indexOf(tok.ts)!==-1) return true;
+    if(tok.ts && tok.ts.length>1 && vs.indexOf(tok.ts)!==-1) return true;
     return v.replace(/,/g,'').indexOf(tok.t)!==-1;
   }
+  function inField(d, k, tok){ return inStr(d._f[k], d._f[k+'_s'], tok); }
   // Returns null (no match) or { score, snip } for one document.
   function matchDoc(d, toks){
     var score = 0, snip = null;
@@ -508,24 +570,29 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   var now = new Date(), THIS_M = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   var DEFAULT_M = months[THIS_M] ? THIS_M : (MONTHS[0] || 'all');
   var params = new URLSearchParams(location.search);
-  var S = { q:'', type:'', ws:'', month:'', cust:'', sort:'', dir:'desc', page:1 };
+  var S = { q:'', type:'', ws:'', month:'', cust:'', job:'', view:'list', sort:'', dir:'desc', page:1 };
   S.q = params.get('q') || '';
   S.type = params.get('type') || '';
   S.cust = params.get('cust') || '';
+  if(S.cust && !CUST[S.cust]) S.cust = '';
+  S.job = params.get('job') || '';
+  S.view = params.get('view')==='cust' ? 'cust' : 'list';
   S.ws = ({needtx:'todo', active:'open', published:'done', stale:'open'})[params.get('status')] || params.get('ws') || params.get('status') || '';
   if(['','todo','partial','open','done'].indexOf(S.ws)<0) S.ws='';
   S.sort = params.get('sort') || '';
   S.dir = params.get('dir') || 'desc';
   S.page = Math.max(1, parseInt(params.get('page')||'1',10) || 1);
-  S.month = params.get('month') || ((S.q || S.cust || S.ws==='todo' || S.ws==='partial') ? 'all' : DEFAULT_M);
-  var monthBeforeSearch = null;
+  S.month = params.get('month') || ((S.q || S.cust || S.job || S.view==='cust' || S.ws==='todo' || S.ws==='partial') ? 'all' : DEFAULT_M);
+  var monthBeforeSearch = null, openGroups = {};
 
   function syncUrl(){
     var p = new URLSearchParams();
     if(S.q) p.set('q',S.q);
     if(S.type) p.set('type',S.type);
     if(S.cust) p.set('cust',S.cust);
+    if(S.job) p.set('job',S.job);
     if(S.ws) p.set('ws',S.ws);
+    if(S.view!=='list') p.set('view',S.view);
     if(S.month!==DEFAULT_M) p.set('month',S.month);
     if(S.sort){ p.set('sort',S.sort); p.set('dir',S.dir); }
     if(S.page>1) p.set('page',S.page);
@@ -540,6 +607,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     for(var i=0;i<DOCS.length;i++){
       var d = DOCS[i];
       if(S.cust && d.cid!==S.cust) continue;
+      if(S.job && d.j!==S.job) continue;
       if(S.type && d.t!==S.type) continue;
       if(S.month!=='all' && monthKey(d.d)!==S.month) continue;
       if(!ignoreWs && S.ws && d.ws!==S.ws) continue;
@@ -550,10 +618,10 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     }
     return out;
   }
+  function byDate(a,b){ return (a.d||'').localeCompare(b.d||'') || (a.ca||'').localeCompare(b.ca||''); }
   function sortList(list){
     var sort = S.sort || (S.q ? 'rel' : 'date');
     var dir = S.sort ? (S.dir==='asc'?1:-1) : (S.ws==='todo' ? 1 : -1);
-    function byDate(a,b){ return (a.d||'').localeCompare(b.d||'') || (a.ca||'').localeCompare(b.ca||''); }
     return list.slice().sort(function(a,b){
       if(sort==='rel') return (b._score-a._score) || -byDate(a,b);
       var r = 0;
@@ -578,7 +646,7 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   }
 
   // ── rendering ────────────────────────────────────────────
-  function rowHtml(d, i){
+  function rowHtml(d, inGroup){
     var rel = [];
     if(d.p) rel.push('จาก <a href="/documents/'+d.p.id+'">'+hl(d.p.n)+'</a>');
     var status = '<span class="sl"><span class="dot"></span>'+esc(d.wl)+'</span>', extra = '';
@@ -592,28 +660,61 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     }
     if(d.tx.length) extra += '<span class="age sub">'+d.tx.map(function(t){ return '<a href="/documents/'+t.id+'">'+hl(t.n)+'</a>'; }).join(', ')+'</span>';
     var hit = d._snip ? '<div class="hit"><i>'+(d._snip.from==='items'?'รายการ':'หมายเหตุ')+':</i> '+hl(snippet(d, d._snip))+'</div>' : '';
-    return '<div class="row ws-'+d.ws+'" data-id="'+d.id+'" data-i="'+i+'">'+
+    var who = inGroup
+      ? '<div class="cust">'+(d.j ? hl(d.j) : '<span style="color:var(--t3);font-weight:400">ไม่ระบุงาน</span>')+'</div>'+(d.pc?'<div class="job">'+hl(d.pc)+'</div>':'')
+      : '<div class="cust">'+hl(d.c)+'</div>'+(d.j?'<div class="job">'+hl(d.j)+'</div>':'');
+    return '<div class="row ws-'+d.ws+'" data-id="'+d.id+'">'+
       '<div class="c-doc"><a class="num" href="/documents/'+d.id+'">'+hl(d.n)+'</a>'+
         '<div class="sub"><span class="t-'+esc(d.t)+'">'+esc(SHORT[d.t]||d.tn)+'</span>'+(rel.length?' · '+rel.join(' · '):'')+'</div></div>'+
-      '<div class="c-cust"><div class="cust">'+hl(d.c)+'</div>'+(d.j?'<div class="job">'+hl(d.j)+'</div>':'')+hit+'</div>'+
+      '<div class="c-cust">'+who+hit+'</div>'+
       '<div class="date">'+thDate(d.d)+'</div>'+
       '<div class="amt">฿'+hl(money(d.a))+'</div>'+
       '<div class="stat">'+status+extra+'</div>'+
     '</div>';
   }
-  function colsHtml(){
+  function colsHtml(inGroup){
     var cur = S.sort || (S.q ? 'rel' : 'date');
     function b(key,label,cls){ var on = cur===key; return '<button class="'+(cls||'')+(on?' on':'')+'" data-sort="'+key+'">'+label+'</button>'; }
-    return '<div class="cols">'+b('num','เลขที่เอกสาร')+b('cust','ลูกค้า / งาน')+'<span class="h-date">'+b('date','วันที่')+'</span>'+b('amt','ยอดเงิน','r')+b('status','สถานะ')+'</div>';
+    return '<div class="cols">'+b('num','เลขที่เอกสาร')+(inGroup ? '<span>งาน</span>' : b('cust','ลูกค้า / งาน'))+'<span class="h-date">'+b('date','วันที่')+'</span>'+b('amt','ยอดเงิน','r')+b('status','สถานะ')+'</div>';
   }
-  var kbIndex = -1, pageList = [];
-
+  function pagerHtml(total, per, unit){
+    var pages = Math.max(1, Math.ceil(total/per));
+    if(total <= per) return '';
+    var from = (S.page-1)*per+1, to = Math.min(total, S.page*per), nums = [], p;
+    for(p=1;p<=pages;p++){
+      if(p===1 || p===pages || Math.abs(p-S.page)<=1) nums.push(p);
+      else if(nums[nums.length-1]!=='gap') nums.push('gap');
+    }
+    return '<div class="pg-info">แสดง '+from+'–'+to+' จาก '+total+' '+unit+'</div><div class="pg">'+
+      '<button data-page="'+(S.page-1)+'"'+(S.page<=1?' disabled':'')+'>ก่อนหน้า</button>'+
+      nums.map(function(n){ return n==='gap' ? '<span class="gap">…</span>' : '<button class="num-btn'+(n===S.page?' on':'')+'" data-page="'+n+'">'+n+'</button>'; }).join('')+
+      '<button data-page="'+(S.page+1)+'"'+(S.page>=pages?' disabled':'')+'>ถัดไป</button></div>';
+  }
+  function groupsOf(list){
+    var g = {}, arr = [];
+    list.forEach(function(d){
+      var x = g[d.cid];
+      if(!x){ x = g[d.cid] = { cid:d.cid, name:d.c, code:d.cc, docs:[], latest:'', todo:0, todoAmt:0, part:0, score:0 }; arr.push(x); }
+      x.docs.push(d);
+      if((d.d||'') > x.latest) x.latest = d.d||'';
+      if(d.ws==='todo'){ x.todo++; x.todoAmt += d.net; }
+      if(d.ws==='partial') x.part += d.a - d.bill;
+      if(d._score > x.score) x.score = d._score;
+    });
+    var dir = S.dir==='asc' ? 1 : -1;
+    arr.sort(function(a,b){
+      if(S.sort==='cust') return a.name.localeCompare(b.name,'th')*dir;
+      if(S.sort==='amt') return (a.todoAmt-b.todoAmt)*dir;
+      if(!S.sort && S.q) return (b.score-a.score) || b.latest.localeCompare(a.latest);
+      return b.latest.localeCompare(a.latest);
+    });
+    return arr;
+  }
+  var lastList = [];
   function render(){
-    var all = base(false);
-    var list = sortList(all);
-    var pages = Math.max(1, Math.ceil(list.length / PAGE));
-    if(S.page > pages) S.page = pages;
-    pageList = list.slice((S.page-1)*PAGE, S.page*PAGE);
+    var list = sortList(base(false));
+    lastList = list;
+    var body = document.getElementById('resBody'), pg = document.getElementById('pager');
     kbIndex = -1;
 
     // header
@@ -623,38 +724,41 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     var sums = { QUOTATION:[0,0], INVOICE:[0,0], TAX_INVOICE:[0,0] };
     list.forEach(function(d){ if(sums[d.t] && !(d.t==='TAX_INVOICE' && d.s==='draft')){ sums[d.t][0]++; sums[d.t][1]+=d.a; } });
     var meta = [list.length+' เอกสาร'];
+    if(S.view==='cust') meta.push(groupsOf(list).length+' ลูกค้า');
     [['QUOTATION','ใบเสนอราคา'],['INVOICE','ใบแจ้งหนี้'],['TAX_INVOICE','ใบกำกับภาษี']].forEach(function(t){
       if(sums[t[0]][0]) meta.push(t[1]+' '+sums[t[0]][0]+' <b>฿'+money(sums[t[0]][1])+'</b>');
     });
     document.getElementById('resMeta').innerHTML = meta.join('<span class="sep">|</span>');
 
-    // body
-    var body = document.getElementById('resBody');
     if(!list.length){
-      var filtered = !!(S.q||S.type||S.ws||S.cust||S.month!==DEFAULT_M);
+      var filtered = !!(S.q||S.type||S.ws||S.cust||S.job||S.month!==DEFAULT_M);
+      var hint = didYouMean();
       body.innerHTML = '<div class="empty"><div class="empty-t">ไม่พบเอกสาร</div><div>'+
-        (S.q && S.month!=='all' ? 'ลองค้นหาในทุกเดือน หรือพิมพ์ให้สั้นลง' : 'ลองพิมพ์ให้สั้นลง เช่น "tx5" หรือชื่อลูกค้าบางส่วน')+'</div>'+
+        (hint ? 'หมายถึง <a href="#" data-dym="'+hint.i+'" style="font-weight:600">'+esc(hint.label)+'</a> ใช่ไหม' :
+          (S.q && S.month!=='all' ? 'ลองค้นหาในทุกเดือน หรือพิมพ์ให้สั้นลง' : 'ลองพิมพ์ให้สั้นลง เช่น "tx5" หรือชื่อลูกค้าบางส่วน'))+'</div>'+
         (filtered ? '<button class="btn" data-reset>ล้างตัวกรองทั้งหมด</button>' : '')+'</div>';
-    } else {
-      body.innerHTML = colsHtml() + pageList.map(rowHtml).join('');
-    }
-
-    // pager
-    var pg = document.getElementById('pager');
-    if(list.length > PAGE){
-      var from = (S.page-1)*PAGE+1, to = Math.min(list.length, S.page*PAGE);
-      var nums = [], p;
-      for(p=1;p<=pages;p++){
-        if(p===1 || p===pages || Math.abs(p-S.page)<=1) nums.push(p);
-        else if(nums[nums.length-1]!=='gap') nums.push('gap');
-      }
-      pg.innerHTML = '<div class="pg-info">แสดง '+from+'–'+to+' จาก '+list.length+' เอกสาร</div><div class="pg">'+
-        '<button data-page="'+(S.page-1)+'"'+(S.page<=1?' disabled':'')+'>ก่อนหน้า</button>'+
-        nums.map(function(n){ return n==='gap' ? '<span class="gap">…</span>' : '<button class="num-btn'+(n===S.page?' on':'')+'" data-page="'+n+'">'+n+'</button>'; }).join('')+
-        '<button data-page="'+(S.page+1)+'"'+(S.page>=pages?' disabled':'')+'>ถัดไป</button></div>';
-      pg.style.display = '';
-    } else {
       pg.innerHTML = ''; pg.style.display = 'none';
+    } else if(S.view==='cust'){
+      var groups = groupsOf(list), gp = Math.max(1, Math.ceil(groups.length/GPAGE));
+      if(S.page > gp) S.page = gp;
+      var shown = groups.slice((S.page-1)*GPAGE, S.page*GPAGE);
+      var autoOpen = shown.length<=2 || !!(S.q||S.cust||S.job);
+      body.innerHTML = shown.map(function(g){
+        var open = g.cid in openGroups ? openGroups[g.cid] : autoOpen;
+        var fig = g.todo ? '<div class="grp-fig red">ค้างรับเงิน '+g.todo+' ใบ<b>฿'+money(g.todoAmt)+'</b></div>'
+          : (g.part>1 ? '<div class="grp-fig">ยังไม่วางบิล<b>฿'+money(g.part)+'</b></div>' : '<div class="grp-fig">ล่าสุด<b>'+thDate(g.latest)+'</b></div>');
+        return '<div class="grp'+(open?' open':'')+'" data-grp="'+esc(g.cid)+'">'+
+          '<div class="grp-h"><span class="grp-chev">'+CHEV+'</span>'+
+            '<div class="grp-main"><div class="grp-name">'+hl(g.name)+'</div><div class="grp-sub">'+(g.code?esc(g.code)+' · ':'')+g.docs.length+' เอกสาร</div></div>'+fig+'</div>'+
+          (open ? '<div class="grp-body">'+colsHtml(true)+g.docs.map(function(d){ return rowHtml(d, true); }).join('')+'</div>' : '')+
+        '</div>';
+      }).join('');
+      pg.innerHTML = pagerHtml(groups.length, GPAGE, 'ลูกค้า'); pg.style.display = pg.innerHTML ? '' : 'none';
+    } else {
+      var pages = Math.max(1, Math.ceil(list.length / PAGE));
+      if(S.page > pages) S.page = pages;
+      body.innerHTML = colsHtml(false) + list.slice((S.page-1)*PAGE, S.page*PAGE).map(function(d){ return rowHtml(d, false); }).join('');
+      pg.innerHTML = pagerHtml(list.length, PAGE, 'เอกสาร'); pg.style.display = pg.innerHTML ? '' : 'none';
     }
     renderControls();
     syncUrl();
@@ -668,15 +772,18 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
       t.classList.toggle('on', t.dataset.ws===S.ws);
       t.querySelector('.n').textContent = cnt[t.dataset.ws];
     });
-    var ts = document.getElementById('typeSel'); ts.value = S.type; ts.classList.toggle('on', !!S.type);
-    var cs = document.getElementById('custSel'); cs.value = S.cust; cs.classList.toggle('on', !!S.cust);
-    var ms = document.getElementById('monthSel'); ms.value = S.month;
-    document.getElementById('monthNav').classList.toggle('on', S.month!==DEFAULT_M);
+    document.querySelectorAll('#typeSeg button').forEach(function(x){ x.classList.toggle('on', x.dataset.t===S.type); });
+    document.querySelectorAll('#viewSeg button').forEach(function(x){ x.classList.toggle('on', x.dataset.v===S.view); });
+    document.getElementById('monthSel').value = S.month;
     var mi = MONTHS.indexOf(S.month);
     document.getElementById('mPrev').disabled = S.month==='all' ? !MONTHS.length : mi>=MONTHS.length-1;
     document.getElementById('mNext').disabled = S.month==='all' || mi<=0;
+    var chips = '';
+    if(S.cust && CUST[S.cust]) chips += '<span class="chip"><span><small>ลูกค้า</small> '+esc(CUST[S.cust].name)+'</span><button data-unchip="cust" aria-label="เอาออก">'+X_ICON+'</button></span>';
+    if(S.job) chips += '<span class="chip"><span><small>งาน</small> '+esc(S.job)+'</span><button data-unchip="job" aria-label="เอาออก">'+X_ICON+'</button></span>';
+    document.getElementById('chips').innerHTML = chips;
     document.getElementById('qClear').classList.toggle('show', !!S.q);
-    document.getElementById('resetBtn').classList.toggle('show', !!(S.q||S.type||S.ws||S.cust||S.month!==DEFAULT_M||S.sort));
+    document.getElementById('resetBtn').classList.toggle('show', !!(S.q||S.type||S.ws||S.cust||S.job||S.month!==DEFAULT_M||S.sort));
   }
 
   function renderSummary(){
@@ -694,16 +801,77 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     document.getElementById('ss-tax').textContent = tx.length+' ใบ (รวม VAT)';
   }
 
+  // ── suggestions (customers, jobs, documents) ─────────────
+  var SUG = [], sIdx = -1, suggOpen = false;
+  var suggEl = document.getElementById('sugg');
+  function textToks(q){ return parseQuery(q).filter(function(t){ return t.kind==='text' && !t.neg && !t.field; }); }
+  function allIn(o, toks){ for(var i=0;i<toks.length;i++){ if(!inStr(o._n, o._s, toks[i])) return false; } return toks.length>0; }
+  function buildSugg(){
+    var q = qInp.value.trim(), out = [];
+    if(!q){
+      CUST_L.slice().sort(function(a,b){ return b.latest.localeCompare(a.latest); }).slice(0,8).forEach(function(c){ out.push({ k:'cust', h:'ลูกค้าล่าสุด', o:c }); });
+      return out;
+    }
+    var toks = textToks(q);
+    var cs = CUST_L.filter(function(c){ return allIn(c, toks); }).sort(function(a,b){ return b.n-a.n; }).slice(0,4);
+    var fuzzyHead = false;
+    if(!cs.length && toks.length){
+      cs = CUST_L.map(function(c){ return { c:c, s:fuzzy(q, c.name) }; }).filter(function(x){ return x.s>=0.5; })
+        .sort(function(a,b){ return b.s-a.s; }).slice(0,3).map(function(x){ return x.c; });
+      fuzzyHead = cs.length>0;
+    }
+    cs.forEach(function(c){ out.push({ k:'cust', h: fuzzyHead ? 'ลูกค้า (ใกล้เคียง)' : 'ลูกค้า', o:c }); });
+    JOB_L.filter(function(j){ return allIn(j, toks); }).sort(function(a,b){ return b.latest.localeCompare(a.latest); }).slice(0,3)
+      .forEach(function(j){ out.push({ k:'job', h:'งาน', o:j }); });
+    var all = parseQuery(q), docs = [];
+    if(all.length){
+      DOCS.forEach(function(d){ var m = matchDoc(d, all); if(m) docs.push({ d:d, s:m.score }); });
+      docs.sort(function(a,b){ return (b.s-a.s) || -byDate(a.d,b.d); }).slice(0,5).forEach(function(x){ out.push({ k:'doc', h:'เอกสาร', o:x.d }); });
+    }
+    return out;
+  }
+  function renderSugg(){
+    SUG = buildSugg();
+    if(!SUG.length){
+      suggEl.innerHTML = qInp.value.trim() ? '<div class="sg-empty">ไม่พบลูกค้า งาน หรือเอกสารที่ตรงกัน</div>' : '';
+    } else {
+      var html = '', lastH = '';
+      SUG.forEach(function(s, i){
+        if(s.h !== lastH){ html += '<div class="sg-h">'+esc(s.h)+'</div>'; lastH = s.h; }
+        var o = s.o, t, sub, r = '', rc = '';
+        if(s.k==='cust'){ t = '<div class="sg-t">'+hlQ(o.name)+'</div>'; sub = (o.code?esc(o.code)+' · ':'')+o.n+' เอกสาร'; if(o.todo){ r = 'ค้าง ฿'+money0(o.todoAmt); rc = ' red'; } }
+        else if(s.k==='job'){ t = '<div class="sg-t">'+hlQ(o.name)+'</div>'; sub = esc(o.c)+' · '+o.n+' เอกสาร'; }
+        else { t = '<div class="sg-t mono">'+esc(o.n)+'</div>'; sub = esc(SHORT[o.t]||o.tn)+' · '+esc(o.c); r = '฿'+money(o.a); }
+        html += '<div class="sg'+(i===sIdx?' on':'')+'" data-s="'+i+'"><div class="sg-main">'+t+'<div class="sg-s">'+sub+'</div></div>'+(r?'<div class="sg-r'+rc+'">'+r+'</div>':'')+'</div>';
+      });
+      suggEl.innerHTML = html;
+    }
+    suggEl.classList.toggle('show', suggOpen && !!suggEl.innerHTML);
+  }
+  function hlQ(text){ var keep = S.q; S.q = qInp.value.trim(); var h = hl(text); S.q = keep; return h; }
+  function openSugg(){ suggOpen = true; sIdx = -1; renderSugg(); }
+  function closeSugg(){ suggOpen = false; sIdx = -1; suggEl.classList.remove('show'); }
+  function pickSugg(i){
+    var s = SUG[i]; if(!s) return;
+    if(s.k==='doc'){ location.href = '/documents/'+s.o.id; return; }
+    if(s.k==='cust'){ S.cust = s.o.id; S.job = ''; }
+    else { S.job = s.o.name; S.cust = s.o.cid; }
+    qInp.value = ''; S.q = ''; monthBeforeSearch = null; S.month = 'all';
+    closeSugg(); go(); qInp.blur();
+  }
+  function didYouMean(){
+    var q = S.q.trim(); if(!q || q.length<3) return null;
+    var best = null;
+    CUST_L.forEach(function(c){ var s = fuzzy(q, c.name); if(s>=0.5 && (!best || s>best.s)) best = { s:s, k:'cust', o:c, label:c.name }; });
+    JOB_L.forEach(function(j){ var s = fuzzy(q, j.name); if(s>=0.5 && (!best || s>best.s)) best = { s:s, k:'job', o:j, label:j.name }; });
+    if(best){ SUG = [best]; best.i = 0; }
+    return best;
+  }
+
   // ── build controls ───────────────────────────────────────
-  var typeSel = document.getElementById('typeSel');
-  typeSel.innerHTML = '<option value="">ทุกประเภท</option>' + TYPES.filter(function(t){ return DOCS.some(function(d){ return d.t===t.code; }); })
-    .map(function(t){ return '<option value="'+esc(t.code)+'">'+esc(t.name)+'</option>'; }).join('');
-  var custSel = document.getElementById('custSel');
-  (function(){
-    var cm = {}; DOCS.forEach(function(d){ var c = cm[d.cid] || (cm[d.cid] = { id:d.cid, name:d.c, n:0 }); c.n++; });
-    var arr = Object.keys(cm).map(function(k){ return cm[k]; }).sort(function(a,b){ return a.name.localeCompare(b.name,'th'); });
-    custSel.innerHTML = '<option value="">ทุกลูกค้า</option>' + arr.map(function(c){ return '<option value="'+esc(c.id)+'">'+esc(c.name)+' ('+c.n+')</option>'; }).join('');
-  })();
+  var typeSeg = document.getElementById('typeSeg');
+  typeSeg.innerHTML = '<button data-t="">ทุกประเภท</button>' + TYPES.filter(function(t){ return DOCS.some(function(d){ return d.t===t.code; }); })
+    .map(function(t){ return '<button data-t="'+esc(t.code)+'">'+esc(SHORT[t.code]||t.name)+'</button>'; }).join('');
   var monthSel = document.getElementById('monthSel');
   monthSel.innerHTML = '<option value="all">ทุกเดือน</option>' + MONTHS.map(function(k){ return '<option value="'+k+'">'+monthLabel(k)+'</option>'; }).join('');
 
@@ -711,8 +879,10 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   function go(){ S.page = 1; render(); }
   var qInp = document.getElementById('q');
   qInp.value = S.q;
-  var timer = null;
+  var timer = null, kbIndex = -1;
+  qInp.addEventListener('focus', openSugg);
   qInp.addEventListener('input', function(){
+    sIdx = -1; suggOpen = true; renderSugg();
     clearTimeout(timer);
     timer = setTimeout(function(){
       var v = qInp.value.trim();
@@ -729,21 +899,39 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
     rows[kbIndex].scrollIntoView({ block:'nearest' });
   }
   qInp.addEventListener('keydown', function(e){
-    if(e.key==='ArrowDown'){ e.preventDefault(); setKb(kbIndex+1); }
-    else if(e.key==='ArrowUp'){ e.preventDefault(); setKb(kbIndex-1); }
+    var sOn = suggOpen && SUG.length;
+    if(e.key==='ArrowDown'){ e.preventDefault(); if(sOn){ sIdx = Math.min(SUG.length-1, sIdx+1); renderSugg(); } else setKb(kbIndex+1); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); if(sOn){ sIdx = Math.max(-1, sIdx-1); renderSugg(); } else setKb(kbIndex-1); }
     else if(e.key==='Enter'){
-      var target = kbIndex>=0 ? pageList[kbIndex] : (pageList.length===1 ? pageList[0] : null);
-      if(target) location.href = '/documents/'+target.id;
-    } else if(e.key==='Escape'){ qInp.value=''; qInp.dispatchEvent(new Event('input')); }
+      e.preventDefault();
+      if(sOn && sIdx>=0) return pickSugg(sIdx);
+      if(!suggOpen || !SUG.length){
+        var rows = document.querySelectorAll('#resBody .row');
+        if(kbIndex>=0 && rows[kbIndex]) { location.href = '/documents/'+rows[kbIndex].dataset.id; return; }
+        if(lastList.length===1){ location.href = '/documents/'+lastList[0].id; return; }
+      }
+      closeSugg();
+    } else if(e.key==='Escape'){
+      if(suggOpen){ closeSugg(); } else { qInp.value=''; qInp.dispatchEvent(new Event('input')); closeSugg(); }
+    } else if(e.key==='Backspace' && !qInp.value){
+      if(S.job){ S.job=''; go(); } else if(S.cust){ S.cust=''; go(); }
+    }
+  });
+  suggEl.addEventListener('mousedown', function(e){ e.preventDefault(); var s = e.target.closest('[data-s]'); if(s) pickSugg(+s.dataset.s); });
+  document.addEventListener('mousedown', function(e){ if(!e.target.closest('.search')) closeSugg(); });
+  document.getElementById('sbox').addEventListener('click', function(e){
+    var u = e.target.closest('[data-unchip]');
+    if(u){ if(u.dataset.unchip==='cust'){ S.cust=''; S.job=''; } else S.job=''; go(); return; }
+    if(!e.target.closest('button')) qInp.focus();
   });
   document.getElementById('qClear').addEventListener('click', function(){ qInp.value=''; qInp.dispatchEvent(new Event('input')); qInp.focus(); });
-  document.getElementById('helpBtn').addEventListener('click', function(){ document.getElementById('help').classList.toggle('show'); });
-  document.getElementById('help').addEventListener('click', function(e){
-    var c = e.target.closest('code'); if(!c) return;
-    qInp.value = c.textContent; qInp.dispatchEvent(new Event('input')); qInp.focus();
+  typeSeg.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; S.type = b.dataset.t; go(); });
+  document.getElementById('viewSeg').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b || b.dataset.v===S.view) return;
+    S.view = b.dataset.v;
+    if(S.view==='cust' && S.month!=='all'){ S.month = 'all'; }
+    go();
   });
-  typeSel.addEventListener('change', function(){ S.type = typeSel.value; go(); });
-  custSel.addEventListener('change', function(){ S.cust = custSel.value; if(S.cust && S.month!=='all'){ S.month='all'; } go(); });
   monthSel.addEventListener('change', function(){ S.month = monthSel.value; monthBeforeSearch = null; go(); });
   document.getElementById('mPrev').addEventListener('click', function(){ var i = MONTHS.indexOf(S.month); S.month = S.month==='all' ? MONTHS[0] : MONTHS[Math.min(MONTHS.length-1,i+1)]; go(); });
   document.getElementById('mNext').addEventListener('click', function(){ var i = MONTHS.indexOf(S.month); if(i>0){ S.month = MONTHS[i-1]; go(); } });
@@ -755,18 +943,22 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
   });
   document.getElementById('summary').addEventListener('click', function(e){
     var b = e.target.closest('.sum'); if(!b) return;
-    S.q=''; qInp.value=''; S.type=''; S.cust=''; S.sort='';
+    S.q=''; qInp.value=''; S.type=''; S.cust=''; S.job=''; S.sort='';
     if(b.dataset.go==='taxmonth'){ S.ws=''; S.type='TAX_INVOICE'; S.month=THIS_M; }
     else { S.ws=b.dataset.go; S.month='all'; }
     go();
     document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' });
   });
-  function resetAll(){ S.q=''; S.type=''; S.ws=''; S.cust=''; S.sort=''; S.dir='desc'; S.month=DEFAULT_M; monthBeforeSearch=null; qInp.value=''; go(); }
+  function resetAll(){ S.q=''; S.type=''; S.ws=''; S.cust=''; S.job=''; S.sort=''; S.dir='desc'; S.month = S.view==='cust' ? 'all' : DEFAULT_M; monthBeforeSearch=null; qInp.value=''; openGroups={}; go(); }
   document.getElementById('resetBtn').addEventListener('click', resetAll);
   document.getElementById('resBody').addEventListener('click', function(e){
     if(e.target.closest('[data-reset]')) return resetAll();
+    var dym = e.target.closest('[data-dym]');
+    if(dym){ e.preventDefault(); return pickSugg(0); }
     var sb = e.target.closest('[data-sort]');
     if(sb){ var k = sb.dataset.sort; if(S.sort===k) S.dir = S.dir==='asc'?'desc':'asc'; else { S.sort=k; S.dir = (k==='amt'||k==='date')?'desc':'asc'; } return go(); }
+    var gh = e.target.closest('.grp-h');
+    if(gh){ var g = gh.parentNode, id = g.dataset.grp; openGroups[id] = !g.classList.contains('open'); return render(); }
     if(e.target.closest('a,button')) return;
     var row = e.target.closest('.row');
     if(row){ if(e.metaKey||e.ctrlKey) window.open('/documents/'+row.dataset.id); else location.href='/documents/'+row.dataset.id; }
@@ -785,7 +977,6 @@ const dataJson = JSON.stringify({ docs: index, types: typeCodes }).replace(/</g,
 
   renderSummary();
   render();
-  if(window.innerWidth > 768 && !S.q) qInp.focus();
 })();
 </script>
 </body>

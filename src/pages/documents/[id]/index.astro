@@ -1,5 +1,5 @@
 ---
-import { getDocument, logAction, publishDocument, removeDocument, updateJob, statusInfo, whtInfo } from '../../../lib/documents';
+import { getDocument, logAction, publishDocument, removeDocument, updateJob, whtInfo } from '../../../lib/documents';
 import { canPublish, canDelete, canEdit } from '../../../lib/auth';
 const user = Astro.locals.user;
 const { id } = Astro.params;
@@ -30,20 +30,22 @@ if (Astro.request.method === 'POST') {
 
 await logAction(id!, 'view', user.id);
 
+const TH_M = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 function thaiDate(s: string) {
   if (!s) return '—';
   const d = new Date(s);
-  const m = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-  return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()+543}`;
+  return `${d.getDate()} ${TH_M[d.getMonth()]} ${d.getFullYear()+543}`;
 }
 function money(n: number) {
-  return Number(n||0).toLocaleString('th-TH', { minimumFractionDigits: 2 });
+  return Number(n||0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 const itemsByCategory: Record<string, any[]> = {};
 doc.categories.forEach((cat: any) => {
   itemsByCategory[cat.id] = doc.items.filter((i: any) => i.category_id === cat.id);
 });
+const hasMatLab = doc.items.some((i: any) => (i.material_cost||0) > 0 || (i.labor_cost||0) > 0);
+const itemCols = hasMatLab ? 10 : 7;
 
 function parseInstallments(cond: string, total: number) {
   if (!cond) return [];
@@ -60,18 +62,35 @@ function parseInstallments(cond: string, total: number) {
   return totalPct > 0 && totalPct <= 100 && result.length > 1 ? result : [];
 }
 
+const code = doc.document_types?.code || '';
+const SHORT: Record<string, string> = { QUOTATION: 'ใบเสนอราคา', INVOICE: 'ใบแจ้งหนี้', TAX_INVOICE: 'ใบกำกับภาษี' };
+const typeLabel = SHORT[code] || doc.document_types?.name_th || code;
 const installments = parseInstallments(doc.payment_condition || '', doc.total_amount || 0);
-// Tax invoice can be issued from ANY live invoice (in_progress / stale / draft /
-// published). It used to require 'published', but since the lifecycle change new
-// invoices start as 'in_progress' and never reach 'published', so the button
-// silently never appeared.
-const existingTx = ((doc as any).linked_invoices || []).filter((i: any) => i.document_types?.code === 'TAX_INVOICE');
-const canIssueTx = doc.document_types?.code === 'INVOICE' && doc.status !== 'removed' && existingTx.length === 0;
-const canMarkPublished = doc.status === 'draft' && canPublish(user); // legacy drafts only — unchanged behaviour
-const sInfo = statusInfo(doc.status);
+const linked = ((doc as any).linked_invoices || []) as any[];
+const existingTx = linked.filter((i: any) => i.document_types?.code === 'TAX_INVOICE');
+const childInv = linked.filter((i: any) => i.document_types?.code === 'INVOICE');
+// Tax invoice can be issued from ANY live invoice (in_progress / stale / draft / published).
+const canIssueTx = code === 'INVOICE' && doc.status !== 'removed' && existingTx.length === 0;
+const canMarkPublished = doc.status === 'draft' && canPublish(user); // legacy drafts only
 const sourceDoc = (doc as any).source_document;
 const W = whtInfo(doc);
-const hasInstallments = true; // always show — every project can have installments
+const total = Number(doc.total_amount || 0);
+const billed = childInv.reduce((s: number, i: any) => s + Number(i.total_amount || 0), 0);
+const billedPct = total > 0 ? Math.min(100, Math.floor(billed / total * 100)) : 0;
+const remaining = Math.max(0, Math.round((total - billed) * 100) / 100);
+const today = new Date(); today.setHours(0, 0, 0, 0);
+const ageDays = doc.issue_date ? Math.max(0, Math.round((today.getTime() - new Date(doc.issue_date).getTime()) / 86400000)) : 0;
+const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); // Bangkok date
+
+// One plain-language state, same wording as the dashboard
+let ws = 'open', wl = 'ยังไม่วางบิล';
+if (code === 'TAX_INVOICE') { ws = doc.status === 'draft' ? 'open' : 'done'; wl = doc.status === 'draft' ? 'ร่าง ยังไม่ออก' : 'ออกแล้ว'; }
+else if (code === 'INVOICE') { ws = existingTx.length ? 'done' : 'todo'; wl = existingTx.length ? 'ออกใบกำกับแล้ว' : 'ค้างรับเงิน'; }
+else if (childInv.length && remaining <= 1) { ws = 'done'; wl = 'วางบิลครบแล้ว'; }
+else if (childInv.length) { ws = 'partial'; wl = `วางบิลแล้ว ${billedPct}%`; }
+const idleNote = doc.status === 'stale' ? 'ไม่เคลื่อนไหว 5+ วัน' : '';
+const job = (doc as any).jobs;
+const cust = doc.customers || {};
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -82,635 +101,711 @@ const hasInstallments = true; // always show — every project can have installm
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <meta name="robots" content="noindex,nofollow"/>
   <title>{doc.document_number} — TNC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-  <style>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
-      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
-      --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
-      --green:#2D7A4F;--grbg:#EDF7F0;--grborder:#C5E8D2;
-      --red:#B94040;--redbg:#FEF2F2;
+      --bg:#F6F5F2;--white:#fff;--border:#E3E0DA;--line:#EEECE7;
+      --text:#1A1814;--t2:#66635C;--t3:#A9A69F;
+      --gold:#B8955A;--gbg:#FAF6EE;
+      --green:#2D7A4F;--grbg:#EEF6F1;--red:#B23B3B;--redbg:#FBF0F0;--amber:#B97A26;--blue:#2D5A9E;
     }
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 20px;height:54px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30;}
-    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 12px;border:1px solid var(--border);border-radius:5px;white-space:nowrap;flex-shrink:0;}
-    .tb-docnum{font-size:13px;font-weight:700;font-family:monospace;white-space:nowrap;}
-    .tb-cust{font-size:12px;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .tb-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;}
-    .btn{padding:7px 13px;border-radius:5px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:none;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all .15s;white-space:nowrap;min-height:38px;}
-    .btn-ol{background:transparent;color:var(--t2);border:1px solid var(--border);}
-    .btn-green{background:var(--green);color:#fff;}
-    .btn-red{background:var(--red);color:#fff;}
-    .spill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;}
-    .sdot{width:6px;height:6px;border-radius:50%;}
-    .spill-draft{background:var(--bg);color:var(--t3);border:1px solid var(--border);}
-    .spill-draft .sdot{background:var(--t3);}
-    .spill-pub{background:var(--grbg);color:var(--green);border:1px solid var(--grborder);}
-    .spill-pub .sdot{background:var(--green);}
-    .spill-stale{background:#FDF4E8;color:#C9822D;border:1px solid #EFD2A8;}
-    .spill-stale .sdot{background:#C9822D;}
-    .chain{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--t2);}
-    .chain a{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--text);text-decoration:none;font-weight:600;}
-    .chain a:hover{border-color:var(--text);}
-    .chain a.tx{background:var(--grbg);border-color:var(--grborder);color:var(--green);}
-    .chain .mono{font-family:monospace;}
-    .aitem.tx-cta{background:var(--grbg);border-color:var(--grborder);}
-    .aitem.tx-cta.pulse{animation:txpulse 1.2s ease-in-out 3;box-shadow:0 0 0 0 rgba(45,122,79,.5);}
-    @keyframes txpulse{0%{box-shadow:0 0 0 0 rgba(45,122,79,.55);}70%{box-shadow:0 0 0 12px rgba(45,122,79,0);}100%{box-shadow:0 0 0 0 rgba(45,122,79,0);}}
-    .layout{display:grid;grid-template-columns:1fr 270px;min-height:calc(100dvh - 54px);}
-    .main{padding:24px;border-right:1px solid var(--border);min-width:0;}
-    .aside{padding:20px;background:var(--white);}
-    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
-    .info-grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
-    .icard{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
-    .icard-lbl{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:6px;}
-    .icard-val{font-size:14px;font-weight:600;}
-    .icard-sub{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.6;}
-    .icard-pay{margin-bottom:20px;}
-    .job-icard{position:relative;}
-    .job-edit-btn{position:absolute;top:14px;right:14px;padding:4px 10px;font-size:10px;font-weight:700;font-family:inherit;color:#8B6914;background:var(--white);border:1px solid var(--gborder);border-radius:20px;cursor:pointer;}
-    .job-edit-btn:hover{background:var(--gbg);}
-    .job-edit-form{display:none;flex-direction:column;gap:8px;}
-    .job-icard.editing .job-static{display:none;}
-    .job-icard.editing .job-edit-form{display:flex;}
-    .jfield{display:flex;flex-direction:column;gap:4px;}
-    .jfield label{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B6914;}
-    .jinp{padding:8px 10px;background:var(--white);border:1.5px solid var(--gborder);border-radius:5px;font-size:12.5px;font-family:inherit;color:var(--text);outline:none;}
-    .jinp:focus{border-color:var(--gold);}
-    .jbtns{display:flex;gap:6px;margin-top:2px;}
-    .jbtn-save{padding:6px 12px;background:#7A5C1E;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;}
-    .jbtn-cancel{padding:6px 12px;background:transparent;border:1px solid var(--gborder);border-radius:5px;font-size:11px;font-family:inherit;color:#8B6914;cursor:pointer;}
-    .cat-sec{margin-bottom:16px;}
-    .cat-hd{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--text);color:var(--bg);border-radius:5px 5px 0 0;font-size:13px;font-weight:600;}
-    .cat-badge{background:rgba(255,255,255,.15);padding:2px 8px;border-radius:3px;font-size:10px;}
-    .cat-total{margin-left:auto;font-size:12px;opacity:.8;}
-    .tbl-wrap{overflow-x:auto;background:var(--white);border:1px solid var(--border);border-top:none;border-radius:0 0 5px 5px;}
-    table{width:100%;border-collapse:collapse;min-width:480px;}
-    thead th{padding:8px 10px;background:var(--bg);font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.09em;text-align:left;border-bottom:1px solid var(--border);}
-    thead th.r{text-align:right;}thead th.c{text-align:center;}
-    tbody tr{border-bottom:1px solid var(--b2);}tbody tr:last-child{border-bottom:none;}tbody tr.sub-row{background:var(--bg);}
-    td{padding:9px 10px;font-size:12.5px;color:var(--t2);}
-    td.r{text-align:right;font-weight:600;color:var(--text);}td.c{text-align:center;}
-    td.mono{font-family:monospace;font-size:11px;color:var(--t3);}td.desc{color:var(--text);}
-    td.sub-lbl{text-align:right;font-weight:700;color:var(--t2);font-size:11.5px;}td.sub-val{text-align:right;font-weight:700;color:var(--text);}
-    .no-items{padding:24px;text-align:center;color:var(--t3);font-size:13px;}
-    .notes-box{margin-top:14px;background:var(--white);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
-    .notes-lbl{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;}
-    .notes-txt{font-size:13px;color:var(--t2);white-space:pre-line;line-height:1.7;}
-    .inst-card{background:var(--gbg);border:1px solid var(--gborder);border-radius:6px;padding:14px 16px;margin-bottom:16px;}
-    .inst-title{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;margin-bottom:10px;}
-    .inst-row{display:flex;align-items:center;padding:7px 0;border-bottom:1px dashed var(--gborder);}
-    .inst-row:last-of-type{border-bottom:none;}
-    .inst-pct{font-size:11px;font-weight:700;color:var(--gold);min-width:36px;}
-    .inst-label{font-size:12px;color:var(--t2);flex:1;padding:0 8px;}
-    .inst-amount{font-size:13px;font-weight:700;color:var(--text);}
-    .inst-gen-btn{width:100%;margin-top:10px;padding:9px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.05em;text-transform:uppercase;}
-    .inst-gen-btn:hover{opacity:.85;}
-    .panel-sec{margin-bottom:20px;}
-    .panel-title{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:12px;}
-    .sum-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--b2);}
-    .sum-row:last-child{border-bottom:none;}
-    .sum-row.total{border-top:2px solid var(--text);border-bottom:none;padding-top:10px;margin-top:4px;}
-    .sum-lbl{font-size:12.5px;color:var(--t2);}
-    .sum-val{font-size:12.5px;font-weight:600;}
-    .sum-val.big{font-size:20px;font-weight:300;letter-spacing:-.02em;}
-    .divider{border:none;border-top:1px solid var(--b2);margin:16px 0;}
-    .action-list{display:flex;flex-direction:column;gap:8px;}
-    .aitem{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;text-decoration:none;cursor:pointer;transition:border-color .15s;width:100%;text-align:left;font-family:inherit;}
-    .aitem:hover{border-color:var(--text);}
-    .aitem.danger{background:var(--redbg);border-color:#FECACA;}
-    .aitem.danger:hover{border-color:var(--red);}
-    .aicon{width:30px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
-    .aicon-pdf{background:#FEF2F2;color:var(--red);}
-    .aicon-edit{background:var(--gbg);color:var(--gold);}
-    .aicon-pub{background:var(--grbg);color:var(--green);}
-    .aicon-del{background:#FEF2F2;color:var(--red);}
-    .aicon-url{background:#E8F4FD;color:#1A6FA8;font-size:11px;font-weight:700;}
-    .atext-title{font-size:13px;font-weight:600;color:var(--text);}
-    .atext-sub{font-size:11px;color:var(--t3);margin-top:1px;}
-    .warn-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:5px;padding:10px 12px;font-size:12px;color:#92400E;margin-bottom:12px;}
-    .warn-box strong{display:block;margin-bottom:2px;}
-    .meta-info{font-size:11.5px;color:var(--t3);line-height:1.8;}
-    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;}
-    .modal-overlay.show{display:flex;}
-    .modal{background:var(--white);border-radius:8px;padding:24px;width:360px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25);}
-    .modal-title{font-size:14px;font-weight:700;margin-bottom:4px;}
-    .modal-sub{font-size:12px;color:var(--t3);margin-bottom:16px;}
-    .modal-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:5px;cursor:pointer;margin-bottom:8px;transition:border-color .15s;}
-    .modal-opt:hover{border-color:var(--gold);}
-    .modal-opt input[type=radio]{accent-color:var(--text);width:16px;height:16px;flex-shrink:0;}
-    .modal-opt-main{font-size:12.5px;font-weight:600;}
-    .modal-opt-sub{font-size:11px;color:var(--t3);}
-    .modal-btns{display:flex;gap:8px;margin-top:16px;}
-    .modal-cancel{flex:1;padding:9px;border:1px solid var(--border);background:transparent;border-radius:4px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;}
-    .modal-confirm{flex:2;padding:9px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.04em;text-transform:uppercase;}
-    @media(max-width:900px){
-      .info-grid.cols-3{grid-template-columns:1fr 1fr;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;}
+    a{color:inherit;}
+    button,input,textarea,select{font-family:inherit;}
+    button:focus{outline:none;} button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+    .ic{width:16px;height:16px;flex-shrink:0;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+
+    /* Top bar */
+    .top{position:sticky;top:0;z-index:40;background:rgba(246,245,242,.92);backdrop-filter:saturate(1.4) blur(8px);-webkit-backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--line);}
+    .top-in{max-width:1200px;margin:0 auto;padding:0 28px;height:58px;display:flex;align-items:center;gap:12px;}
+    .back{display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 10px 0 6px;border-radius:7px;font-size:13px;color:var(--t2);text-decoration:none;}
+    .back:hover{background:var(--white);color:var(--text);}
+    .crumb{font-size:13px;color:var(--t3);display:flex;align-items:center;gap:8px;min-width:0;}
+    .crumb b{color:var(--text);font-weight:600;}
+    .spacer{flex:1;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);white-space:nowrap;}
+    .btn:hover{border-color:var(--text);}
+    .btn-dark{background:var(--text);border-color:var(--text);color:var(--white);}
+    .btn-dark:hover{opacity:.88;}
+    .btn-green{background:var(--green);border-color:var(--green);color:var(--white);}
+    .btn-green:hover{opacity:.9;}
+    .btn-block{width:100%;height:40px;}
+    .btn[disabled]{opacity:.6;cursor:default;}
+
+    /* Page */
+    .wrap{max-width:1200px;margin:0 auto;padding:28px 28px 64px;}
+    .hero{display:flex;align-items:flex-end;gap:24px;margin-bottom:24px;}
+    .hero-main{flex:1;min-width:0;}
+    .eyebrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--t2);margin-bottom:8px;}
+    .docno{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:600;color:var(--text);font-size:14px;}
+    .t-QUOTATION{color:var(--blue);} .t-INVOICE{color:var(--green);} .t-TAX_INVOICE{color:var(--red);}
+    .pill{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;border-radius:13px;background:var(--white);border:1px solid var(--border);font-size:12.5px;font-weight:500;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--t3);}
+    .ws-todo .dot{background:var(--red);} .ws-partial .dot{background:var(--gold);} .ws-done .dot{background:var(--green);}
+    .h1{font-size:26px;font-weight:700;letter-spacing:-.015em;line-height:1.25;}
+    .jobline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:15px;color:var(--t2);}
+    .linkbtn{border:none;background:none;padding:0;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+    .linkbtn:hover{color:var(--text);}
+    .hero-amt{text-align:right;flex-shrink:0;}
+    .hero-amt .l{font-size:12.5px;color:var(--t2);}
+    .hero-amt .v{font-size:30px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2;}
+    .hero-amt .s{font-size:12.5px;color:var(--t2);margin-top:2px;font-variant-numeric:tabular-nums;}
+    .jobform{display:none;margin:-8px 0 24px;padding:16px;background:var(--white);border:1px solid var(--border);border-radius:12px;gap:12px;align-items:flex-end;flex-wrap:wrap;}
+    .jobform.show{display:flex;}
+    .field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:200px;}
+    .field label{font-size:12px;color:var(--t2);font-weight:500;}
+    .inp{height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);background:var(--white);outline:none;width:100%;}
+    .inp:focus{border-color:var(--text);}
+    textarea.inp{height:auto;padding:10px 12px;line-height:1.7;resize:vertical;}
+
+    .grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start;}
+    .content,.side{min-width:0;}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:12px;}
+    .card + .card{margin-top:16px;}
+    .card-h{display:flex;align-items:center;gap:10px;padding:16px 20px 0;}
+    .card-t{font-size:13px;font-weight:700;flex:1;}
+    .card-b{padding:14px 20px 18px;}
+
+    /* Details */
+    .dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 24px;}
+    .dl .full{grid-column:1 / -1;}
+    .dt{font-size:12px;color:var(--t3);margin-bottom:3px;}
+    .dd{font-size:13.5px;color:var(--text);line-height:1.55;word-break:break-word;}
+    .dd.muted{color:var(--t3);}
+    .dd a{text-decoration:none;border-bottom:1px solid var(--line);}
+    .dd a:hover{border-color:var(--text);}
+
+    /* Items */
+    .cat{border-top:1px solid var(--line);}
+    .cat:first-of-type{border-top:none;}
+    .cat-h{display:flex;align-items:baseline;gap:12px;padding:14px 20px 10px;}
+    .cat-n{font-size:12px;color:var(--t3);font-weight:600;white-space:nowrap;}
+    .cat-t{font-size:14px;font-weight:600;flex:1;}
+    .cat-sum{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 8px 8px;}
+    table{width:100%;border-collapse:collapse;min-width:560px;font-variant-numeric:tabular-nums;}
+    th{padding:8px 10px;font-size:11.5px;font-weight:600;color:var(--t3);text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;}
+    th.r,td.r{text-align:right;} th.c,td.c{text-align:center;}
+    td{padding:10px 10px;font-size:13px;color:var(--t2);border-bottom:1px solid var(--line);vertical-align:top;}
+    tr:last-child td{border-bottom:none;}
+    td.no{font-size:12px;color:var(--t3);white-space:nowrap;}
+    td.desc{color:var(--text);line-height:1.55;min-width:200px;}
+    td.amt{color:var(--text);font-weight:600;white-space:nowrap;}
+    tr.sub td{background:var(--bg);font-weight:600;color:var(--text);}
+    .mlist{display:none;padding:0 16px 6px;}
+    .mi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--line);}
+    .mi-d{font-size:13.5px;line-height:1.5;}
+    .mi-no{color:var(--t3);font-size:12px;margin-right:8px;}
+    .mi-a{font-size:13.5px;font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+    .mi-s{grid-column:1 / -1;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums;}
+    .mi.sub{background:var(--bg);margin:0 -16px;padding:10px 16px;}
+    .mi.sub .mi-d{font-weight:600;}
+    .empty{padding:36px 20px;text-align:center;color:var(--t3);font-size:13px;}
+    .notes{white-space:pre-line;font-size:13.5px;line-height:1.75;color:var(--t2);}
+
+    /* Side */
+    .side{position:sticky;top:78px;}
+    .sumrow{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .sumrow span:last-child{color:var(--text);font-weight:500;}
+    .sumrow.total{border-top:1px solid var(--border);margin-top:6px;padding-top:12px;font-size:14px;color:var(--text);font-weight:600;}
+    .sumrow.total span:last-child{font-size:18px;font-weight:700;}
+    .sumrow.net{font-weight:600;color:var(--text);}
+    .sumrow.net span:last-child{font-weight:700;}
+    .next{border-color:var(--text);}
+    .next.done{border-color:var(--border);}
+    .next-t{font-size:15px;font-weight:700;margin-bottom:4px;}
+    .next-s{font-size:12.5px;color:var(--t2);line-height:1.6;margin-bottom:14px;}
+    .next-s b{color:var(--text);font-weight:600;}
+    .age-old{color:var(--red);font-weight:600;} .age-mid{color:var(--amber);font-weight:600;}
+    .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:4px 0 10px;}
+    .bar i{display:block;height:100%;background:var(--gold);}
+    .kv{display:flex;justify-content:space-between;font-size:12.5px;color:var(--t2);padding:3px 0;font-variant-numeric:tabular-nums;}
+    .kv span:last-child{color:var(--text);font-weight:600;}
+    .pulse{animation:pulse 1.2s ease-in-out 3;}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(26,24,20,.35);}70%{box-shadow:0 0 0 10px rgba(26,24,20,0);}100%{box-shadow:0 0 0 0 rgba(26,24,20,0);}}
+    .inst{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+    .inst:last-child{border-bottom:none;}
+    .inst-p{font-weight:700;min-width:42px;font-variant-numeric:tabular-nums;}
+    .inst-l{flex:1;color:var(--t2);line-height:1.5;}
+    .inst-a{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums;}
+    .hint{font-size:12px;color:var(--t3);line-height:1.6;}
+    .rel{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);text-decoration:none;}
+    .rel:last-child{border-bottom:none;}
+    .rel:hover .rel-n{text-decoration:underline;}
+    .rel-main{flex:1;min-width:0;}
+    .rel-n{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:600;}
+    .rel-s{font-size:12px;color:var(--t3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .rel-a{font-size:13px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;}
+    .rel-a small{display:block;font-size:11.5px;font-weight:500;color:var(--t3);}
+    .acts{display:flex;flex-direction:column;}
+    .act{display:flex;align-items:center;gap:10px;width:100%;padding:11px 20px;border:none;border-top:1px solid var(--line);background:none;font-size:13.5px;color:var(--text);text-decoration:none;cursor:pointer;text-align:left;}
+    .act:first-child{border-top:none;}
+    .act:hover{background:#FBFAF8;}
+    .act .ic{color:var(--t2);}
+    .act small{margin-left:auto;font-size:12px;color:var(--t3);}
+    .act.danger{color:var(--red);}
+    .act.danger .ic{color:var(--red);}
+    .meta{font-size:12px;color:var(--t3);line-height:1.8;padding:14px 4px 0;}
+
+    /* Modals */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(26,24,20,.45);z-index:200;align-items:center;justify-content:center;padding:16px;}
+    .overlay.show{display:flex;}
+    .modal{background:var(--white);border-radius:14px;width:520px;max-width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.25);}
+    .modal-h{display:flex;align-items:flex-start;gap:12px;padding:20px 22px 0;}
+    .modal-t{font-size:16px;font-weight:700;flex:1;}
+    .modal-s{font-size:12.5px;color:var(--t2);margin-top:3px;}
+    .xbtn{width:32px;height:32px;border:none;border-radius:8px;background:none;color:var(--t2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+    .xbtn:hover{background:var(--bg);color:var(--text);}
+    .modal-b{padding:16px 22px;}
+    .modal-f{display:flex;gap:8px;padding:0 22px 20px;}
+    .modal-f .btn{flex:1;height:42px;}
+    .seg{display:flex;background:var(--bg);border-radius:9px;padding:3px;gap:2px;margin-bottom:14px;}
+    .seg button{flex:1;height:32px;border:none;border-radius:7px;background:none;font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;}
+    .seg button.on{background:var(--white);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08);}
+    .opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:8px;}
+    .opt:hover{border-color:var(--t2);}
+    .opt:has(input:checked){border-color:var(--text);background:#FBFAF8;}
+    .opt input{width:16px;height:16px;accent-color:var(--text);flex-shrink:0;}
+    .opt-m{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+    .opt-s{font-size:12px;color:var(--t2);margin-top:1px;}
+    .crow{display:grid;grid-template-columns:20px 76px minmax(0,1fr) auto 28px;gap:8px;align-items:center;margin-bottom:8px;}
+    .crow input[type=radio]{width:16px;height:16px;accent-color:var(--text);}
+    .crow .inp{height:36px;padding:0 10px;font-size:13px;}
+    .crow .amt-lbl{font-size:12.5px;font-weight:600;min-width:84px;text-align:right;font-variant-numeric:tabular-nums;}
+    .addrow{width:100%;height:36px;border:1px dashed var(--border);border-radius:8px;background:none;font-size:13px;color:var(--t2);cursor:pointer;}
+    .addrow:hover{border-color:var(--text);color:var(--text);}
+    .totpct{display:flex;justify-content:space-between;margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:13px;color:var(--t2);}
+    .totpct b{color:var(--text);}
+    .msg{display:none;margin-top:10px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;}
+    .msg.show{display:block;}
+    .msg.info{background:var(--gbg);color:#7A5C1E;}
+    .msg.ok{background:var(--grbg);color:var(--green);}
+    .msg.err{background:var(--redbg);color:var(--red);}
+    .msg.warn{background:#FDF6EA;color:#8A5A12;}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);}
+    .confirm-box{background:var(--bg);border-radius:10px;padding:14px 16px;margin-bottom:16px;}
+
+    @media(max-width:1020px){
+      .grid{grid-template-columns:minmax(0,1fr);}
+      .side{position:static;}
+      .dl{grid-template-columns:repeat(2,minmax(0,1fr));}
     }
-    @media(max-width:768px){
-      .topbar{padding:0 14px;gap:6px;height:auto;min-height:52px;}
-      .tb-cust{display:none;}
-      .tb-actions .spill{display:none;}
-      .layout{display:block;}
-      .main{padding:14px 12px;border-right:none;}
-      .aside{border-top:1px solid var(--border);padding:16px 12px;}
-      .info-grid{grid-template-columns:1fr;}
-      .info-grid.cols-3{grid-template-columns:1fr;}
-      /* bigger tap targets for action items */
-      .aitem{padding:14px 13px;}
-      .aicon{width:36px;height:36px;}
-      .atext-title{font-size:14px;}
-      .atext-sub{font-size:12px;}
-      /* BOQ table scroll on mobile */
-      .boq-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-      .boq-tbl{min-width:500px;}
-      /* summary panel full width */
-      .sum-row{font-size:13px;}
-      .sum-total{font-size:18px;}
-    }
-    @media(max-width:480px){
-      .tb-docnum{font-size:12px;}
-      .info-grid{gap:8px;}
-      .panel-sec{padding:14px 12px;}
+    @media(max-width:640px){
+      .top-in{padding:0 12px;height:54px;gap:8px;}
+      .crumb{display:none;}
+      .top .btn .lbl{display:none;}
+      .wrap{padding:18px 12px 48px;}
+      .hero{flex-direction:column;align-items:flex-start;gap:14px;margin-bottom:18px;}
+      .hero-amt{text-align:left;}
+      .h1{font-size:21px;}
+      .hero-amt .v{font-size:24px;}
+      .dl{grid-template-columns:1fr 1fr;gap:14px 16px;}
+      .card-h{padding:14px 16px 0;} .card-b{padding:12px 16px 16px;}
+      .cat-h{padding:12px 16px 8px;}
+      .act{padding:12px 16px;}
+      .tbl-wrap{display:none;} .mlist{display:block;}
+      .crow{grid-template-columns:20px 64px minmax(0,1fr) 28px;}
+      .crow .amt-lbl{display:none;}
+      .two{grid-template-columns:1fr;}
     }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <a href="/documents/dashboard" class="back" id="backLink">← กลับ</a>
-    <div class="tb-docnum">{doc.document_number}</div>
-    <div class="tb-cust">— {doc.customers?.company_name}</div>
-    <div class="tb-actions">
-      <span class={`spill spill-${sInfo.cls === 'published' ? 'pub' : (sInfo.cls === 'stale' ? 'stale' : 'draft')}`}>
-        <span class="sdot"></span>{sInfo.label}
-      </span>
-      <a href={`/documents/${id}/print`} target="_blank" class="btn btn-ol">PDF</a>
-      {canMarkPublished && (
-        <form method="POST" style="display:inline;">
-          <input type="hidden" name="action" value="publish"/>
-          <button type="submit" class="btn btn-green"
-            onclick="return confirm('ออกเอกสารนี้?')">ออกเอกสาร</button>
-        </form>
-      )}
-      {canDelete(user) && (
-        <form method="POST" style="display:inline;">
-          <input type="hidden" name="action" value="delete"/>
-          <button type="submit" class="btn btn-red"
-            onclick={`return confirm('ลบเอกสาร ${doc.document_number}? จะย้ายไปที่ถังขยะของลูกค้า สามารถกู้คืนได้ภายใน 45 วัน')`}>ลบ</button>
-        </form>
+  <header class="top">
+    <div class="top-in">
+      <a href="/documents/dashboard" class="back" id="backLink"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>เอกสาร</a>
+      <div class="crumb"><span>/</span><b class="mono">{doc.document_number}</b></div>
+      <span class="spacer"></span>
+      <a href={`/documents/${id}/print`} target="_blank" class="btn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg><span class="lbl">พิมพ์ / PDF</span></a>
+      {canEdit(user) && (
+        <a href={`/documents/${id}/edit`} class="btn btn-dark"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg><span class="lbl">แก้ไข</span></a>
       )}
     </div>
-  </div>
+  </header>
 
-  <div class="layout">
-    <div class="main">
-      {(sourceDoc || existingTx.length > 0) && (
-        <div class="chain">
-          {sourceDoc && (
-            <span>สร้างจาก <a href={`/documents/${sourceDoc.id}`}><span class="mono">{sourceDoc.document_number}</span> · {sourceDoc.document_types?.name_th}</a></span>
-          )}
-          {existingTx.map((t: any) => (
-            <span>ใบกำกับภาษี <a class="tx" href={`/documents/${t.id}`}>✓ <span class="mono">{t.document_number}</span></a></span>
-          ))}
+  <main class="wrap">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow">
+          <span class="docno">{doc.document_number}</span>
+          <span class={`t-${code}`}>{typeLabel}</span>
+          <span class={`pill ws-${ws}`}><span class="dot"></span>{wl}</span>
+          {idleNote && <span style="color:var(--amber);font-size:12.5px;">{idleNote}</span>}
         </div>
-      )}
-      <div class={`info-grid${(doc as any).jobs ? ' cols-3' : ''}`}>
-        <div class="icard">
-          <div class="icard-lbl">ลูกค้า</div>
-          <div class="icard-val">{doc.customers?.company_name}</div>
-          <div class="icard-sub">{doc.customers?.customer_code}<br/>{doc.customers?.address}</div>
-        </div>
-        {(doc as any).jobs && (
-          <div class="icard job-icard" id="jobIcard" style="background:var(--gbg);border-color:var(--gborder);">
-            <div class="job-static">
-              <div class="icard-lbl" style="color:#8B6914;">ชื่องาน</div>
-              <div class="icard-val" style="color:#7A5C1E;">{(doc as any).jobs?.name}</div>
-              {(doc as any).jobs?.description && <div class="icard-sub">{(doc as any).jobs?.description}</div>}
-              <button type="button" class="job-edit-btn" onclick="document.getElementById('jobIcard').classList.add('editing')">แก้ไข</button>
-            </div>
-            <form method="POST" class="job-edit-form">
-              <input type="hidden" name="action" value="rename_job"/>
-              <div class="jfield">
-                <label>ชื่องาน</label>
-                <input class="jinp" type="text" name="job_name" value={(doc as any).jobs?.name} required/>
-              </div>
-              <div class="jfield">
-                <label>รายละเอียด (ไม่บังคับ)</label>
-                <input class="jinp" type="text" name="job_description" value={(doc as any).jobs?.description || ''}/>
-              </div>
-              <div class="jbtns">
-                <button type="submit" class="jbtn-save">บันทึก</button>
-                <button type="button" class="jbtn-cancel" onclick="document.getElementById('jobIcard').classList.remove('editing')">ยกเลิก</button>
-              </div>
-            </form>
+        <h1 class="h1">{cust.company_name || 'ไม่ระบุลูกค้า'}</h1>
+        {job ? (
+          <div class="jobline">
+            <span>{job.name}</span>
+            <button type="button" class="linkbtn" onclick="document.getElementById('jobForm').classList.toggle('show')">แก้ไขชื่องาน</button>
           </div>
-        )}
-        <div class="icard">
-          <div class="icard-lbl">ข้อมูลเอกสาร</div>
-          <div class="icard-val">{doc.document_types?.name_th}</div>
-          <div class="icard-sub">
-            {doc.document_types?.code === 'TAX_INVOICE' ? (
-              <div style="margin-top:4px;">
-                <div style="font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">วันที่ออกเอกสาร</div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <input type="date" id="txDateInp" value={doc.issue_date||''} onchange="saveTxDate(this.value)"
-                    style="font-size:12.5px;font-family:inherit;font-weight:600;border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);background:var(--white);cursor:pointer;outline:none;"/>
-                  <span id="txDateHint" style="font-size:11px;color:var(--green);font-weight:600;"></span>
-                </div>
-              </div>
-            ) : (
-              <span>วันที่ออก: {thaiDate(doc.issue_date)}</span>
-            )}<br/>
-            {doc.due_date ? `วันครบกำหนด: ${thaiDate(doc.due_date)}` : ''}
-            {doc.reference_po ? `P/O: ${doc.reference_po}` : ''}
-          </div>
-        </div>
+        ) : null}
       </div>
-      {doc.payment_condition && (
-        <div class="icard icard-pay">
-          <div class="icard-lbl">เงื่อนไขการชำระเงิน</div>
-          <div class="icard-sub" style="white-space:pre-line;">{doc.payment_condition}</div>
-        </div>
-      )}
+      <div class="hero-amt">
+        <div class="l">ยอดรวมทั้งสิ้น</div>
+        <div class="v">฿{money(doc.total_amount)}</div>
+        {W.applies && code !== 'TAX_INVOICE' && <div class="s">โอนสุทธิหลังหัก ณ ที่จ่าย ฿{money(W.net)}</div>}
+      </div>
+    </section>
 
-      {doc.categories.length === 0 ? (
-        <div class="no-items">ยังไม่มีรายการงานในเอกสารนี้</div>
-      ) : (
-        doc.categories.map((cat: any) => {
-          const items = itemsByCategory[cat.id] || [];
-          const catTotal = items.filter((i:any)=>!i.is_subtotal_row).reduce((s:number,i:any)=>s+Number(i.amount||0),0);
-          return (
-            <div class="cat-sec">
-              <div class="cat-hd">
-                <span class="cat-badge">หมวด {cat.category_number}</span>
-                {cat.name_th}
-                <span class="cat-total">฿{money(catTotal)}</span>
+    {job && (
+      <form method="POST" class="jobform" id="jobForm">
+        <input type="hidden" name="action" value="rename_job"/>
+        <div class="field"><label>ชื่องาน</label><input class="inp" type="text" name="job_name" value={job.name} required/></div>
+        <div class="field"><label>รายละเอียด (ไม่บังคับ)</label><input class="inp" type="text" name="job_description" value={job.description || ''}/></div>
+        <button type="submit" class="btn btn-dark">บันทึก</button>
+        <button type="button" class="btn" onclick="document.getElementById('jobForm').classList.remove('show')">ยกเลิก</button>
+      </form>
+    )}
+
+    <div class="grid">
+      <div class="content">
+        <section class="card">
+          <div class="card-h"><div class="card-t">ข้อมูลเอกสาร</div></div>
+          <div class="card-b">
+            <div class="dl">
+              <div>
+                <div class="dt">{code === 'TAX_INVOICE' ? 'วันที่ในใบกำกับภาษี' : 'วันที่ออก'}</div>
+                <div class="dd">{thaiDate(doc.issue_date)}</div>
               </div>
-              <div class="tbl-wrap">
-                <table>
-                  <thead>
-                    {doc.items.some((i:any)=>(i.material_cost||0)>0||(i.labor_cost||0)>0) ? (
-                      <tr>
-                        <th style="width:36px;">#</th><th style="width:44px;">รหัส</th>
-                        <th>รายการ</th><th class="r" style="width:50px;">จำนวน</th>
-                        <th class="c" style="width:44px;">หน่วย</th>
-                        <th class="r" style="width:72px;">วัสดุ</th>
-                        <th class="r" style="width:72px;">รวมวัสดุ</th>
-                        <th class="r" style="width:72px;">แรงงาน</th>
-                        <th class="r" style="width:72px;">รวมแรงงาน</th>
-                        <th class="r" style="width:80px;">รวม</th>
-                      </tr>
-                    ) : (
-                      <tr>
-                        <th style="width:40px;">#</th><th style="width:48px;">รหัส</th>
-                        <th>รายการ</th><th class="r" style="width:56px;">จำนวน</th>
-                        <th class="c" style="width:48px;">หน่วย</th>
-                        <th class="r" style="width:84px;">หน่วยละ</th>
-                        <th class="r" style="width:96px;">จำนวนเงิน</th>
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody>
-                    {items.map((item: any) => {
-                      if (item.is_subtotal_row) return (
-                        <tr class="sub-row">
-                          <td colspan="6" class="sub-lbl">{item.description_th}</td>
-                          <td class="sub-val">฿{money(item.amount)}</td>
-                        </tr>
-                      );
-                      return (
+              <div>
+                <div class="dt">{code === 'QUOTATION' ? 'ราคามีผลถึง' : 'กำหนดชำระ'}</div>
+                <div class={`dd${doc.due_date ? '' : ' muted'}`}>{doc.due_date ? thaiDate(doc.due_date) : 'ไม่ระบุ'}</div>
+              </div>
+              <div>
+                <div class="dt">อ้างอิง P/O</div>
+                <div class={`dd${doc.reference_po ? '' : ' muted'}`}>{doc.reference_po || 'ไม่ระบุ'}</div>
+              </div>
+              <div>
+                <div class="dt">รหัสลูกค้า</div>
+                <div class="dd mono">{cust.customer_code || '—'}</div>
+              </div>
+              <div>
+                <div class="dt">เลขประจำตัวผู้เสียภาษี</div>
+                <div class={`dd mono${cust.tax_id ? '' : ' muted'}`}>{cust.tax_id || 'ยังไม่มีข้อมูล'}</div>
+              </div>
+              <div>
+                <div class="dt">โทรศัพท์</div>
+                <div class={`dd${cust.phone ? '' : ' muted'}`}>{cust.phone || '—'}</div>
+              </div>
+              <div class="full">
+                <div class="dt">ที่อยู่</div>
+                <div class={`dd${cust.address ? '' : ' muted'}`}>{cust.address || 'ยังไม่มีข้อมูล'}</div>
+              </div>
+              {cust.id && (
+                <div class="full"><div class="dd"><a href={`/documents/customers/${cust.id}`}>ดูข้อมูลลูกค้า</a> <span style="color:var(--line);margin:0 6px;">|</span> <a href={`/documents/dashboard?cust=${cust.id}`}>เอกสารทั้งหมดของลูกค้านี้</a></div></div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-h"><div class="card-t">รายการ</div><span class="hint">{doc.items.filter((i: any) => !i.is_subtotal_row).length} รายการ</span></div>
+          <div style="padding-top:6px;">
+            {doc.categories.length === 0 ? (
+              <div class="empty">ยังไม่มีรายการในเอกสารนี้</div>
+            ) : doc.categories.map((cat: any) => {
+              const items = itemsByCategory[cat.id] || [];
+              const catTotal = items.filter((i: any) => !i.is_subtotal_row).reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+              return (
+                <div class="cat">
+                  <div class="cat-h">
+                    <span class="cat-n">หมวด {cat.category_number}</span>
+                    <span class="cat-t">{cat.name_th}</span>
+                    <span class="cat-sum">฿{money(catTotal)}</span>
+                  </div>
+                  <div class="tbl-wrap">
+                    <table>
+                      <thead>
                         <tr>
-                          <td class="mono">{item.item_number}</td>
-                          <td class="mono c">{item.item_code||''}</td>
-                          <td class="desc">{item.description_th}</td>
-                          <td class="r">{item.quantity>0?item.quantity:'—'}</td>
-                          <td class="c">{item.unit_th}</td>
-                          {doc.items.some((i:any)=>(i.material_cost||0)>0||(i.labor_cost||0)>0) ? (
+                          <th style="width:48px;">ลำดับ</th>
+                          <th style="width:56px;">รหัส</th>
+                          <th>รายการ</th>
+                          <th class="r" style="width:60px;">จำนวน</th>
+                          <th class="c" style="width:56px;">หน่วย</th>
+                          {hasMatLab ? (
                             <>
-                              <td class="r">{item.material_cost>0?money(item.material_cost):'—'}</td>
-                              <td class="r">{item.material_total>0?money(item.material_total):'—'}</td>
-                              <td class="r">{item.labor_cost>0?money(item.labor_cost):'—'}</td>
-                              <td class="r">{item.labor_total>0?money(item.labor_total):'—'}</td>
+                              <th class="r">วัสดุ</th>
+                              <th class="r">รวมวัสดุ</th>
+                              <th class="r">แรงงาน</th>
+                              <th class="r">รวมแรงงาน</th>
                             </>
                           ) : (
-                            <td class="r">{item.unit_price>0?money(item.unit_price):'—'}</td>
+                            <th class="r" style="width:100px;">หน่วยละ</th>
                           )}
-                          <td class="r">{item.amount>0?money(item.amount):'—'}</td>
+                          <th class="r" style="width:110px;">จำนวนเงิน</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })
-      )}
-      {doc.notes && (
-        <div class="notes-box">
-          <div class="notes-lbl">หมายเหตุ</div>
-          <div class="notes-txt">{doc.notes}</div>
-        </div>
-      )}
-    </div>
+                      </thead>
+                      <tbody>
+                        {items.map((item: any) => item.is_subtotal_row ? (
+                          <tr class="sub">
+                            <td colspan={itemCols - 1} class="r">{item.description_th}</td>
+                            <td class="r amt">{money(item.amount)}</td>
+                          </tr>
+                        ) : (
+                          <tr>
+                            <td class="no">{item.item_number}</td>
+                            <td class="no">{item.item_code || ''}</td>
+                            <td class="desc">{item.description_th}</td>
+                            <td class="r">{item.quantity > 0 ? Number(item.quantity).toLocaleString('th-TH') : '—'}</td>
+                            <td class="c">{item.unit_th}</td>
+                            {hasMatLab ? (
+                              <>
+                                <td class="r">{item.material_cost > 0 ? money(item.material_cost) : '—'}</td>
+                                <td class="r">{item.material_total > 0 ? money(item.material_total) : '—'}</td>
+                                <td class="r">{item.labor_cost > 0 ? money(item.labor_cost) : '—'}</td>
+                                <td class="r">{item.labor_total > 0 ? money(item.labor_total) : '—'}</td>
+                              </>
+                            ) : (
+                              <td class="r">{item.unit_price > 0 ? money(item.unit_price) : '—'}</td>
+                            )}
+                            <td class="r amt">{item.amount > 0 ? money(item.amount) : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="mlist">
+                    {items.map((item: any) => item.is_subtotal_row ? (
+                      <div class="mi sub"><div class="mi-d">{item.description_th}</div><div class="mi-a">{money(item.amount)}</div></div>
+                    ) : (
+                      <div class="mi">
+                        <div class="mi-d"><span class="mi-no">{item.item_number}</span>{item.description_th}</div>
+                        <div class="mi-a">{item.amount > 0 ? money(item.amount) : '—'}</div>
+                        <div class="mi-s">
+                          {item.quantity > 0 ? `${Number(item.quantity).toLocaleString('th-TH')} ${item.unit_th || ''}` : ''}
+                          {hasMatLab
+                            ? `${item.material_cost > 0 ? ` · วัสดุ ${money(item.material_cost)}` : ''}${item.labor_cost > 0 ? ` · แรงงาน ${money(item.labor_cost)}` : ''}`
+                            : (item.unit_price > 0 ? ` × ${money(item.unit_price)}` : '')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-    <div class="aside">
-      <div class="panel-sec">
-        <div class="panel-title">สรุปราคา</div>
-        <div class="sum-row"><span class="sum-lbl">รวมจำนวนเงิน</span><span class="sum-val">฿{money(doc.subtotal)}</span></div>
-        {doc.discount_design>0 && <div class="sum-row"><span class="sum-lbl">ส่วนลดค่าแบบ</span><span class="sum-val">-฿{money(doc.discount_design)}</span></div>}
-        {doc.discount_trade>0 && <div class="sum-row"><span class="sum-lbl">ส่วนลดการค้า</span><span class="sum-val">-฿{money(doc.discount_trade)}</span></div>}
-        <div class="sum-row"><span class="sum-lbl">ราคาก่อน VAT</span><span class="sum-val">฿{money(doc.price_before_vat)}</span></div>
-        <div class="sum-row"><span class="sum-lbl">VAT 7%</span><span class="sum-val">฿{money(doc.vat_amount)}</span></div>
-        <div class="sum-row total">
-          <span class="sum-lbl" style="font-weight:700;font-size:13px;">ยอดรวมทั้งสิ้น</span>
-          <span class="sum-val big">฿{money(doc.total_amount)}</span>
-        </div>
-        {W.applies ? (
-          <>
-            <div class="sum-row">
-              <span class="sum-lbl">หัก ณ ที่จ่าย 3%</span>
-              <span class="sum-val">-฿{money(W.wht)}</span>
-            </div>
-            <div class="sum-row" style="border-top:2px solid var(--text);padding-top:10px;margin-top:4px;">
-              <span class="sum-lbl" style="font-weight:700;font-size:13px;">ยอดชำระสุทธิ</span>
-              <span class="sum-val" style="font-size:18px;font-weight:700;">฿{money(W.net)}</span>
-            </div>
-          </>
-        ) : (
-          <div class="sum-row"><span class="sum-lbl" style="color:var(--t3);">ไม่หัก ณ ที่จ่าย</span><span class="sum-val"></span></div>
+        {doc.notes && (
+          <section class="card">
+            <div class="card-h"><div class="card-t">หมายเหตุ</div></div>
+            <div class="card-b"><div class="notes">{doc.notes}</div></div>
+          </section>
         )}
-
       </div>
 
-      <div class="inst-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div class="inst-title" style="margin-bottom:0;">งวดการชำระเงิน</div>
-            <button onclick="toggleInstEdit()" id="instEditBtn" style="font-size:10px;font-weight:600;color:var(--gold);background:none;border:1px solid var(--gborder);border-radius:4px;cursor:pointer;font-family:inherit;padding:2px 8px;">แก้ไข</button>
-          </div>
-          <div id="instPreview">
-            {installments.length > 0 ? installments.map((inst: any) => (
-              <div class="inst-row">
-                <span class="inst-pct">{inst.pct}%</span>
-                <span class="inst-label">{inst.label}</span>
-                <span class="inst-amount">฿{money(inst.amount)}</span>
+      <aside class="side">
+        {/* Next step: depends on the kind of document */}
+        {code === 'INVOICE' && canIssueTx && (
+          <section class="card next">
+            <div class="card-b" style="padding-top:18px;">
+              <div class="next-t">รอรับชำระเงิน</div>
+              <div class="next-s">
+                วางบิลเมื่อ {thaiDate(doc.issue_date)} · <span class={ageDays > 60 ? 'age-old' : (ageDays > 30 ? 'age-mid' : '')}>ค้าง {ageDays} วัน</span><br/>
+                ลูกค้าต้องโอน <b>฿{money(W.applies ? W.net : doc.total_amount)}</b>{W.applies ? ' (หัก ณ ที่จ่าย 3% แล้ว)' : ''}
               </div>
-            )) : (
-              <div style="font-size:11.5px;color:var(--t3);padding:4px 0 8px;">ยังไม่มีเงื่อนไข — กด "แก้ไข" เพื่อเพิ่ม</div>
+              <button type="button" class="btn btn-dark btn-block" id="txBtn" onclick="openTxModal()">ลูกค้าชำระแล้ว ออกใบกำกับภาษี</button>
+            </div>
+          </section>
+        )}
+        {code === 'INVOICE' && !canIssueTx && existingTx.length > 0 && (
+          <section class="card next done">
+            <div class="card-b" style="padding-top:18px;">
+              <div class="next-t">ออกใบกำกับภาษีแล้ว</div>
+              <div class="next-s">ใบแจ้งหนี้นี้ได้รับชำระและออกใบกำกับภาษีเรียบร้อย</div>
+              {existingTx.map((t: any) => (
+                <a href={`/documents/${t.id}`} class="btn btn-block">ดู {t.document_number}</a>
+              ))}
+            </div>
+          </section>
+        )}
+        {code === 'TAX_INVOICE' && (
+          <section class="card next done">
+            <div class="card-b" style="padding-top:18px;">
+              <div class="next-t">วันที่รับชำระเงิน</div>
+              <div class="next-s">วันที่ในใบกำกับภาษีต้องเป็นวันที่ลูกค้าชำระเงิน แก้ไขได้ที่นี่</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="date" class="inp" id="txDateInp" value={doc.issue_date || ''} onchange="saveTxDate(this.value)"/>
+              </div>
+              <div class="hint" id="txDateHint" style="margin-top:6px;"></div>
+            </div>
+          </section>
+        )}
+        {code !== 'INVOICE' && code !== 'TAX_INVOICE' && (
+          <section class="card next">
+            <div class="card-b" style="padding-top:18px;">
+              <div class="next-t">{childInv.length ? (remaining > 1 ? 'วางบิลงวดถัดไป' : 'วางบิลครบแล้ว') : 'วางบิลงวดแรก'}</div>
+              <div class="kv"><span>วางบิลแล้ว</span><span>฿{money(billed)} ({billedPct}%)</span></div>
+              <div class="bar"><i style={`width:${billedPct}%`}></i></div>
+              <div class="kv" style="margin-bottom:14px;"><span>ยังไม่วางบิล</span><span>฿{money(remaining)}</span></div>
+              <button type="button" class="btn btn-dark btn-block" id="genInstBtn">สร้างใบแจ้งหนี้งวด</button>
+            </div>
+          </section>
+        )}
+
+        <section class="card">
+          <div class="card-h"><div class="card-t">สรุปยอด</div></div>
+          <div class="card-b">
+            <div class="sumrow"><span>รวมจำนวนเงิน</span><span>฿{money(doc.subtotal)}</span></div>
+            {doc.discount_design > 0 && <div class="sumrow"><span>ส่วนลดค่าแบบ</span><span>-฿{money(doc.discount_design)}</span></div>}
+            {doc.discount_trade > 0 && <div class="sumrow"><span>ส่วนลดการค้า</span><span>-฿{money(doc.discount_trade)}</span></div>}
+            <div class="sumrow"><span>ราคาก่อน VAT</span><span>฿{money(doc.price_before_vat)}</span></div>
+            <div class="sumrow"><span>VAT 7%</span><span>฿{money(doc.vat_amount)}</span></div>
+            <div class="sumrow total"><span>ยอดรวมทั้งสิ้น</span><span>฿{money(doc.total_amount)}</span></div>
+            {W.applies ? (
+              <>
+                <div class="sumrow"><span>หัก ณ ที่จ่าย 3%</span><span>-฿{money(W.wht)}</span></div>
+                <div class="sumrow net"><span>ยอดชำระสุทธิ</span><span>฿{money(W.net)}</span></div>
+              </>
+            ) : (
+              <div class="sumrow"><span>ไม่หัก ณ ที่จ่าย</span><span></span></div>
             )}
           </div>
-          <div id="instEditBox" style="display:none;margin-bottom:10px;">
-            <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">เงื่อนไขการชำระเงิน</div>
-            <textarea id="instEditTA" rows="5" style="width:100%;padding:8px 10px;font-size:12px;font-family:inherit;border:1.5px solid var(--gborder);border-radius:4px;background:var(--white);resize:vertical;line-height:1.8;">{doc.payment_condition||''}</textarea>
-            <div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.6;">พิมพ์แต่ละงวดในบรรทัดใหม่ เช่น:<br/>30% เมื่อตกลงทำสัญญา<br/>70% เมื่อส่งมอบงาน</div>
-            <button onclick="saveInstCondition()" style="margin-top:8px;width:100%;padding:8px;background:var(--text);color:var(--bg);border:none;border-radius:4px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;">บันทึกเงื่อนไข</button>
-          </div>
-          {(doc as any).linked_invoices && (doc as any).linked_invoices.length > 0 && (
-            <div style="margin-bottom:10px;padding-top:10px;border-top:1px dashed var(--gborder);">
-              <div style="font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;margin-bottom:8px;">ใบแจ้งหนี้ที่ออกแล้ว</div>
-              {(doc as any).linked_invoices.map((inv: any) => (
-                <a href={`/documents/${inv.id}`} style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--gborder);text-decoration:none;">
-                  <div>
-                    <div style="font-size:12px;font-weight:600;color:var(--text);font-family:monospace;">{inv.document_number}</div>
-                    <div style="font-size:10.5px;color:var(--t3);">{inv.payment_condition || (inv.document_types?.code === 'TAX_INVOICE' ? 'ใบกำกับภาษี' : '')}</div>
-                    <div style="font-size:10.5px;color:var(--t3);">วันที่ออก: {thaiDate(inv.issue_date)}</div>
+        </section>
+
+        {code !== 'TAX_INVOICE' && (
+          <section class="card">
+            <div class="card-h">
+              <div class="card-t">เงื่อนไขการชำระเงิน</div>
+              <button type="button" class="linkbtn" id="instEditBtn" onclick="toggleInstEdit()">แก้ไข</button>
+            </div>
+            <div class="card-b">
+              <div id="instPreview">
+                {installments.length > 0 ? installments.map((inst: any) => (
+                  <div class="inst"><span class="inst-p">{inst.pct}%</span><span class="inst-l">{inst.label}</span><span class="inst-a">฿{money(inst.amount)}</span></div>
+                )) : (doc.payment_condition ? (
+                  <div class="notes" style="font-size:13px;">{doc.payment_condition}</div>
+                ) : (
+                  <div class="hint">ยังไม่มีเงื่อนไข กด "แก้ไข" เพื่อเพิ่ม</div>
+                ))}
+              </div>
+              <div id="instEditBox" style="display:none;">
+                <textarea id="instEditTA" class="inp" rows="5">{doc.payment_condition || ''}</textarea>
+                <div class="hint" style="margin:6px 0 10px;">พิมพ์แต่ละงวดในบรรทัดใหม่ เช่น<br/>30% เมื่อตกลงทำสัญญา<br/>70% เมื่อส่งมอบงาน</div>
+                <button type="button" class="btn btn-dark btn-block" onclick="saveInstCondition()">บันทึกเงื่อนไข</button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {(sourceDoc || linked.length > 0) && (
+          <section class="card">
+            <div class="card-h"><div class="card-t">เอกสารที่เกี่ยวข้อง</div></div>
+            <div class="card-b" style="padding-top:6px;">
+              {sourceDoc && (
+                <a class="rel" href={`/documents/${sourceDoc.id}`}>
+                  <div class="rel-main"><div class="rel-n">{sourceDoc.document_number}</div><div class="rel-s">เอกสารต้นทาง · {SHORT[sourceDoc.document_types?.code] || sourceDoc.document_types?.name_th}</div></div>
+                </a>
+              )}
+              {linked.map((inv: any) => (
+                <a class="rel" href={`/documents/${inv.id}`}>
+                  <div class="rel-main">
+                    <div class="rel-n">{inv.document_number}</div>
+                    <div class="rel-s">{SHORT[inv.document_types?.code] || ''}{inv.payment_condition ? ` · ${inv.payment_condition.split('\n')[0]}` : ''}</div>
                   </div>
-                  <div style="text-align:right;flex-shrink:0;padding-left:8px;">
-                    <div style="font-size:12px;font-weight:600;color:var(--text);">฿{money(inv.total_amount)}</div>
-                    <div style={`font-size:10px;font-weight:600;color:${statusInfo(inv.status).cls==='published'?'var(--green)':(statusInfo(inv.status).cls==='stale'?'#C9822D':'var(--t3)')}`}>{statusInfo(inv.status).label}</div>
-                  </div>
+                  <div class="rel-a">฿{money(inv.total_amount)}<small>{thaiDate(inv.issue_date)}</small></div>
                 </a>
               ))}
             </div>
-          )}
-          <button class="inst-gen-btn" id="genInstBtn">สร้างใบแจ้งหนี้งวด →</button>
-        </div>
-
-      <hr class="divider"/>
-
-      <div class="panel-sec">
-        <div class="panel-title">การดำเนินการ</div>
-        {doc.status==='draft' && (
-          <div class="warn-box"><strong>เอกสารนี้เป็น Draft</strong>ยังไม่ได้ออกเอกสารอย่างเป็นทางการ</div>
+          </section>
         )}
-        <div class="action-list">
-          <a href={`/documents/${id}/print`} target="_blank" class="aitem">
-            <div class="aicon aicon-pdf">PDF</div>
-            <div><div class="atext-title">Preview & พิมพ์</div><div class="atext-sub">เปิดหน้า PDF</div></div>
-          </a>
-          <button onclick="copyLink()" class="aitem">
-            <div class="aicon aicon-url">URL</div>
-            <div><div class="atext-title">คัดลอกลิงก์</div><div class="atext-sub" id="copy-hint">ส่งให้ลูกค้าดูเอกสาร</div></div>
-          </button>
-          {existingTx.map((t: any) => (
-            <a href={`/documents/${t.id}`} class="aitem tx-cta">
-              <div class="aicon" style="background:#fff;color:#2D7A4F;font-size:11px;font-weight:700;">TX</div>
-              <div><div class="atext-title">ดูใบกำกับภาษี</div><div class="atext-sub" style="font-family:monospace;">{t.document_number}</div></div>
-            </a>
-          ))}
-          {canIssueTx && (
-            <button onclick="createTaxInvoice()" class="aitem tx-cta" id="txBtn">
-              <div class="aicon" style="background:#EDF7F0;color:#2D7A4F;font-size:11px;font-weight:700;">TX</div>
-              <div><div class="atext-title">ออกใบกำกับภาษี</div><div class="atext-sub" id="tx-hint">สร้างใบเสร็จรับเงิน/ใบกำกับภาษี</div></div>
-            </button>
-          )}
-          {canEdit(user) && (
-            <a href={`/documents/${id}/edit`} class="aitem">
-              <div class="aicon aicon-edit">✎</div>
-              <div><div class="atext-title">แก้ไขเอกสาร</div><div class="atext-sub">แก้ไขรายการและข้อมูล</div></div>
-            </a>
-          )}
-          {canMarkPublished && (
-            <form method="POST">
-              <input type="hidden" name="action" value="publish"/>
-              <button type="submit" class="aitem" style="background:var(--grbg);border-color:var(--grborder);"
-                onclick="return confirm('ออกเอกสารนี้?')">
-                <div class="aicon aicon-pub">✓</div>
-                <div><div class="atext-title" style="color:var(--green);">ออกเอกสาร</div><div class="atext-sub">เปลี่ยนสถานะเป็น "เผยแพร่แล้ว"</div></div>
-              </button>
-            </form>
-          )}
-          {canDelete(user) && (
-            <form method="POST">
-              <input type="hidden" name="action" value="delete"/>
-              <button type="submit" class="aitem danger"
-                onclick={`return confirm('ลบเอกสาร ${doc.document_number}? จะย้ายไปที่ถังขยะของลูกค้า สามารถกู้คืนได้ภายใน 45 วัน')`}>
-                <div class="aicon aicon-del">🗑</div>
-                <div><div class="atext-title" style="color:var(--red);">ลบเอกสาร</div><div class="atext-sub">ย้ายไปถังขยะ กู้คืนได้ภายใน 45 วัน</div></div>
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
 
-      <hr class="divider"/>
-      <div class="panel-title">ข้อมูลเพิ่มเติม</div>
-      <div class="meta-info">
-        สร้างโดย: {doc.tnc_users?.full_name||'—'}<br/>
-        ประเภท: {doc.document_types?.name_th}<br/>
-        ID: <span style="font-family:monospace;font-size:10px;">{id?.substring(0,8)}...</span>
+        <section class="card">
+          <div class="acts">
+            <button type="button" class="act" onclick="copyLink()">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+              คัดลอกลิงก์ให้ลูกค้า<small id="copy-hint"></small>
+            </button>
+            <a href={`/documents/${id}/print`} target="_blank" class="act">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg>
+              พิมพ์ / บันทึก PDF
+            </a>
+            {canEdit(user) && (
+              <a href={`/documents/${id}/edit`} class="act">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>
+                แก้ไขเอกสาร
+              </a>
+            )}
+            {canMarkPublished && (
+              <form method="POST">
+                <input type="hidden" name="action" value="publish"/>
+                <button type="submit" class="act" onclick="return confirm('ออกเอกสารนี้?')">
+                  <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+                  ออกเอกสาร (เปลี่ยนจากร่าง)
+                </button>
+              </form>
+            )}
+            {canDelete(user) && (
+              <form method="POST">
+                <input type="hidden" name="action" value="delete"/>
+                <button type="submit" class="act danger" onclick={`return confirm('ลบเอกสาร ${doc.document_number}? จะย้ายไปถังขยะ กู้คืนได้ภายใน 45 วัน')`}>
+                  <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+                  ลบเอกสาร<small>กู้คืนได้ภายใน 45 วัน</small>
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+        <div class="meta">
+          สร้างโดย {doc.tnc_users?.full_name || '—'}<br/>
+          {doc.document_types?.name_th} · <span class="mono">{id?.substring(0, 8)}</span>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  {canIssueTx && (
+    <div class="overlay" id="txModal">
+      <div class="modal" style="width:440px;">
+        <div class="modal-h">
+          <div style="flex:1;"><div class="modal-t">ออกใบกำกับภาษี</div><div class="modal-s">จาก {doc.document_number} · {cust.company_name}</div></div>
+          <button type="button" class="xbtn" aria-label="ปิด" onclick="closeModal('txModal')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <div class="modal-b">
+          <div class="confirm-box">
+            <div class="kv"><span>ยอดรวมทั้งสิ้น</span><span>฿{money(doc.total_amount)}</span></div>
+            {W.applies && <div class="kv"><span>หัก ณ ที่จ่าย 3%</span><span>-฿{money(W.wht)}</span></div>}
+            {W.applies && <div class="kv"><span>ลูกค้าโอนสุทธิ</span><span>฿{money(W.net)}</span></div>}
+          </div>
+          <div class="field">
+            <label for="txPayDate">วันที่ลูกค้าชำระเงิน (จะเป็นวันที่ในใบกำกับภาษี)</label>
+            <input type="date" class="inp" id="txPayDate" value={todayIso}/>
+          </div>
+          <div class="hint" style="margin-top:8px;">เลขที่ใบกำกับภาษีจะถูกใช้ถาวรและยกเลิกไม่ได้ กรุณาตรวจสอบยอดและวันที่ก่อนยืนยัน</div>
+          <div class="msg" id="txMsg"></div>
+        </div>
+        <div class="modal-f">
+          <button type="button" class="btn" onclick="closeModal('txModal')">ยกเลิก</button>
+          <button type="button" class="btn btn-dark" id="txConfirm" onclick="createTaxInvoice()">ยืนยันออกใบกำกับภาษี</button>
+        </div>
       </div>
     </div>
-  </div>
+  )}
 
-  <div class="modal-overlay" id="instModal">
-    <div class="modal" style="width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <div class="modal-title">สร้างใบแจ้งหนี้งวด</div>
-        <button onclick="document.getElementById('instModal').classList.remove('show')" style="background:none;border:none;font-size:20px;color:var(--t3);cursor:pointer;line-height:1;">×</button>
+  <div class="overlay" id="instModal">
+    <div class="modal">
+      <div class="modal-h">
+        <div style="flex:1;"><div class="modal-t">สร้างใบแจ้งหนี้งวด</div><div class="modal-s" id="instModalSub"></div></div>
+        <button type="button" class="xbtn" aria-label="ปิด" onclick="closeModal('instModal')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
-      <div class="modal-sub" id="instModalSub"></div>
-      <!-- Tabs -->
-      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-bottom:14px;" id="instTabs">
-        <button onclick="switchInstTab('preset')" id="tabPreset" style="flex:1;padding:7px;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;border:none;background:var(--text);color:var(--bg);">ใช้เงื่อนไขเดิม</button>
-        <button onclick="switchInstTab('custom')" id="tabCustom" style="flex:1;padding:7px;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;border:none;background:var(--bg);color:var(--t2);">กำหนดเอง</button>
-      </div>
-      <!-- Preset tab -->
-      <div id="tabPresetContent">
-        <div id="presetList"></div>
-      </div>
-      <!-- Custom tab -->
-      <div id="tabCustomContent" style="display:none;">
-        <div id="customRows" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-        <button onclick="addInstRow()" style="width:100%;padding:7px;background:var(--bg);border:1px dashed var(--border);border-radius:4px;font-size:12px;color:var(--t2);cursor:pointer;font-family:inherit;">+ เพิ่มงวด</button>
-        <div id="instSummary" style="margin-top:10px;padding:8px 12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--t2);display:flex;justify-content:space-between;">
-          <span>รวม</span><span id="instTotalPct" style="font-weight:700;">0%</span>
+      <div class="modal-b">
+        <div class="seg" id="instTabs">
+          <button type="button" id="tabPreset" onclick="switchInstTab('preset')">ตามเงื่อนไขเดิม</button>
+          <button type="button" id="tabCustom" onclick="switchInstTab('custom')">กำหนดเอง</button>
         </div>
-        <div id="instWarning" style="display:none;margin-top:6px;padding:7px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;font-size:11.5px;color:var(--red);"></div>
-      </div>
-      <!-- Date fields -->
-      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b2);display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:5px;">วันที่ออกใบแจ้งหนี้</div>
-          <input type="date" id="instIssueDate" class="inp" style="width:100%;padding:8px 10px;font-size:12.5px;font-family:inherit;border:1.5px solid var(--border);border-radius:5px;background:var(--bg);"/>
+        <div id="tabPresetContent"><div id="presetList"></div></div>
+        <div id="tabCustomContent" style="display:none;">
+          <div id="customRows"></div>
+          <button type="button" class="addrow" onclick="addInstRow()">เพิ่มงวด</button>
+          <div class="totpct"><span>รวม</span><b id="instTotalPct">0%</b></div>
+          <div class="msg" id="instWarning"></div>
         </div>
-        <div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:5px;">กำหนดชำระ</div>
-          <input type="date" id="instDueDate" class="inp" style="width:100%;padding:8px 10px;font-size:12.5px;font-family:inherit;border:1.5px solid var(--border);border-radius:5px;background:var(--bg);"/>
+        <div class="two">
+          <div class="field" style="min-width:0;"><label for="instIssueDate">วันที่ออกใบแจ้งหนี้</label><input type="date" id="instIssueDate" class="inp"/></div>
+          <div class="field" style="min-width:0;"><label for="instDueDate">กำหนดชำระ</label><input type="date" id="instDueDate" class="inp"/></div>
         </div>
+        <div class="msg" id="instCreateStatus"></div>
       </div>
-      <div id="instCreateStatus" style="display:none;margin-top:10px;padding:8px 12px;border-radius:5px;font-size:12px;"></div>
-      <div class="modal-btns" style="margin-top:12px;">
-        <button class="modal-cancel" onclick="document.getElementById('instModal').classList.remove('show')">ยกเลิก</button>
-        <button class="modal-confirm" id="instConfirm">สร้างใบแจ้งหนี้ →</button>
+      <div class="modal-f">
+        <button type="button" class="btn" onclick="closeModal('instModal')">ยกเลิก</button>
+        <button type="button" class="btn btn-dark" id="instConfirm">สร้างใบแจ้งหนี้</button>
       </div>
     </div>
   </div>
 
   <script is:inline define:vars={{ installments, docId: id, docNum: doc.document_number, docTotal: doc.total_amount, docCustomerId: doc.customer_id }}>
-  // ── Installment Modal ─────────────────────────────────────────
   var TOTAL = Number(docTotal) || 0;
   var customRowCount = 0;
+  var X_SVG = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  function money(n) { return Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function setMsg(el, kind, text) { el.className = 'msg show ' + kind; el.textContent = text; }
 
-  function money(n) {
-    return Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
-  }
+  window.closeModal = function(id) { var m = document.getElementById(id); if (m) m.classList.remove('show'); };
+  document.querySelectorAll('.overlay').forEach(function(o) {
+    o.addEventListener('click', function(e) { if (e.target === o) o.classList.remove('show'); });
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.querySelectorAll('.overlay.show').forEach(function(o){ o.classList.remove('show'); });
+  });
 
+  // ── Installment modal ─────────────────────────────────────────
   window.switchInstTab = function(tab) {
     var isPreset = tab === 'preset';
     document.getElementById('tabPresetContent').style.display = isPreset ? '' : 'none';
     document.getElementById('tabCustomContent').style.display = isPreset ? 'none' : '';
-    document.getElementById('tabPreset').style.background = isPreset ? 'var(--text)' : 'var(--bg)';
-    document.getElementById('tabPreset').style.color = isPreset ? 'var(--bg)' : 'var(--t2)';
-    document.getElementById('tabCustom').style.background = isPreset ? 'var(--bg)' : 'var(--text)';
-    document.getElementById('tabCustom').style.color = isPreset ? 'var(--t2)' : 'var(--bg)';
-  }
+    document.getElementById('tabPreset').classList.toggle('on', isPreset);
+    document.getElementById('tabCustom').classList.toggle('on', !isPreset);
+  };
 
   window.addInstRow = function(pct, label) {
     customRowCount++;
     var id = 'row_' + customRowCount;
     var div = document.createElement('div');
     div.id = id;
-    div.style.cssText = 'display:grid;grid-template-columns:36px 70px 1fr auto auto;gap:6px;align-items:center;';
+    div.className = 'crow';
     div.innerHTML =
-      '<input type="radio" name="customChoice" value="'+customRowCount+'" style="width:16px;height:16px;accent-color:var(--text);" onchange="updateCustomSummary()"/>'+
-      '<input type="number" class="cinp pct-inp" placeholder="%" min="1" max="100" step="0.01" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;width:100%;" oninput="updateCustomSummary()" data-row="'+customRowCount+'" value="'+(pct||'')+'"/>'+
-      '<input type="text" class="cinp lbl-inp" placeholder="รายละเอียดงวด" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;width:100%;" data-row="'+customRowCount+'" value="'+(label||'')+'"/>'+
-      '<span class="amt-lbl" style="font-size:11px;font-weight:600;white-space:nowrap;min-width:80px;text-align:right;">฿—</span>'+
-      '<button onclick="removeInstRow(\'' + id + '\')" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0 4px;">×</button>';
+      '<input type="radio" name="customChoice" value="'+customRowCount+'" onchange="updateCustomSummary()"/>'+
+      '<input type="number" class="inp pct-inp" placeholder="%" min="1" max="100" step="0.01" oninput="updateCustomSummary()" value="'+(pct||'')+'"/>'+
+      '<input type="text" class="inp lbl-inp" placeholder="รายละเอียดงวด" value="'+escHtml(label||'')+'"/>'+
+      '<span class="amt-lbl">฿—</span>'+
+      '<button type="button" class="xbtn" aria-label="ลบงวด" onclick="removeInstRow(\'' + id + '\')">' + X_SVG + '</button>';
     document.getElementById('customRows').appendChild(div);
     updateCustomSummary();
-  }
+  };
 
   window.removeInstRow = function(id) {
     var el = document.getElementById(id);
     if (el) el.remove();
     updateCustomSummary();
-  }
+  };
 
   window.updateCustomSummary = function() {
-    var rows = document.querySelectorAll('#customRows > div');
+    var rows = document.querySelectorAll('#customRows > .crow');
     var total = 0;
     rows.forEach(function(row) {
-      var pctInp = row.querySelector('.pct-inp');
-      var amtLbl = row.querySelector('.amt-lbl');
-      var pct = parseFloat(pctInp?.value) || 0;
+      var pct = parseFloat(row.querySelector('.pct-inp').value) || 0;
       total += pct;
       var amt = Math.round(TOTAL * pct / 100 * 100) / 100;
-      if (amtLbl) amtLbl.textContent = pct > 0 ? '฿'+money(amt) : '฿—';
+      row.querySelector('.amt-lbl').textContent = pct > 0 ? '฿' + money(amt) : '฿—';
     });
     var pctEl = document.getElementById('instTotalPct');
+    pctEl.textContent = total.toFixed(2).replace(/\.00$/, '') + '%';
+    pctEl.style.color = Math.abs(total - 100) < 0.01 ? 'var(--green)' : (total > 100 ? 'var(--red)' : 'var(--text)');
     var warn = document.getElementById('instWarning');
-    if (pctEl) {
-      pctEl.textContent = total.toFixed(2).replace(/\.00$/,'') + '%';
-      pctEl.style.color = Math.abs(total - 100) < 0.01 ? 'var(--green)' : total > 100 ? 'var(--red)' : 'var(--text)';
-    }
-    if (warn) {
-      if (total > 100) {
-        warn.style.display = '';
-        warn.textContent = 'รวมเกิน 100% — กรุณาตรวจสอบ';
-      } else if (total < 100 && total > 0) {
-        warn.style.display = '';
-        warn.textContent = 'รวม ' + total.toFixed(2) + '% — ยังไม่ครบ 100% (สามารถสร้างได้)';
-        warn.style.background = '#FFFBEB';
-        warn.style.borderColor = '#FDE68A';
-        warn.style.color = '#92400E';
-      } else {
-        warn.style.display = 'none';
-      }
-    }
-  }
+    if (total > 100) setMsg(warn, 'err', 'รวมเกิน 100% กรุณาตรวจสอบ');
+    else if (total > 0 && total < 100) setMsg(warn, 'warn', 'รวม ' + total.toFixed(2).replace(/\.00$/, '') + '% ยังไม่ครบ 100% (สร้างได้)');
+    else warn.className = 'msg';
+  };
 
   window.openInstModal = function() {
-    // Set subtitle
-    document.getElementById('instModalSub').textContent = docNum + ' • ยอดรวม ฿' + money(TOTAL);
-    // Build preset list
+    document.getElementById('instModalSub').textContent = docNum + ' · ยอดรวม ฿' + money(TOTAL);
     var presetList = document.getElementById('presetList');
     if (installments && installments.length > 0) {
       presetList.innerHTML = '';
       installments.forEach(function(inst, idx) {
         var lbl = document.createElement('label');
-        lbl.className = 'modal-opt';
+        lbl.className = 'opt';
         lbl.innerHTML =
-          '<input type="radio" name="instChoice" value="'+idx+'" style="width:16px;height:16px;accent-color:var(--text);flex-shrink:0;"/>'+
-          '<div style="flex:1;">'+
-            '<div class="modal-opt-main">'+inst.pct+'% — ฿'+money(inst.amount)+'</div>'+
-            '<div class="modal-opt-sub">'+inst.label+'</div>'+
-          '</div>';
+          '<input type="radio" name="instChoice" value="'+idx+'"/>'+
+          '<div style="flex:1;min-width:0;"><div class="opt-m">'+inst.pct+'% · ฿'+money(inst.amount)+'</div>'+
+          '<div class="opt-s">'+escHtml(inst.label)+'</div></div>';
         presetList.appendChild(lbl);
       });
-      // Show preset tab by default
+      document.getElementById('instTabs').style.display = '';
       switchInstTab('preset');
-      document.getElementById('tabPreset').style.display = '';
     } else {
-      // No preset — go straight to custom tab, hide preset tab
-      document.getElementById('tabPreset').style.display = 'none';
+      document.getElementById('instTabs').style.display = 'none';
       switchInstTab('custom');
     }
-    // Add initial custom row if custom tab is active and empty
-    if (document.getElementById('customRows').children.length === 0) {
-      addInstRow();
-    }
-    // Set today as default issue date
-    var today = new Date().toISOString().split('T')[0];
-    document.getElementById('instIssueDate').value = today;
+    if (document.getElementById('customRows').children.length === 0) addInstRow();
+    var d = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
+    document.getElementById('instIssueDate').value = d;
+    document.getElementById('instCreateStatus').className = 'msg';
     document.getElementById('instModal').classList.add('show');
-  }
-
-  document.getElementById('instModal').addEventListener('click', function(e) {
-    if (e.target === this) this.classList.remove('show');
-  });
+  };
 
   var genBtn = document.getElementById('genInstBtn');
   if (genBtn) genBtn.addEventListener('click', openInstModal);
@@ -718,7 +813,6 @@ const hasInstallments = true; // always show — every project can have installm
   document.getElementById('instConfirm').addEventListener('click', async function() {
     var isPreset = document.getElementById('tabPresetContent').style.display !== 'none';
     var pct, label, amount;
-
     if (isPreset) {
       var sel = document.querySelector('input[name="instChoice"]:checked');
       if (!sel) { alert('กรุณาเลือกงวด'); return; }
@@ -727,29 +821,21 @@ const hasInstallments = true; // always show — every project can have installm
     } else {
       var selCustom = document.querySelector('input[name="customChoice"]:checked');
       if (!selCustom) { alert('กรุณาเลือกงวดที่ต้องการสร้างใบแจ้งหนี้'); return; }
-      var rowId = 'row_' + selCustom.value;
-      var row = document.getElementById(rowId);
+      var row = document.getElementById('row_' + selCustom.value);
       pct = parseFloat(row.querySelector('.pct-inp').value) || 0;
       label = row.querySelector('.lbl-inp').value || ('งวด ' + selCustom.value);
       amount = Math.round(TOTAL * pct / 100 * 100) / 100;
       if (!pct || pct <= 0) { alert('กรุณากรอก % ของงวดที่เลือก'); return; }
     }
-
     var issueDate = document.getElementById('instIssueDate').value;
     var dueDate = document.getElementById('instDueDate').value;
     if (!issueDate) { alert('กรุณาระบุวันที่ออกใบแจ้งหนี้'); return; }
 
-    // Show loading
     var btn = document.getElementById('instConfirm');
     var status = document.getElementById('instCreateStatus');
     btn.disabled = true;
     btn.textContent = 'กำลังสร้าง...';
-    status.style.display = '';
-    status.style.background = 'var(--gbg)';
-    status.style.border = '1px solid var(--gborder)';
-    status.style.color = '#7A5C1E';
-    status.textContent = 'กำลังสร้างใบแจ้งหนี้...';
-
+    setMsg(status, 'info', 'กำลังสร้างใบแจ้งหนี้...');
     try {
       var res = await fetch('/documents/api/create-installment', {
         method: 'POST',
@@ -767,24 +853,16 @@ const hasInstallments = true; // always show — every project can have installm
       });
       var data = await res.json();
       if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
-      status.style.background = 'var(--grbg)';
-      status.style.border = '1px solid var(--grborder)';
-      status.style.color = 'var(--green)';
-      status.textContent = 'สร้างสำเร็จ! ' + data.document_number + ' — กำลังเปิดเอกสาร...';
-      setTimeout(function() {
-        window.location.href = '/documents/' + data.id;
-      }, 800);
-    } catch(e) {
-      status.style.background = 'var(--redbg)';
-      status.style.border = '1px solid #FECACA';
-      status.style.color = 'var(--red)';
-      status.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
+      setMsg(status, 'ok', 'สร้างสำเร็จ ' + data.document_number + ' กำลังเปิดเอกสาร...');
+      setTimeout(function() { window.location.href = '/documents/' + data.id; }, 800);
+    } catch (e) {
+      setMsg(status, 'err', 'เกิดข้อผิดพลาด: ' + e.message);
       btn.disabled = false;
-      btn.textContent = 'สร้างใบแจ้งหนี้ →';
+      btn.textContent = 'สร้างใบแจ้งหนี้';
     }
   });
 
-  // ── Copy link ─────────────────────────────────────────────────
+  // ── Payment condition ─────────────────────────────────────────
   window.toggleInstEdit = function() {
     var box = document.getElementById('instEditBox');
     var btn = document.getElementById('instEditBtn');
@@ -804,26 +882,25 @@ const hasInstallments = true; // always show — every project can have installm
       });
       if (res.ok) { window.location.reload(); }
       else { alert('บันทึกไม่สำเร็จ'); }
-    } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
+    } catch (e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
   };
-  // Back returns to the exact dashboard search/filter the user came from
-  try {
-    var dashUrl = sessionStorage.getItem('tnc_dash_url');
-    var back = document.getElementById('backLink');
-    if (dashUrl && back && dashUrl.indexOf('/documents/dashboard') === 0) back.setAttribute('href', dashUrl);
-  } catch(e) {}
-  // Arrived via the dashboard's "+ ออกใบกำกับภาษี" shortcut → bring the button into view
-  if (new URLSearchParams(location.search).get('tx') === '1') {
-    var txb = document.getElementById('txBtn');
-    if (txb) { txb.scrollIntoView({behavior:'smooth', block:'center'}); txb.classList.add('pulse'); }
-    history.replaceState(null, '', location.pathname);
-  }
+
+  // ── Tax invoice (from an invoice) ─────────────────────────────
+  window.openTxModal = function() {
+    var m = document.getElementById('txModal');
+    if (!m) return;
+    document.getElementById('txMsg').className = 'msg';
+    m.classList.add('show');
+  };
   window.createTaxInvoice = async function() {
-    if (!confirm('ออกใบกำกับภาษีสำหรับ ' + docNum + ' ยอด ฿' + Number(docTotal).toLocaleString('th-TH',{minimumFractionDigits:2}) + ' ?')) return;
-    var btn = document.getElementById('txBtn');
-    var hint = document.getElementById('tx-hint');
-    if (btn) btn.style.opacity = '0.6';
-    if (hint) hint.textContent = 'กำลังสร้าง...';
+    var dateEl = document.getElementById('txPayDate');
+    var payDate = dateEl ? dateEl.value : '';
+    if (!payDate) { alert('กรุณาระบุวันที่ลูกค้าชำระเงิน'); return; }
+    var btn = document.getElementById('txConfirm');
+    var msg = document.getElementById('txMsg');
+    btn.disabled = true;
+    btn.textContent = 'กำลังสร้าง...';
+    setMsg(msg, 'info', 'กำลังออกใบกำกับภาษี...');
     try {
       var res = await fetch('/documents/api/create-tax-invoice', {
         method: 'POST',
@@ -833,21 +910,26 @@ const hasInstallments = true; // always show — every project can have installm
           source_doc_num: docNum,
           customer_id: docCustomerId,
           total_amount: Number(docTotal),
-          issue_date: new Date().toISOString().split('T')[0],
-          inst_label: document.getElementById('txDateHint')?.dataset?.label || null,
+          issue_date: payDate,
+          inst_label: null,
         })
       });
       var data = await res.json();
       if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
-      if (hint) hint.textContent = 'สร้างสำเร็จ! ' + data.document_number;
-      setTimeout(function(){ window.location.href = '/documents/' + data.id; }, 800);
-    } catch(e) {
-      if (hint) hint.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
-      if (btn) btn.style.opacity = '1';
+      setMsg(msg, 'ok', 'สร้างสำเร็จ ' + data.document_number + ' กำลังเปิดเอกสาร...');
+      setTimeout(function() { window.location.href = '/documents/' + data.id; }, 800);
+    } catch (e) {
+      setMsg(msg, 'err', 'เกิดข้อผิดพลาด: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'ยืนยันออกใบกำกับภาษี';
     }
   };
+
+  // ── Tax invoice date (on a tax invoice) ───────────────────────
   window.saveTxDate = async function(val) {
     if (!val) return;
+    var hint = document.getElementById('txDateHint');
+    if (hint) hint.textContent = 'กำลังบันทึก...';
     try {
       var res = await fetch('/documents/api/update-date', {
         method: 'POST',
@@ -855,24 +937,37 @@ const hasInstallments = true; // always show — every project can have installm
         body: JSON.stringify({ doc_id: docId, issue_date: val })
       });
       var data = await res.json();
-      if (!res.ok) { alert('บันทึกไม่สำเร็จ: ' + (data.error||'')); return; }
+      if (!res.ok) { alert('บันทึกไม่สำเร็จ: ' + (data.error || '')); if (hint) hint.textContent = ''; return; }
       window.location.reload();
-    } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
+    } catch (e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
   };
+
+  // ── Copy customer link ────────────────────────────────────────
   window.copyLink = function() {
     var url = 'https://tncdocument.pages.dev/documents/' + docId + '/print';
     navigator.clipboard.writeText(url).then(function() {
       var hint = document.getElementById('copy-hint');
       if (hint) {
-        hint.textContent = 'คัดลอกแล้ว!';
-        hint.style.color = '#2D7A4F';
-        setTimeout(function() {
-          hint.textContent = 'ส่งให้ลูกค้าดูเอกสาร';
-          hint.style.color = '';
-        }, 2000);
+        hint.textContent = 'คัดลอกแล้ว';
+        hint.style.color = 'var(--green)';
+        setTimeout(function() { hint.textContent = ''; hint.style.color = ''; }, 2000);
       }
     });
   };
+
+  // Back returns to the exact dashboard search/filter the user came from
+  try {
+    var dashUrl = sessionStorage.getItem('tnc_dash_url');
+    var back = document.getElementById('backLink');
+    if (dashUrl && back && dashUrl.indexOf('/documents/dashboard') === 0) back.setAttribute('href', dashUrl);
+  } catch (e) {}
+
+  // Arrived via the dashboard's "ออกใบกำกับภาษี" shortcut → open the confirm dialog
+  if (new URLSearchParams(location.search).get('tx') === '1') {
+    var txb = document.getElementById('txBtn');
+    if (txb) { txb.scrollIntoView({ behavior: 'smooth', block: 'center' }); txb.classList.add('pulse'); openTxModal(); }
+    history.replaceState(null, '', location.pathname);
+  }
   </script>
 </body>
 </html>
