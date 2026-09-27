@@ -17,7 +17,7 @@ if (Astro.request.method === 'POST') {
       error = 'กรุณากรอกชื่องาน';
     } else {
       const { error: dbErr } = await updateJob(jobId, name, description);
-      if (dbErr) { error = dbErr.message; } else { success = `เปลี่ยนชื่องานเป็น "${name}" สำเร็จ — อัปเดตในทุกเอกสารที่เชื่อมโยงแล้ว`; }
+      if (dbErr) { error = dbErr.message; } else { success = `เปลี่ยนชื่องานเป็น "${name}" แล้ว เอกสารที่เชื่อมกับงานนี้จะแสดงชื่อใหม่ทั้งหมด`; }
     }
   }
 
@@ -28,18 +28,20 @@ if (Astro.request.method === 'POST') {
       error = 'กรุณากรอกชื่องาน';
     } else {
       const { error: dbErr } = await createJob(name, description, user.id);
-      if (dbErr) { error = dbErr.message; } else { success = `เพิ่มงาน "${name}" สำเร็จ`; }
+      if (dbErr) { error = dbErr.message; } else { success = `เพิ่มงาน "${name}" แล้ว`; }
     }
   }
 
   if (action === 'delete') {
     const jobId = form.get('job_id') as string;
     const { error: dbErr } = await deleteJob(jobId);
-    if (dbErr) { error = 'ลบไม่ได้ — งานนี้ถูกใช้งานอยู่ในเอกสาร'; } else { success = 'ลบงานสำเร็จ'; }
+    if (dbErr) { error = 'ลบไม่ได้ เพราะงานนี้ถูกใช้อยู่ในเอกสาร'; } else { success = 'ลบงานแล้ว'; }
   }
 }
 
 const jobs = await getJobsWithCount();
+const list = jobs.map((j: any) => ({ id: j.id, name: j.name || '', desc: j.description || '', n: j.doc_count || 0 }));
+const dataJson = JSON.stringify(list).replace(/</g, '\\u003c');
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -48,158 +50,353 @@ const jobs = await getJobsWithCount();
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dynjnftnu/image/upload/v1781103809/LOGO_TNC-02_xhpu0t.png"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>จัดการงาน — TNC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-  <style>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>งาน — TNC Build Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
-      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
-      --gold:#C9A96E;--gbg:#FAF5EC;--gborder:#E8D5A8;
-      --green:#2D7A4F;--grbg:#EDF7F0;--grborder:#C5E8D2;
-      --red:#B94040;--redbg:#FEF2F2;
+      --bg:#F6F5F2;--white:#fff;--border:#E3E0DA;--line:#EEECE7;
+      --text:#1A1814;--t2:#66635C;--t3:#A9A69F;
+      --gold:#B8955A;--gbg:#FAF6EE;
+      --green:#2D7A4F;--grbg:#EEF6F1;--red:#B23B3B;--redbg:#FBF0F0;--amber:#B97A26;--blue:#2D5A9E;
+      --sb:216px;
     }
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;}
-    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 14px;border:1px solid var(--border);border-radius:6px;transition:all .15s;}
-    .back:hover{border-color:var(--text);color:var(--text);}
-    .topbar-title{font-size:16px;font-weight:700;}
-    .layout{display:grid;grid-template-columns:1fr 380px;gap:24px;padding:28px;max-width:1100px;margin:0 auto;align-items:start;}
-    .card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
-    .card-hd{padding:18px 22px;border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;}
-    .card-title{font-size:14px;font-weight:700;}
-    .card-sub{font-size:11.5px;color:var(--t3);margin-top:2px;}
-    .card-count{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--t2);}
-    .job-list{padding:8px 0;}
-    .job-row{padding:14px 22px;border-bottom:1px solid var(--b2);}
-    .job-row:last-child{border-bottom:none;}
-    .job-static{display:flex;align-items:center;gap:12px;}
-    .job-avatar{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#C9A96E,#a8824f);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
-    .job-info{flex:1;min-width:0;}
-    .job-name{font-size:13.5px;font-weight:600;color:var(--text);}
-    .job-desc{font-size:11.5px;color:var(--t3);margin-top:1px;}
-    .job-count{font-size:10.5px;font-weight:700;color:var(--t2);background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;white-space:nowrap;}
-    .job-actions{display:flex;gap:6px;flex-shrink:0;}
-    .icon-btn{padding:6px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--t2);transition:all .15s;white-space:nowrap;}
-    .icon-btn:hover{border-color:var(--text);color:var(--text);}
-    .icon-btn.danger:hover{border-color:var(--red);color:var(--red);}
-    .edit-form{display:none;margin-top:10px;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;gap:10px;flex-direction:column;}
-    .job-row.editing .job-static{display:none;}
-    .job-row.editing .edit-form{display:flex;}
-    .edit-heading{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
-    .edit-heading span{color:var(--text);text-transform:none;letter-spacing:0;font-weight:600;}
-    .edit-field{display:flex;flex-direction:column;gap:5px;}
-    .edit-field label{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
-    .inp{padding:10px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:all .2s;width:100%;}
-    .inp:focus{border-color:var(--text);background:var(--white);}
-    .edit-btns{display:flex;gap:8px;}
-    .btn-save{padding:9px 16px;background:var(--text);color:var(--bg);border:none;border-radius:6px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;}
-    .btn-cancel{padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;color:var(--t2);cursor:pointer;}
-    .card-body{padding:22px;}
-    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
-    .field label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);}
-    .hint{font-size:11px;color:var(--t3);margin-top:-10px;margin-bottom:14px;line-height:1.6;}
-    .alert{border-radius:7px;padding:12px 16px;font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
-    .alert-ok{background:var(--grbg);border:1px solid var(--grborder);color:var(--green);}
-    .alert-err{background:var(--redbg);border:1px solid #FECACA;color:var(--red);}
-    .btn-submit{width:100%;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:7px;font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:opacity .15s;margin-top:4px;}
-    .btn-submit:hover{opacity:.88;}
-    .empty{padding:40px 22px;text-align:center;color:var(--t3);font-size:13px;}
+    html{height:100%;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100%;font-size:14px;-webkit-font-smoothing:antialiased;}
+    a{color:inherit;}
+    button,select,input{font-family:inherit;}
+    button:focus{outline:none;}
+    button:focus-visible,a:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+    .ic{width:16px;height:16px;flex-shrink:0;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+
+    /* Sidebar (same as dashboard) */
+    .sidebar{width:var(--sb);background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100dvh;z-index:200;transition:transform .25s cubic-bezier(.4,0,.2,1);}
+    .sb-brand{padding:22px 22px 18px;}
+    .sb-brand-name{font-size:13px;font-weight:700;letter-spacing:.06em;}
+    .sb-brand-sub{font-size:11px;color:var(--t3);margin-top:2px;}
+    .sb-nav{padding:6px 12px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+    .sb-link{display:block;padding:9px 12px;border-radius:6px;font-size:13.5px;color:var(--t2);text-decoration:none;}
+    .sb-link:hover{background:var(--bg);color:var(--text);}
+    .sb-link.active{background:var(--bg);color:var(--text);font-weight:600;}
+    .sb-foot{padding:16px 22px;border-top:1px solid var(--line);}
+    .sb-user{font-size:13px;font-weight:600;}
+    .sb-role{font-size:11px;color:var(--t3);margin-top:1px;text-transform:capitalize;}
+    .sb-logout{margin-top:10px;background:none;border:none;padding:0;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+    .sb-logout:hover{color:var(--red);}
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:190;}
+    .overlay.show{display:block;}
+
+    /* Page */
+    .main{margin-left:var(--sb);min-height:100dvh;}
+    .page{max-width:1180px;margin:0 auto;padding:28px 32px 48px;display:flex;flex-direction:column;gap:20px;}
+    .head{display:flex;align-items:center;gap:12px;}
+    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:6px;margin-left:-6px;color:var(--text);}
+    .h1{font-size:22px;font-weight:700;letter-spacing:-.01em;flex:1;}
+    .btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border-radius:7px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);white-space:nowrap;}
+    .btn:hover{border-color:var(--text);}
+    .btn-dark{background:var(--text);border-color:var(--text);color:var(--white);}
+    .btn-dark:hover{opacity:.88;}
+
+    /* Search + tabs (same as dashboard panel) */
+    .panel{background:var(--white);border:1px solid var(--border);border-radius:12px;}
+    .search{padding:14px 14px 12px;}
+    .sbox{display:flex;align-items:center;gap:8px;min-height:50px;padding:6px 8px 6px 14px;background:var(--bg);border:1px solid transparent;border-radius:10px;transition:border-color .15s,background .15s;}
+    .sbox:focus-within{background:var(--white);border-color:var(--text);}
+    .sbox > .ic{color:var(--t3);width:18px;height:18px;}
+    .q{flex:1;min-width:0;border:none;outline:none;font-size:15.5px;color:var(--text);background:none;padding:6px 2px;}
+    .q::placeholder{color:var(--t3);}
+    .q::-webkit-search-cancel-button{display:none;}
+    .icon-btn{display:none;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:50%;background:var(--line);color:var(--t2);cursor:pointer;flex-shrink:0;}
+    .icon-btn.show{display:inline-flex;}
+    .icon-btn .ic{width:12px;height:12px;}
+    .tabs{display:flex;gap:4px;padding:0 10px;border-top:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .tab{position:relative;border:none;background:none;padding:13px 10px;font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;white-space:nowrap;}
+    .tab:hover{color:var(--text);}
+    .tab.on{color:var(--text);font-weight:700;}
+    .tab.on::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--text);border-radius:2px;}
+    .tab .n{margin-left:5px;font-size:11.5px;color:var(--t3);font-weight:600;font-variant-numeric:tabular-nums;}
+
+    /* Results */
+    .results{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+    .res-head{display:flex;align-items:baseline;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+    .res-title{font-size:14px;font-weight:700;}
+    .res-meta{font-size:12.5px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .row{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:16px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--line);}
+    .item:last-child .row{border-bottom:none;}
+    .item.editing .row{display:none;}
+    .name{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .sub{font-size:12px;color:var(--t3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .cnt{font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap;text-decoration:none;}
+    a.cnt:hover{color:var(--text);text-decoration:underline;text-underline-offset:3px;}
+    .cnt.zero{color:var(--t3);}
+    .acts{display:flex;gap:6px;justify-content:flex-end;}
+    .btn-sm{height:30px;padding:0 11px;font-size:12.5px;font-weight:500;border-radius:7px;}
+    .btn-sm.danger:hover{border-color:var(--red);color:var(--red);}
+    mark{background:#F6E3B0;color:inherit;border-radius:2px;padding:0 1px;}
+    .empty{padding:56px 20px;text-align:center;color:var(--t2);}
+    .empty-t{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
+    .empty-s{font-size:13px;}
+
+    /* Inline forms */
+    .eform{display:none;padding:16px 18px;border-bottom:1px solid var(--line);background:#FBFAF8;}
+    .item.editing .eform{display:block;}
+    .item:last-child .eform{border-bottom:none;}
+    .fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 16px;}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .field label{font-size:12px;color:var(--t2);font-weight:500;}
+    .field label .req{color:var(--red);margin-left:2px;}
+    .inp{height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);background:var(--white);outline:none;width:100%;}
+    .inp:hover{border-color:#CFCBC3;}
+    .inp:focus{border-color:var(--text);}
+    .inp::placeholder{color:var(--t3);}
+    .form-f{display:flex;align-items:center;gap:8px;margin-top:14px;}
+    .fnote{font-size:12px;color:var(--t3);line-height:1.6;margin-left:auto;}
+    .addcard{display:none;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 18px 16px;}
+    .addcard.show{display:block;}
+    .addcard-t{font-size:13px;font-weight:700;margin-bottom:12px;}
+    .msg{padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6;}
+    .msg.ok{background:var(--grbg);color:var(--green);}
+    .msg.err{background:var(--redbg);color:var(--red);}
+
+    /* Pager (same as dashboard) */
+    .pager{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap;}
+    .pager:empty{display:none;}
+    .pg-info{font-size:12.5px;color:var(--t2);flex:1;font-variant-numeric:tabular-nums;}
+    .pg{display:flex;gap:4px;}
+    .pg button{min-width:34px;height:32px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:var(--white);font-size:12.5px;cursor:pointer;color:var(--text);font-variant-numeric:tabular-nums;}
+    .pg button:hover:not(:disabled){border-color:var(--text);}
+    .pg button.on{background:var(--text);border-color:var(--text);color:var(--white);font-weight:600;}
+    .pg button:disabled{color:var(--t3);cursor:default;}
+    .pg .gap{padding:0 4px;color:var(--t3);align-self:center;}
+
     @media(max-width:768px){
-      .layout{grid-template-columns:1fr;padding:14px;}
-      .topbar{padding:0 16px;}
+      .sidebar{transform:translateX(-100%);}
+      .sidebar.open{transform:translateX(0);}
+      .main{margin-left:0;}
+      .hamburger{display:inline-flex;}
+      .page{padding:16px 12px 32px;gap:14px;}
+      .h1{font-size:19px;}
+      .search{padding:10px;}
+      .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name name" "cnt acts";gap:8px 12px;padding:14px;}
+      .c-name{grid-area:name;} .cnt{grid-area:cnt;} .acts{grid-area:acts;}
+      .eform{padding:14px;}
+      .fields{grid-template-columns:1fr;}
+      .form-f{flex-wrap:wrap;} .fnote{margin-left:0;flex-basis:100%;}
+      .pager{padding:12px;}
+      .pg-info{flex:1 1 100%;}
+      .pg .num-btn{display:none;} .pg .num-btn.on{display:inline-block;}
+      .pg .gap{display:none;}
+      input{font-size:16px!important;}
     }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <a href="/documents/dashboard" class="back">← กลับ</a>
-    <div>
-      <div class="topbar-title">จัดการงาน / Jobs</div>
-    </div>
-  </div>
 
-  <div class="layout">
-    <!-- Jobs List -->
-    <div class="card">
-      <div class="card-hd">
-        <div>
-          <div class="card-title">รายชื่องานทั้งหมด</div>
-          <div class="card-sub">แก้ไขชื่องานที่นี่ที่เดียว จะอัปเดตในทุกเอกสารที่เชื่อมโยงทันที</div>
-        </div>
-        <div class="card-count">{jobs.length} งาน</div>
-      </div>
-      <div class="job-list">
-        {jobs.length === 0 && <div class="empty">ยังไม่มีงานในระบบ</div>}
-        {jobs.map((j: any) => (
-          <div class="job-row" id={`row-${j.id}`}>
-            <div class="job-static">
-              <div class="job-avatar">{j.name.charAt(0).toUpperCase()}</div>
-              <div class="job-info">
-                <div class="job-name">{j.name}</div>
-                {j.description && <div class="job-desc">{j.description}</div>}
-              </div>
-              <div class="job-count">{j.doc_count} เอกสาร</div>
-              <div class="job-actions">
-                <button type="button" class="icon-btn" onclick={`document.getElementById('row-${j.id}').classList.add('editing')`}>แก้ไข</button>
-                {j.doc_count === 0 && (
-                  <form method="POST" style="display:inline;" onsubmit="return confirm('ลบงานนี้?')">
-                    <input type="hidden" name="action" value="delete"/>
-                    <input type="hidden" name="job_id" value={j.id}/>
-                    <button type="submit" class="icon-btn danger">ลบ</button>
-                  </form>
-                )}
-              </div>
-            </div>
-            <form method="POST" class="edit-form">
-              <input type="hidden" name="action" value="rename"/>
-              <input type="hidden" name="job_id" value={j.id}/>
-              <div class="edit-heading">แก้ไขงาน: <span>{j.name}</span></div>
-              <div class="edit-field">
-                <label>ชื่องาน</label>
-                <input class="inp" type="text" name="name" value={j.name} placeholder="ชื่องาน" required/>
-              </div>
-              <div class="edit-field">
-                <label>รายละเอียด (ไม่บังคับ)</label>
-                <input class="inp" type="text" name="description" value={j.description || ''} placeholder="รายละเอียด (ไม่บังคับ)"/>
-              </div>
-              <div class="edit-btns">
-                <button type="submit" class="btn-save">บันทึก</button>
-                <button type="button" class="btn-cancel" onclick={`document.getElementById('row-${j.id}').classList.remove('editing')`}>ยกเลิก</button>
-              </div>
-            </form>
-          </div>
-        ))}
-      </div>
+<div class="overlay" id="overlay"></div>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-name">TNC BUILD STUDIO</div>
+    <div class="sb-brand-sub">ระบบเอกสาร</div>
+  </div>
+  <div class="sb-nav">
+    <a href="/documents/dashboard" class="sb-link">เอกสาร</a>
+    <a href="/documents/new" class="sb-link">สร้างเอกสารใหม่</a>
+    <a href="/documents/customers" class="sb-link">ลูกค้า</a>
+    <a href="/documents/jobs" class="sb-link active">งาน</a>
+    {user.role === 'superadmin' && <a href="/documents/users" class="sb-link">ผู้ใช้งาน</a>}
+    <a href="/documents/logs" class="sb-link">ประวัติการใช้งาน</a>
+  </div>
+  <div class="sb-foot">
+    <div class="sb-user">{user.full_name}</div>
+    <div class="sb-role">{user.role}</div>
+    <form method="POST" action="/documents/logout"><button type="submit" class="sb-logout">ออกจากระบบ</button></form>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page">
+    <div class="head">
+      <button class="hamburger" id="hamburger" aria-label="เมนู"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:22px;height:22px"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <h1 class="h1">งาน</h1>
+      <button type="button" class="btn btn-dark" id="addBtn">เพิ่มงาน</button>
     </div>
 
-    <!-- Add Job Form -->
-    <div class="card">
-      <div class="card-hd">
-        <div>
-          <div class="card-title">เพิ่มงานใหม่</div>
-          <div class="card-sub">สร้างงานเพื่อผูกกับเอกสาร</div>
+    {success && <div class="msg ok">{success}</div>}
+    {error && <div class="msg err">{error}</div>}
+
+    <form method="POST" class="addcard" id="addCard">
+      <input type="hidden" name="action" value="create"/>
+      <div class="addcard-t">เพิ่มงานใหม่</div>
+      <div class="fields">
+        <div class="field">
+          <label for="newName">ชื่องาน<span class="req">*</span></label>
+          <input class="inp" id="newName" type="text" name="name" placeholder="เช่น ตกแต่งร้าน Central Westgate" required/>
         </div>
-        <span style="font-size:18px;color:var(--t3);">▤</span>
+        <div class="field">
+          <label for="newDesc">รายละเอียด</label>
+          <input class="inp" id="newDesc" type="text" name="description" placeholder="ไม่บังคับ"/>
+        </div>
       </div>
-      <div class="card-body">
-        {success && <div class="alert alert-ok">✓ {success}</div>}
-        {error && <div class="alert alert-err">✕ {error}</div>}
-        <form method="POST">
-          <input type="hidden" name="action" value="create"/>
-          <div class="field">
-            <label>ชื่องาน *</label>
-            <input class="inp" type="text" name="name" placeholder="เช่น ตกแต่งร้าน Central Westgate" required/>
-          </div>
-          <div class="field">
-            <label>รายละเอียด (ไม่บังคับ)</label>
-            <input class="inp" type="text" name="description" placeholder="ข้อมูลเพิ่มเติม"/>
-          </div>
-          <div class="hint">งานนี้จะปรากฏในขั้นตอนสร้างเอกสารใหม่ และแก้ไขได้ทุกเมื่อจากหน้านี้</div>
-          <button type="submit" class="btn-submit">+ เพิ่มงานใหม่</button>
-        </form>
+      <div class="form-f">
+        <button type="submit" class="btn btn-dark">บันทึกงาน</button>
+        <button type="button" class="btn" id="addCancel">ยกเลิก</button>
+        <span class="fnote">งานนี้จะเลือกได้ตอนสร้างเอกสารใหม่</span>
+      </div>
+    </form>
+
+    <div class="panel">
+      <div class="search">
+        <div class="sbox">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input type="search" class="q" id="q" autocomplete="off" enterkeyhint="search" spellcheck="false" placeholder="ค้นหาชื่องานหรือรายละเอียด"/>
+          <button class="icon-btn" id="qClear" aria-label="ล้างคำค้นหา"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+      </div>
+      <div class="tabs" id="tabs">
+        <button class="tab" data-f="">ทั้งหมด<span class="n"></span></button>
+        <button class="tab" data-f="used">มีเอกสาร<span class="n"></span></button>
+        <button class="tab" data-f="unused">ยังไม่มีเอกสาร<span class="n"></span></button>
       </div>
     </div>
+
+    <div class="results">
+      <div class="res-head">
+        <div class="res-title" id="resTitle"></div>
+        <div class="res-meta">แก้ชื่องานที่นี่ ทุกเอกสารที่ใช้งานนี้จะเปลี่ยนตาม</div>
+      </div>
+      <div id="resBody"></div>
+      <div class="pager" id="pager"></div>
+    </div>
   </div>
+</div>
+
+<script type="application/json" id="jobData" set:html={dataJson}></script>
+
+<script is:inline>
+(function(){
+  var ALL = JSON.parse(document.getElementById('jobData').textContent);
+  var PER = 25;
+  var S = { q: '', f: '', page: 1 };
+  var $ = function(id){ return document.getElementById(id); };
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function norm(s){ return String(s || '').toLowerCase().replace(/[\s\-\.]/g, '').replace(/[\u0E48-\u0E4C]/g, ''); }
+  ALL.forEach(function(j){ j._s = norm(j.name + ' ' + j.desc); });
+  function hl(s){
+    var t = String(s || ''), q = S.q.trim();
+    if (!q) return esc(t);
+    var i = t.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return esc(t);
+    return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length));
+  }
+
+  function readUrl(){
+    var p = new URLSearchParams(location.search);
+    S.q = p.get('q') || ''; S.f = p.get('f') || ''; S.page = Math.max(1, parseInt(p.get('page') || '1', 10) || 1);
+    $('q').value = S.q;
+  }
+  function writeUrl(){
+    var p = new URLSearchParams();
+    if (S.q) p.set('q', S.q); if (S.f) p.set('f', S.f); if (S.page > 1) p.set('page', S.page);
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+  }
+  function matchQ(){
+    var words = S.q.trim().split(/\s+/).map(norm).filter(Boolean);
+    return ALL.filter(function(j){ return words.every(function(w){ return j._s.indexOf(w) >= 0; }); });
+  }
+  function byTab(list, f){
+    if (f === 'used') return list.filter(function(j){ return j.n > 0; });
+    if (f === 'unused') return list.filter(function(j){ return !j.n; });
+    return list;
+  }
+
+  function itemHtml(j){
+    var cnt = j.n
+      ? '<a class="cnt" href="/documents/dashboard?job=' + encodeURIComponent(j.name) + '">' + j.n + ' เอกสาร</a>'
+      : '<span class="cnt zero">ยังไม่มีเอกสาร</span>';
+    var del = j.n ? '' :
+      '<form method="POST" style="margin:0;" data-del="' + esc(j.name) + '"><input type="hidden" name="action" value="delete"/><input type="hidden" name="job_id" value="' + esc(j.id) + '"/><button type="submit" class="btn btn-sm danger">ลบ</button></form>';
+    return '<div class="item" id="it_' + esc(j.id) + '">'
+      + '<div class="row">'
+      +   '<div class="c-name"><div class="name">' + hl(j.name) + '</div>' + (j.desc ? '<div class="sub">' + hl(j.desc) + '</div>' : '') + '</div>'
+      +   cnt
+      +   '<div class="acts"><button type="button" class="btn btn-sm" data-edit="' + esc(j.id) + '">แก้ไข</button>' + del + '</div>'
+      + '</div>'
+      + '<form method="POST" class="eform"><input type="hidden" name="action" value="rename"/><input type="hidden" name="job_id" value="' + esc(j.id) + '"/>'
+      +   '<div class="fields">'
+      +     '<div class="field"><label>ชื่องาน<span class="req">*</span></label><input class="inp" type="text" name="name" value="' + esc(j.name) + '" required/></div>'
+      +     '<div class="field"><label>รายละเอียด</label><input class="inp" type="text" name="description" value="' + esc(j.desc) + '" placeholder="ไม่บังคับ"/></div>'
+      +   '</div>'
+      +   '<div class="form-f"><button type="submit" class="btn btn-dark">บันทึก</button><button type="button" class="btn" data-cancel="' + esc(j.id) + '">ยกเลิก</button>'
+      +   (j.n ? '<span class="fnote">ชื่อใหม่จะแสดงใน ' + j.n + ' เอกสารที่ใช้งานนี้</span>' : '') + '</div>'
+      + '</form></div>';
+  }
+
+  function pagerHtml(total){
+    var pages = Math.max(1, Math.ceil(total / PER));
+    if (total <= PER) return '';
+    var from = (S.page - 1) * PER + 1, to = Math.min(total, S.page * PER), nums = [], p;
+    for (p = 1; p <= pages; p++){
+      if (p === 1 || p === pages || Math.abs(p - S.page) <= 1) nums.push(p);
+      else if (nums[nums.length - 1] !== 'gap') nums.push('gap');
+    }
+    return '<div class="pg-info">แสดง ' + from + '–' + to + ' จาก ' + total + ' งาน</div><div class="pg">'
+      + '<button data-page="' + (S.page - 1) + '"' + (S.page <= 1 ? ' disabled' : '') + '>ก่อนหน้า</button>'
+      + nums.map(function(n){ return n === 'gap' ? '<span class="gap">…</span>' : '<button class="num-btn' + (n === S.page ? ' on' : '') + '" data-page="' + n + '">' + n + '</button>'; }).join('')
+      + '<button data-page="' + (S.page + 1) + '"' + (S.page >= pages ? ' disabled' : '') + '>ถัดไป</button></div>';
+  }
+
+  function render(){
+    var base = matchQ();
+    [].forEach.call($('tabs').children, function(t){
+      var f = t.getAttribute('data-f');
+      t.classList.toggle('on', f === S.f);
+      t.querySelector('.n').textContent = byTab(base, f).length;
+    });
+    var list = byTab(base, S.f);
+    var pages = Math.max(1, Math.ceil(list.length / PER));
+    if (S.page > pages) S.page = pages;
+    var shown = list.slice((S.page - 1) * PER, S.page * PER);
+    $('resTitle').textContent = (S.q ? 'พบ ' + list.length + ' จาก ' + ALL.length : list.length) + ' งาน';
+    $('qClear').classList.toggle('show', !!S.q);
+    if (!ALL.length) $('resBody').innerHTML = '<div class="empty"><div class="empty-t">ยังไม่มีงานในระบบ</div><div class="empty-s">กด "เพิ่มงาน" เพื่อสร้างงานแรก</div></div>';
+    else if (!list.length) $('resBody').innerHTML = '<div class="empty"><div class="empty-t">' + (S.q ? 'ไม่พบงานที่ตรงกับ "' + esc(S.q) + '"' : 'ไม่มีงานในหมวดนี้') + '</div><div class="empty-s">ลองค้นหาด้วยคำอื่น</div></div>';
+    else $('resBody').innerHTML = shown.map(itemHtml).join('');
+    $('pager').innerHTML = pagerHtml(list.length);
+    writeUrl();
+  }
+
+  $('q').addEventListener('input', function(){ S.q = this.value; S.page = 1; render(); });
+  $('q').addEventListener('keydown', function(e){ if (e.key === 'Escape'){ S.q = ''; this.value = ''; S.page = 1; render(); } });
+  $('qClear').addEventListener('click', function(){ S.q = ''; $('q').value = ''; S.page = 1; render(); $('q').focus(); });
+  $('tabs').addEventListener('click', function(e){ var t = e.target.closest('.tab'); if (!t) return; S.f = t.getAttribute('data-f'); S.page = 1; render(); });
+  $('pager').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-page]'); if (!b || b.disabled) return;
+    S.page = parseInt(b.getAttribute('data-page'), 10); render();
+    document.querySelector('.results').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+  $('resBody').addEventListener('click', function(e){
+    var ed = e.target.closest('[data-edit]'), cn = e.target.closest('[data-cancel]');
+    if (ed) { var it = $('it_' + ed.getAttribute('data-edit')); it.classList.add('editing'); var i = it.querySelector('.eform input[name=name]'); i.focus(); i.select(); }
+    if (cn) $('it_' + cn.getAttribute('data-cancel')).classList.remove('editing');
+  });
+  $('resBody').addEventListener('submit', function(e){
+    var f = e.target;
+    if (f.hasAttribute('data-del') && !confirm('ลบงาน "' + f.getAttribute('data-del') + '"?')) e.preventDefault();
+  });
+  $('addBtn').addEventListener('click', function(){ $('addCard').classList.add('show'); $('newName').focus(); });
+  $('addCancel').addEventListener('click', function(){ $('addCard').classList.remove('show'); $('addCard').reset(); });
+
+  function toggleSidebar(){ $('sidebar').classList.toggle('open'); $('overlay').classList.toggle('show'); }
+  $('hamburger').addEventListener('click', toggleSidebar);
+  $('overlay').addEventListener('click', toggleSidebar);
+
+  readUrl();
+  render();
+})();
+</script>
 </body>
 </html>
