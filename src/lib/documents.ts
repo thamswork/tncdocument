@@ -123,13 +123,35 @@ export async function getDocuments(filters?: any) {
 export async function getDocumentIndex() {
   const { data } = await supabaseAdmin.from('documents').select(`
     id, document_number, customer_id, job_id, status, issue_date, reference_po,
-    payment_condition, total_amount, price_before_vat, apply_wht, created_at, updated_at, source_document_id,
+    payment_condition, total_amount, price_before_vat, apply_wht, notes, last_activity_at, created_at, updated_at, source_document_id,
     document_types(code, name_th),
-    customers(customer_code, company_name),
+    customers(customer_code, company_name, tax_id),
     jobs(name),
     tnc_users!documents_issued_by_fkey(full_name)
   `).neq('status', 'removed').order('created_at', { ascending: false }).limit(5000);
   return data || [];
+}
+
+/** Category + line-item text per document, for the dashboard's full-text search.
+ *  Paged in 1000-row chunks because PostgREST caps a single response. */
+export async function getDocumentSearchText(): Promise<Record<string, string>> {
+  const out: Record<string, string[]> = {};
+  const add = (id: string, t: string) => { if (!t) return; const a = (out[id] ||= []); if (!a.includes(t)) a.push(t); };
+  async function pull(table: string, cols: string, pick: (r: any) => string) {
+    for (let from = 0; from < 100000; from += 1000) {
+      const { data, error } = await supabaseAdmin.from(table).select(cols).order('id').range(from, from + 999);
+      if (error || !data?.length) break;
+      for (const r of data as any[]) add(r.document_id, pick(r));
+      if (data.length < 1000) break;
+    }
+  }
+  await Promise.all([
+    pull('document_categories', 'id, document_id, name_th', (r) => String(r.name_th || '').trim()),
+    pull('document_items', 'id, document_id, description_th, is_subtotal_row', (r) => r.is_subtotal_row ? '' : String(r.description_th || '').trim()),
+  ]);
+  const res: Record<string, string> = {};
+  for (const id in out) res[id] = out[id].join(' · ');
+  return res;
 }
 
 export async function getDocument(id: string) {
