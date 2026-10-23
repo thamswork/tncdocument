@@ -59,7 +59,7 @@ export async function getDocumentTypes() {
 }
 
 export async function getCustomers(search?: string) {
-  let query = supabaseAdmin.from('customers').select('id,customer_code,company_name,contact_name,address,phone,fax,tax_id,email,notes,created_by,created_at,updated_at').order('customer_code');
+  let query = supabaseAdmin.from('customers').select('id,customer_code,company_name,contact_name,address,phone,fax,tax_id,email,notes,credit_days,branch,created_by,created_at,updated_at').order('customer_code');
   if (search) {
     query = query.or(`company_name.ilike.%${search}%,customer_code.ilike.%${search}%`).limit(50);
   } else {
@@ -72,6 +72,59 @@ export async function getCustomers(search?: string) {
 export async function createCustomer(data: any) {
   const { data: customer, error } = await supabaseAdmin.from('customers').insert(data).select().single();
   return { customer, error };
+}
+
+/** Branch for the duplicate rule. Empty, "สำนักงานใหญ่" and 00000 all mean head office;
+ *  "สาขา 1" / "00001" mean branch 00001; anything else is compared as typed. */
+export function branchKey(b: any): string {
+  const s = String(b ?? '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!s || /สำนักงานใหญ่|headoffice|^hq$/.test(s)) return 'HQ';
+  const m = s.match(/^(?:สาขา(?:ที่)?|branch|no\.?)?0*(\d{1,5})$/);
+  if (m) return Number(m[1]) === 0 ? 'HQ' : m[1].padStart(5, '0');
+  return s;
+}
+
+/** How a branch prints: "" (not set), "สำนักงานใหญ่" or "สาขาที่ 00001". */
+export function branchLabel(b: any): string {
+  if (!String(b ?? '').trim()) return '';
+  const k = branchKey(b);
+  return k === 'HQ' ? 'สำนักงานใหญ่' : /^\d{5}$/.test(k) ? 'สาขาที่ ' + k : String(b).trim();
+}
+
+/** Another customer with the same 13-digit tax ID AND the same branch, or null.
+ *  One customer per (tax ID, branch): this is what blocks duplicate customers. */
+export async function findTaxDuplicate(taxId: any, branch: any, excludeId?: string) {
+  const t = String(taxId || '').replace(/\D/g, '');
+  if (t.length !== 13) return null;
+  const { data } = await supabaseAdmin.from('customers').select('id, customer_code, company_name, tax_id, branch');
+  const k = branchKey(branch);
+  return (data || []).find((c: any) =>
+    c.id !== excludeId && String(c.tax_id || '').replace(/\D/g, '') === t && branchKey(c.branch) === k) || null;
+}
+
+/** Deletes a customer, but only one with no documents at all (trash included),
+ *  so no quotation, invoice or tax invoice can ever lose its customer. */
+export async function deleteCustomer(id: string) {
+  const { count, error: cErr } = await supabaseAdmin
+    .from('documents').select('id', { count: 'exact', head: true }).eq('customer_id', id);
+  if (cErr) return { error: cErr };
+  if ((count || 0) > 0) return { error: { message: `ลบไม่ได้ เพราะลูกค้ารายนี้มีเอกสาร ${count} ฉบับ (รวมในถังขยะ)` } };
+  const { error } = await supabaseAdmin.from('customers').delete().eq('id', id);
+  return { error };
+}
+
+/** Credit days from a form/JSON value: whole days 0–365, or null when blank. */
+export function parseCreditDays(v: any): number | null {
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.max(0, Math.min(365, n)) : null;
+}
+
+/** YYYY-MM-DD plus n days (date only, no time zone shift). */
+export function addDaysIso(iso: string, n: number): string {
+  const d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 // Suggests the next customer code as TNC{currentYear}_{seq}, where seq is the next
@@ -233,6 +286,7 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
     itemsForTotals = existingItems || [];
   }
   const totals = calculateTotals(itemsForTotals, docData.discount_design || 0, docData.discount_trade || 0);
+  if ('credit_days' in docData) docData = { ...docData, credit_days: parseCreditDays(docData.credit_days) };
   if (isNew) {
     const { data: docType } = await supabaseAdmin.from('document_types').select('prefix').eq('id', docData.document_type_id).single();
     const docNumber = await generateDocumentNumber(docData.document_type_id, docType?.prefix || 'DOC');

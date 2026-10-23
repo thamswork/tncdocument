@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../../../lib/supabase';
 import { getSessionUser, SESSION_COOKIE } from '../../../lib/auth';
-import { round2 } from '../../../lib/documents';
+import { round2, addDaysIso } from '../../../lib/documents';
 
 export async function POST({ request, cookies }: any) {
   const token = cookies.get(SESSION_COOKIE)?.value;
@@ -46,10 +46,17 @@ export async function POST({ request, cookies }: any) {
   // VAT-inclusive amount (÷1.07) made installments drift by a satang or two.
   let beforeVat = round2(amount / 1.07);
   const pctNum = Number(pct);
-  if (source_doc_id && pctNum > 0 && pctNum <= 100) {
-    const { data: src } = await supabaseAdmin.from('documents').select('price_before_vat').eq('id', source_doc_id).single();
-    if (src && Number(src.price_before_vat) > 0) beforeVat = round2(Number(src.price_before_vat) * pctNum / 100);
+  const { data: src } = source_doc_id
+    ? await supabaseAdmin.from('documents').select('price_before_vat, credit_days').eq('id', source_doc_id).single()
+    : { data: null as any };
+  if (src && pctNum > 0 && pctNum <= 100 && Number(src.price_before_vat) > 0) {
+    beforeVat = round2(Number(src.price_before_vat) * pctNum / 100);
   }
+  // The invoice keeps the quotation's credit term; its due date counts from
+  // this invoice's own date unless a due date was typed in.
+  const creditDays: number | null = src?.credit_days ?? null;
+  const invDate = issue_date || new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const invDue = due_date || (creditDays !== null ? addDaysIso(invDate, creditDays) : null);
   const vatAmt = round2(beforeVat * 0.07);
   const totalAmt = round2(beforeVat + vatAmt);
 
@@ -63,8 +70,9 @@ export async function POST({ request, cookies }: any) {
       status: 'in_progress', // lifecycle: new documents start in progress (no draft gate)
       last_activity_at: new Date().toISOString(),
       language: 'th',
-      issue_date: issue_date || new Date().toISOString().split('T')[0],
-      due_date: due_date || null,
+      issue_date: invDate,
+      due_date: invDue,
+      credit_days: creditDays,
       reference_po: source_doc_num,
       source_document_id: source_doc_id || null,
       payment_condition: label,

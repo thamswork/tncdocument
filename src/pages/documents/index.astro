@@ -4,9 +4,11 @@ const token = Astro.cookies.get(SESSION_COOKIE)?.value;
 const existingUser = await getSessionUser(token);
 if (existingUser) return Astro.redirect('/documents/dashboard');
 let error = '';
+let typedUsername = '';
 const returnUrl = Astro.url.searchParams.get('return') || '/documents/dashboard';
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
+  typedUsername = (form.get('username') as string) || '';
   const user = await loginUser(form.get('username') as string, form.get('password') as string);
   if (user) {
     const t = await createSession(user.id);
@@ -25,95 +27,123 @@ if (Astro.request.method === 'POST') {
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <meta name="robots" content="noindex,nofollow"/>
   <title>เข้าสู่ระบบ — TNC Build Studio</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;
-      --text:#1A1814;--t2:#6B6860;--t3:#AEABA4;
-      --gold:#C9A96E;--red:#B94040;
+      --bg:#F6F5F2;--white:#fff;--border:#E3E0DA;--line:#EEECE7;
+      --text:#1A1814;--t2:#66635C;--t3:#A9A69F;
+      --gold:#B8955A;--gbg:#FAF6EE;
+      --green:#2D7A4F;--grbg:#EEF6F1;--red:#B23B3B;--redbg:#FBF0F0;--amber:#B97A26;--blue:#2D5A9E;
     }
-    html,body{height:100%;font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
-    body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;min-height:100dvh;padding:24px 20px;}
+    html{height:100%;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100%;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;}
+    a{color:inherit;}
+    button,input{font-family:inherit;}
+    button:focus{outline:none;}
+    button:focus-visible,a:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
 
-    .logo-area{text-align:center;margin-bottom:32px;}
-    .logo-mark{width:48px;height:48px;background:var(--text);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;}
-    .logo-mark svg{fill:var(--bg);width:24px;height:24px;}
-    .brand-name{font-size:16px;font-weight:700;letter-spacing:.04em;color:var(--text);}
-    .brand-sub{font-size:11px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-top:2px;}
+    .wrap{width:100%;max-width:380px;display:flex;flex-direction:column;gap:20px;}
+    .brand{text-align:center;}
+    .brand-name{font-size:13px;font-weight:700;letter-spacing:.06em;}
+    .brand-sub{font-size:11px;color:var(--t3);margin-top:2px;}
 
-    .card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,.06);}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:28px 26px 26px;}
+    .card-t{font-size:22px;font-weight:700;letter-spacing:-.01em;}
+    .card-s{font-size:13px;color:var(--t2);margin-top:4px;}
+    .form{display:flex;flex-direction:column;gap:14px;margin-top:22px;}
 
-    .card-title{font-size:20px;font-weight:700;margin-bottom:6px;}
-    .card-sub{font-size:13px;color:var(--t2);margin-bottom:28px;}
-
-    .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
-    .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t2);}
-    .inp{padding:13px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-size:15px;font-family:inherit;color:var(--text);outline:none;transition:border-color .2s;width:100%;-webkit-appearance:none;appearance:none;}
-    .inp:focus{border-color:var(--text);background:var(--white);}
+    .field{display:flex;flex-direction:column;gap:6px;}
+    .field label{font-size:12px;color:var(--t2);font-weight:500;}
+    .inp{height:42px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);background:var(--white);outline:none;width:100%;-webkit-appearance:none;appearance:none;}
+    .inp:hover{border-color:#CFCBC3;}
+    .inp:focus{border-color:var(--text);}
     .inp::placeholder{color:var(--t3);}
+    .pw{position:relative;}
+    .pw .inp{padding-right:64px;}
+    .pw-t{position:absolute;right:6px;top:50%;transform:translateY(-50%);height:30px;padding:0 8px;border:none;background:none;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+    .pw-t:hover{color:var(--text);}
 
-    .error{background:#FFF0F0;border:1px solid #F5C6C6;color:var(--red);padding:11px 14px;border-radius:6px;font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+    .msg{padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6;}
+    .msg.err{background:var(--redbg);color:var(--red);}
 
-    .submit-btn{width:100%;padding:14px;background:var(--text);color:var(--bg);border:none;border-radius:6px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.04em;text-transform:uppercase;transition:opacity .15s;margin-top:8px;-webkit-tap-highlight-color:transparent;min-height:50px;}
-    .submit-btn:active{opacity:.85;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:42px;padding:0 16px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);white-space:nowrap;}
+    .btn-dark{background:var(--text);border-color:var(--text);color:var(--white);}
+    .btn-dark:hover{opacity:.88;}
+    .btn-dark:disabled{opacity:.6;cursor:default;}
+    .btn-block{width:100%;margin-top:6px;}
 
-    .back-link{margin-top:24px;font-size:12px;color:var(--t3);text-align:center;}
-    .back-link a{color:var(--t2);text-decoration:none;}
-    .back-link a:hover{color:var(--text);}
+    .foot{text-align:center;font-size:12.5px;color:var(--t3);}
+    .foot a{color:var(--t2);text-decoration:underline;text-underline-offset:3px;}
+    .foot a:hover{color:var(--text);}
 
-    @media(max-width:440px){
-      .card{padding:24px 20px;border-radius:10px;}
-      .card-title{font-size:18px;}
+    @media(max-width:640px){
+      body{justify-content:flex-start;padding-top:12vh;}
+      .card{padding:24px 20px 22px;}
+      .card-t{font-size:20px;}
+      .inp{height:46px;font-size:16px;}
+      .btn{height:46px;}
     }
   </style>
 </head>
 <body>
-
-  <div class="logo-area">
-    <div class="logo-mark">
-      <svg viewBox="0 0 24 24"><path d="M19 3H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-name">TNC BUILD STUDIO</div>
+      <div class="brand-sub">ระบบเอกสาร</div>
     </div>
-    <div class="brand-name">TNC BUILD STUDIO</div>
-    <div class="brand-sub">ระบบจัดการเอกสาร</div>
+
+    <div class="card">
+      <h1 class="card-t">เข้าสู่ระบบ</h1>
+      <div class="card-s">กรอกชื่อผู้ใช้และรหัสผ่านของคุณ</div>
+
+      <form method="POST" autocomplete="on" class="form" id="loginForm">
+        {error && <div class="msg err" role="alert">{error}</div>}
+        <div class="field">
+          <label for="username">ชื่อผู้ใช้</label>
+          <input class="inp" type="text" id="username" name="username"
+            placeholder="กรอกชื่อผู้ใช้"
+            value={typedUsername}
+            autocomplete="username"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
+            autofocus={!error}
+            required/>
+        </div>
+        <div class="field">
+          <label for="password">รหัสผ่าน</label>
+          <div class="pw">
+            <input class="inp" type="password" id="password" name="password"
+              placeholder="กรอกรหัสผ่าน"
+              autocomplete="current-password"
+              autofocus={!!error}
+              required/>
+            <button type="button" class="pw-t" id="pwToggle" aria-controls="password">แสดง</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-dark btn-block" id="submitBtn">เข้าสู่ระบบ</button>
+      </form>
+    </div>
+
+    <div class="foot"><a href="/">กลับสู่เว็บไซต์หลัก</a></div>
   </div>
 
-  <div class="card">
-    <div class="card-title">เข้าสู่ระบบ</div>
-    <div class="card-sub">กรอกชื่อผู้ใช้และรหัสผ่านของคุณ</div>
-
-    {error && (
-      <div class="error">
-        <span>⚠</span>
-        <span>{error}</span>
-      </div>
-    )}
-
-    <form method="POST" autocomplete="on">
-      <div class="fg">
-        <label class="lbl" for="username">ชื่อผู้ใช้</label>
-        <input class="inp" type="text" id="username" name="username"
-          placeholder="กรอกชื่อผู้ใช้"
-          autocomplete="username"
-          autocapitalize="none"
-          autocorrect="off"
-          spellcheck="false"
-          required/>
-      </div>
-      <div class="fg">
-        <label class="lbl" for="password">รหัสผ่าน</label>
-        <input class="inp" type="password" id="password" name="password"
-          placeholder="กรอกรหัสผ่าน"
-          autocomplete="current-password"
-          required/>
-      </div>
-      <button type="submit" class="submit-btn">เข้าสู่ระบบ</button>
-    </form>
-  </div>
-
-  <div class="back-link">
-    <a href="/">กลับสู่เว็บไซต์หลัก</a>
-  </div>
-
+<script is:inline>
+(function(){
+  var pw = document.getElementById('password'), t = document.getElementById('pwToggle');
+  t.addEventListener('click', function(){
+    var show = pw.type === 'password';
+    pw.type = show ? 'text' : 'password';
+    t.textContent = show ? 'ซ่อน' : 'แสดง';
+    pw.focus();
+  });
+  document.getElementById('loginForm').addEventListener('submit', function(){
+    pw.type = 'password';
+    var b = document.getElementById('submitBtn');
+    setTimeout(function(){ b.disabled = true; b.textContent = 'กำลังเข้าสู่ระบบ'; }, 0);
+  });
+})();
+</script>
 </body>
 </html>

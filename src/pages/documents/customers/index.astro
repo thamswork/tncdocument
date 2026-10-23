@@ -2,6 +2,7 @@
 import { getCustomers } from '../../../lib/documents';
 const user = Astro.locals.user;
 const customers = await getCustomers();
+const deletedCode = (Astro.url.searchParams.get('deleted') || '').slice(0, 40);
 
 // Thai tax ID: 13 digits, last digit is a checksum of the first 12.
 function taxState(raw: string | null | undefined) {
@@ -137,6 +138,8 @@ const dataJson = JSON.stringify(list).replace(/</g, '\\u003c');
     .stat small{font-size:12px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .edit{justify-self:end;font-size:12.5px;color:var(--t2);text-decoration:underline;text-underline-offset:3px;}
     .row:hover .edit{color:var(--text);}
+    .msg{padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6;}
+    .msg.ok{background:var(--grbg);color:var(--green);}
     mark{background:#F6E3B0;color:inherit;border-radius:2px;padding:0 1px;}
     .empty{padding:56px 20px;text-align:center;color:var(--t2);}
     .empty-t{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
@@ -213,6 +216,7 @@ const dataJson = JSON.stringify(list).replace(/</g, '\\u003c');
       <h1 class="h1">ลูกค้า</h1>
       <a href="/documents/customers/new" class="btn btn-dark">เพิ่มลูกค้า</a>
     </div>
+    {deletedCode && <div class="msg ok">ลบลูกค้า {deletedCode} แล้ว</div>}
 
     <div class="panel">
       <div class="search">

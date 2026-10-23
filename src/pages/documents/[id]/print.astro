@@ -1,5 +1,5 @@
 ---
-import { getDocument, logAction } from '../../../lib/documents';
+import { getDocument, logAction, branchLabel } from '../../../lib/documents';
 const user = Astro.locals.user || null;
 const { id } = Astro.params;
 const doc = await getDocument(id!);
@@ -254,6 +254,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <td>
         <div><span class="lbl">เลขที่เอกสาร / No: </span><span class="val mono">{doc.document_number}</span></div>
         {doc.reference_po && <div><span class="lbl">P/O: </span><span class="val mono">{doc.reference_po}</span></div>}
+        {(isQuotation || isInvoice) && (doc as any).credit_days != null && <div><span class="lbl">เครดิต: </span><span class="val">{(doc as any).credit_days === 0 ? 'เงินสด' : `${(doc as any).credit_days} วัน`}</span></div>}
         {isInvoice && doc.due_date && <div><span class="lbl">กำหนดชำระ: </span><span class="val">{thaiDate(doc.due_date)}</span></div>}
         {doc.payment_condition && <div style="margin-top:4px;"><div class="lbl">เงื่อนไขการชำระเงิน:</div><div class="pay">{doc.payment_condition}</div></div>}
         {isQuotation && doc.due_date && <div class="valid-until">⚠ ราคานี้มีผลถึง: {thaiDate(doc.due_date)}</div>}
@@ -261,7 +262,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
     </tr>
     <tr>
       <td><span class="lbl">โทรศัพท์: </span><span class="val">{doc.customers?.phone||'—'}</span></td>
-      <td><span class="lbl">เลขประจำตัวผู้เสียภาษี: </span><span class="val mono">{doc.customers?.tax_id||'—'}</span></td>
+      <td><span class="lbl">เลขประจำตัวผู้เสียภาษี: </span><span class="val mono">{doc.customers?.tax_id||'—'}</span>{branchLabel(doc.customers?.branch) && !String(doc.customers?.company_name || '').includes(branchLabel(doc.customers?.branch)) && <span class="val"> ({branchLabel(doc.customers?.branch)})</span>}</td>
     </tr>
   </table>
 

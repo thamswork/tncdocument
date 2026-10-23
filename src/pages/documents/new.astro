@@ -101,6 +101,8 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
     .fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 20px;}
     .fields .full{grid-column:1 / -1;}
     .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .fhint{font-size:12px;color:var(--t3);line-height:1.5;}
+    .fhint .linkbtn{font-size:12px;}
     .field label,.flabel{font-size:12px;color:var(--t2);font-weight:500;}
     .inp{height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);background:var(--white);outline:none;width:100%;}
     .inp:hover{border-color:#CFCBC3;}
@@ -334,9 +336,14 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
                 <label for="issueDate" id="issueLbl">วันที่ออก</label>
                 <input type="date" class="inp" id="issueDate" value={todayIso}/>
               </div>
+              <div class="field" id="creditField">
+                <label for="creditDays">เครดิต (วัน)</label>
+                <input type="number" class="inp" id="creditDays" min="0" max="365" step="1" inputmode="numeric" placeholder="ไม่ระบุ"/>
+              </div>
               <div class="field">
                 <label for="dueDate" id="dueLbl">ราคามีผลถึง</label>
                 <input type="date" class="inp" id="dueDate"/>
+                <div class="fhint" id="dueHint" style="display:none"></div>
               </div>
               <div class="field ref">
                 <label for="refPO">อ้างอิง P/O</label>
@@ -410,7 +417,7 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
   var CUSTS = JSON.parse(decodeURIComponent(document.getElementById('__cu').dataset.v || '%5B%5D'));
   var UNITS = ['งาน','ตร.ม.','เมตร','ชุด','ชิ้น','จุด','เส้น','ตู้','คู่','ลิตร','ใบ','แผ่น'];
   var cats = [], ibc = {}, cc = 0, ic = 0;
-  var savedDoc = null, busy = false, dirty = false, typeCode = '';
+  var savedDoc = null, busy = false, dirty = false, typeCode = '', creditTouched = false;
   var $ = function(id){ return document.getElementById(id); };
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -480,9 +487,40 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
     $('dueLbl').textContent = L[1];
     $('txWarn').classList.toggle('show', typeCode === 'TAX_INVOICE');
     showCustWarn();
+    syncCredit();
     recalc();
   }
   $('typeSeg').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b) setType(b); });
+
+  /* ── Credit term and invoice due date ──
+     Invoice due date = invoice date + credit days, filled in automatically
+     until someone types their own due date. */
+  var dueAuto = !$('dueDate').value;
+  function addDays(iso, n) { var d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  function creditVal() {
+    var v = String($('creditDays').value).trim();
+    if (v === '') return null;
+    var n = Math.round(Number(v));
+    return isFinite(n) ? Math.max(0, Math.min(365, n)) : null;
+  }
+  function creditShown() { return typeCode === 'QUOTATION' || typeCode === 'INVOICE'; }
+  function syncCredit() {
+    var cd = creditVal(), iso = $('issueDate').value, h = $('dueHint');
+    $('creditField').style.display = creditShown() ? '' : 'none';
+    if (typeCode === 'INVOICE' && cd !== null && iso) {
+      var calc = addDays(iso, cd);
+      if (dueAuto) $('dueDate').value = calc;
+      h.innerHTML = $('dueDate').value === calc
+        ? 'วันที่ออก + เครดิต ' + cd + ' วัน'
+        : 'กำหนดเอง · <button type="button" class="linkbtn" id="dueReset">ใช้วันที่ออก + ' + cd + ' วัน</button>';
+      h.style.display = '';
+    } else { h.textContent = ''; h.style.display = 'none'; }
+  }
+  $('creditDays').addEventListener('input', function(){ creditTouched = true; syncCredit(); });
+  $('issueDate').addEventListener('input', syncCredit);
+  $('issueDate').addEventListener('change', syncCredit);
+  $('dueDate').addEventListener('input', function(){ dueAuto = !$('dueDate').value; syncCredit(); });
+  $('dueHint').addEventListener('click', function(e){ if (e.target.id === 'dueReset') { dueAuto = true; syncCredit(); dirty = true; } });
 
   /* ── Customer picker ── */
   var custById = {}; CUSTS.forEach(function(c){ custById[c.id] = c; });
@@ -514,6 +552,7 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
     $('chosen').classList.add('show');
     closeDD();
     showCustWarn();
+    if (!creditTouched) { $('creditDays').value = c.credit_days == null ? '' : c.credit_days; syncCredit(); }
     dirty = true;
   }
   function showCustWarn() {
@@ -749,6 +788,7 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
         discount_design: num($('dD').value),
         discount_trade: num($('dT').value),
         apply_wht: $('applyWht').checked,
+        credit_days: creditShown() ? creditVal() : null,
       },
       categories: cats.map(function(c, i){ return { temp_id: c.tid, category_number: c.num, name_th: c.name || 'หมวดที่ ' + c.num, sort_order: i }; }),
       items: items

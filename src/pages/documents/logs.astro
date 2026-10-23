@@ -1,24 +1,150 @@
 ---
 import { supabaseAdmin } from '../../lib/supabase';
-const user = Astro.locals.user;
-const { data: logs } = await supabaseAdmin
-  .from('export_logs')
-  .select(`*, documents(document_number), tnc_users!export_logs_performed_by_fkey(full_name)`)
-  .order('created_at', { ascending: false })
-  .limit(100);
 
-function thaiDate(s: string) {
-  if (!s) return '—';
-  return new Date(s).toLocaleString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+const user = Astro.locals.user;
+const PER = 25;
+const TZ = 'Asia/Bangkok';
+
+// Filters live in the URL: ?q=&a=&u=&page=
+const sp = Astro.url.searchParams;
+const q = (sp.get('q') || '').trim().slice(0, 80);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uRaw = sp.get('u') || '';
+const u = uRaw === 'system' || UUID.test(uRaw) ? uRaw : '';
+
+const TABS: { k: string; label: string; actions?: string[]; not?: string }[] = [
+  { k: '', label: 'ทั้งหมด' },
+  { k: 'change', label: 'ไม่รวมการเปิดดู', not: 'view' },
+  { k: 'save', label: 'สร้าง/บันทึก', actions: ['document_created', 'draft_saved', 'document_saved'] },
+  { k: 'publish', label: 'ออกเอกสาร', actions: ['published'] },
+  { k: 'pdf', label: 'พิมพ์/PDF', actions: ['pdf_exported'] },
+  { k: 'remove', label: 'ลบ', actions: ['removed'] },
+  { k: 'view', label: 'เปิดดู', actions: ['view'] },
+];
+const a = TABS.some(t => t.k === sp.get('a')) ? (sp.get('a') as string) : '';
+
+const ACTION: Record<string, { label: string; cls: string }> = {
+  view: { label: 'เปิดดู', cls: 'a-view' },
+  document_created: { label: 'สร้างเอกสาร', cls: 'a-create' },
+  draft_saved: { label: 'บันทึกฉบับร่าง', cls: 'a-save' },
+  document_saved: { label: 'บันทึกการแก้ไข', cls: 'a-save' },
+  published: { label: 'ออกเอกสาร', cls: 'a-pub' },
+  pdf_exported: { label: 'พิมพ์/PDF', cls: 'a-pdf' },
+  removed: { label: 'ย้ายไปถังขยะ', cls: 'a-rm' },
+  auto_flagged_stale: { label: 'ไม่เคลื่อนไหว 5+ วัน', cls: 'a-stale' },
+  link_sent: { label: 'ส่งลิงก์', cls: 'a-pdf' },
+  cancelled: { label: 'ยกเลิก', cls: 'a-rm' },
+};
+
+// "tx24" -> "TX0024", "sv92-36" -> "SV0092-36"
+function docPattern(s: string) {
+  const t = s.toUpperCase().replace(/\s+/g, '');
+  const m = t.match(/^(SV|IV|TX|BQ)0*(\d{1,4})(.*)$/);
+  return m ? m[1] + m[2].padStart(4, '0') + m[3] : t;
 }
-const actionLabel: Record<string,string> = {
-  view:'เปิดดู', draft_saved:'บันทึก Draft', published:'ออกเอกสาร',
-  pdf_exported:'Export PDF', link_sent:'ส่งลิงก์', cancelled:'ยกเลิก'
-};
-const actionColor: Record<string,string> = {
-  view:'#AEABA4', draft_saved:'#C9A96E', published:'#2D7A4F',
-  pdf_exported:'#1a6fb5', link_sent:'#7B2D8B', cancelled:'#B94040'
-};
+const clean = (s: string) => s.replace(/[%_,()*\\"]/g, '');
+
+// Search: document number (with short aliases) or customer name -> document ids
+let docIds: string[] | null = null;
+let searchCapped = false;
+if (q) {
+  const pat = clean(docPattern(q));
+  const nameQ = clean(q);
+  const { data: cs } = nameQ
+    ? await supabaseAdmin.from('customers').select('id').ilike('company_name', `%${nameQ}%`).limit(100)
+    : { data: [] as any[] };
+  const cids = (cs || []).map((c: any) => c.id);
+  let dq: any = supabaseAdmin.from('documents').select('id').limit(301);
+  dq = cids.length
+    ? dq.or(`document_number.ilike.%${pat}%,customer_id.in.(${cids.join(',')})`)
+    : dq.ilike('document_number', `%${pat}%`);
+  const { data: ds } = pat || cids.length ? await dq : { data: [] as any[] };
+  docIds = (ds || []).map((d: any) => d.id);
+  if (docIds.length > 300) { docIds = docIds.slice(0, 300); searchCapped = true; }
+}
+
+function applyFilters(qb: any, tab: (typeof TABS)[number]) {
+  if (docIds) qb = qb.in('document_id', docIds.length ? docIds : ['00000000-0000-0000-0000-000000000000']);
+  if (u === 'system') qb = qb.is('performed_by', null);
+  else if (u) qb = qb.eq('performed_by', u);
+  if (tab.not) qb = qb.neq('action', tab.not);
+  else if (tab.actions) qb = qb.in('action', tab.actions);
+  return qb;
+}
+
+const [usersRes, ...countRes] = await Promise.all([
+  supabaseAdmin.from('tnc_users').select('id, full_name').order('full_name'),
+  ...TABS.map(t => applyFilters(supabaseAdmin.from('export_logs').select('id', { count: 'exact', head: true }), t)),
+]);
+const users: { id: string; full_name: string }[] = (usersRes as any).data || [];
+const counts: Record<string, number> = {};
+TABS.forEach((t, i) => { counts[t.k] = (countRes[i] as any).count || 0; });
+
+const tab = TABS.find(t => t.k === a)!;
+const total = counts[a];
+const pages = Math.max(1, Math.ceil(total / PER));
+const page = Math.min(pages, Math.max(1, parseInt(sp.get('page') || '1', 10) || 1));
+const from = (page - 1) * PER;
+
+let logs: any[] = [];
+if (total) {
+  const { data } = await applyFilters(
+    supabaseAdmin
+      .from('export_logs')
+      .select(`id, action, notes, created_at, performed_by, documents(id, document_number, status, document_types(code), customers(company_name)), tnc_users!export_logs_performed_by_fkey(full_name)`),
+    tab,
+  )
+    .order('created_at', { ascending: false })
+    .range(from, from + PER - 1);
+  logs = data || [];
+}
+
+// Bangkok dates (the server runs in UTC)
+const dayKey = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: TZ });
+const todayKey = dayKey(new Date());
+const yKey = dayKey(new Date(Date.now() - 864e5));
+function dayLabel(d: Date) {
+  const k = dayKey(d);
+  const full = d.toLocaleDateString('th-TH', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+  return k === todayKey ? 'วันนี้ · ' + full : k === yKey ? 'เมื่อวาน · ' + full : full;
+}
+const timeOf = (d: Date) => d.toLocaleTimeString('th-TH', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+
+const groups: { k: string; label: string; items: any[] }[] = [];
+for (const l of logs) {
+  const d = new Date(l.created_at);
+  const k = dayKey(d);
+  let g = groups[groups.length - 1];
+  if (!g || g.k !== k) { g = { k, label: dayLabel(d), items: [] }; groups.push(g); }
+  g.items.push({ ...l, time: timeOf(d) });
+}
+
+// Search highlight (split into before / match / after)
+function hl(text: string, needle: string) {
+  const t = String(text || '');
+  if (!needle) return [t, '', ''];
+  const i = t.toLowerCase().indexOf(needle.toLowerCase());
+  return i < 0 ? [t, '', ''] : [t.slice(0, i), t.slice(i, i + needle.length), t.slice(i + needle.length)];
+}
+const numNeedle = q ? clean(docPattern(q)) : '';
+const nameNeedle = q ? clean(q) : '';
+
+function href(over: Record<string, string | number>) {
+  const p = new URLSearchParams();
+  const v: Record<string, string | number> = { q, a, u, page: 1, ...over };
+  for (const [k, val] of Object.entries(v)) if (val && !(k === 'page' && val === 1)) p.set(k, String(val));
+  const s = p.toString();
+  return '/documents/logs' + (s ? '?' + s : '');
+}
+
+const nums: (number | 'gap')[] = [];
+for (let p = 1; p <= pages; p++) {
+  if (p === 1 || p === pages || Math.abs(p - page) <= 1) nums.push(p);
+  else if (nums[nums.length - 1] !== 'gap') nums.push('gap');
+}
+const fmt = (n: number) => n.toLocaleString('th-TH');
+const filtered = !!(q || u || a);
+const uName = u === 'system' ? 'ระบบอัตโนมัติ' : users.find(x => x.id === u)?.full_name || '';
 ---
 <!DOCTYPE html>
 <html lang="th">
@@ -27,101 +153,267 @@ const actionColor: Record<string,string> = {
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dynjnftnu/image/upload/v1781103809/LOGO_TNC-02_xhpu0t.png"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Export Logs — TNC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-  <style>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>ประวัติการใช้งาน — TNC Build Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#F7F6F3;--white:#fff;--border:#E0DDD7;--b2:#ECEAE5;--text:#1A1814;--t2:#6B6860;--t3:#AEABA4;}
-    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);}
-    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
-    .back{font-size:12px;color:var(--t2);text-decoration:none;padding:7px 12px;border:1px solid var(--border);border-radius:5px;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
-    .back:active{background:var(--bg);}
-    .topbar-title{font-size:15px;font-weight:700;flex:1;}
-    .content{padding:20px 16px;}
-    .card{background:var(--white);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    :root{
+      --bg:#F6F5F2;--white:#fff;--border:#E3E0DA;--line:#EEECE7;
+      --text:#1A1814;--t2:#66635C;--t3:#A9A69F;
+      --gold:#B8955A;--gbg:#FAF6EE;
+      --green:#2D7A4F;--grbg:#EEF6F1;--red:#B23B3B;--redbg:#FBF0F0;--amber:#B97A26;--blue:#2D5A9E;
+      --sb:216px;
+    }
+    html{height:100%;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100%;font-size:14px;-webkit-font-smoothing:antialiased;}
+    a{color:inherit;}
+    button,select,input{font-family:inherit;}
+    button:focus{outline:none;}
+    button:focus-visible,a:focus-visible,select:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+    .ic{width:16px;height:16px;flex-shrink:0;}
 
-    /* Desktop table */
-    .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-    table{width:100%;border-collapse:collapse;min-width:480px;}
-    thead th{padding:10px 14px;text-align:left;font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;background:var(--bg);border-bottom:1px solid var(--border);}
-    tbody tr{border-bottom:1px solid var(--b2);}
-    tbody tr:last-child{border-bottom:none;}
-    td{padding:12px 14px;font-size:12.5px;color:var(--t2);}
-    td.mono{font-family:monospace;font-size:12px;color:var(--text);}
-    .badge{display:inline-block;padding:3px 9px;border-radius:4px;font-size:10.5px;font-weight:700;color:#fff;white-space:nowrap;}
+    /* Sidebar (same as dashboard) */
+    .sidebar{width:var(--sb);background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100dvh;z-index:200;transition:transform .25s cubic-bezier(.4,0,.2,1);}
+    .sb-brand{padding:22px 22px 18px;}
+    .sb-brand-name{font-size:13px;font-weight:700;letter-spacing:.06em;}
+    .sb-brand-sub{font-size:11px;color:var(--t3);margin-top:2px;}
+    .sb-nav{padding:6px 12px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+    .sb-link{display:block;padding:9px 12px;border-radius:6px;font-size:13.5px;color:var(--t2);text-decoration:none;}
+    .sb-link:hover{background:var(--bg);color:var(--text);}
+    .sb-link.active{background:var(--bg);color:var(--text);font-weight:600;}
+    .sb-foot{padding:16px 22px;border-top:1px solid var(--line);}
+    .sb-user{font-size:13px;font-weight:600;}
+    .sb-role{font-size:11px;color:var(--t3);margin-top:1px;text-transform:capitalize;}
+    .sb-logout{margin-top:10px;background:none;border:none;padding:0;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+    .sb-logout:hover{color:var(--red);}
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:190;}
+    .overlay.show{display:block;}
 
-    /* Mobile card list */
-    .mob-list{display:none;}
-    .mob-item{padding:14px 16px;border-bottom:1px solid var(--b2);}
-    .mob-item:last-child{border-bottom:none;}
-    .mob-row1{display:flex;align-items:center;gap:10px;margin-bottom:5px;}
-    .mob-docnum{font-size:13px;font-weight:700;color:var(--text);flex:1;}
-    .mob-date{font-size:11px;color:var(--t3);}
-    .mob-row2{display:flex;align-items:center;gap:8px;}
-    .mob-user{font-size:12px;color:var(--t2);}
+    /* Page */
+    .main{margin-left:var(--sb);min-height:100dvh;}
+    .page{max-width:1180px;margin:0 auto;padding:28px 32px 48px;display:flex;flex-direction:column;gap:20px;}
+    .head{display:flex;align-items:center;gap:12px;}
+    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:6px;margin-left:-6px;color:var(--text);}
+    .h1{font-size:22px;font-weight:700;letter-spacing:-.01em;flex:1;}
+    .head-note{font-size:12.5px;color:var(--t3);}
 
-    .empty{padding:48px 24px;text-align:center;color:var(--t3);}
+    /* Search + tabs (same as dashboard panel) */
+    .panel{background:var(--white);border:1px solid var(--border);border-radius:12px;}
+    .search{padding:14px 14px 12px;display:flex;gap:10px;align-items:stretch;}
+    .sbox{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:50px;padding:6px 8px 6px 14px;background:var(--bg);border:1px solid transparent;border-radius:10px;transition:border-color .15s,background .15s;}
+    .sbox:focus-within{background:var(--white);border-color:var(--text);}
+    .sbox > .ic{color:var(--t3);width:18px;height:18px;}
+    .q{flex:1;min-width:0;border:none;outline:none;font-size:15.5px;color:var(--text);background:none;padding:6px 2px;}
+    .q::placeholder{color:var(--t3);}
+    .q::-webkit-search-cancel-button{display:none;}
+    .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:50%;background:var(--line);color:var(--t2);cursor:pointer;flex-shrink:0;}
+    .icon-btn .ic{width:12px;height:12px;}
+    .usel{width:200px;flex-shrink:0;min-height:50px;padding:0 34px 0 14px;border:1px solid var(--border);border-radius:10px;font-size:13.5px;color:var(--text);background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2366635C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center/14px;appearance:none;-webkit-appearance:none;cursor:pointer;outline:none;}
+    .usel:hover{border-color:#CFCBC3;}
+    .usel:focus{border-color:var(--text);}
+    .usel.on{border-color:var(--text);font-weight:600;}
+    .tabs{display:flex;gap:4px;padding:0 10px;border-top:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .tab{position:relative;padding:13px 10px;font-size:13px;font-weight:500;color:var(--t2);white-space:nowrap;text-decoration:none;}
+    .tab:hover{color:var(--text);}
+    .tab.on{color:var(--text);font-weight:700;}
+    .tab.on::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--text);border-radius:2px;}
+    .tab .n{margin-left:5px;font-size:11.5px;color:var(--t3);font-weight:600;font-variant-numeric:tabular-nums;}
 
-    @media(max-width:600px){
-      .topbar{padding:0 16px;}
-      .topbar-title{font-size:13px;}
-      .content{padding:14px 12px;}
-      .tbl-wrap{display:none;}
-      .mob-list{display:block;}
+    /* Results */
+    .results{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+    .res-head{display:flex;align-items:baseline;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+    .res-title{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;}
+    .res-meta{font-size:12.5px;color:var(--t2);}
+    .res-clear{margin-left:auto;font-size:12.5px;color:var(--t2);text-decoration:underline;text-underline-offset:3px;}
+    .res-clear:hover{color:var(--text);}
+    .day{padding:9px 18px;font-size:12px;font-weight:600;color:var(--t2);background:#FBFAF8;border-bottom:1px solid var(--line);}
+    .row{display:grid;grid-template-columns:56px minmax(0,1fr) 170px 170px;gap:16px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);}
+    .rows > .row:last-child{border-bottom:none;}
+    .time{font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;font-weight:600;text-decoration:none;letter-spacing:-.01em;}
+    a.num:hover{text-decoration:underline;}
+    .num.none{color:var(--t3);font-weight:500;}
+    .t-QUOTATION{color:var(--blue);} .t-INVOICE{color:var(--green);} .t-TAX_INVOICE{color:var(--red);}
+    .sub{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .trash{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:4px;background:var(--redbg);color:var(--red);font-size:11px;font-weight:600;font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;letter-spacing:0;vertical-align:1px;}
+    .note{font-size:12px;color:var(--t3);margin-top:3px;line-height:1.55;word-break:break-word;}
+    .sl{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500;white-space:nowrap;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--t3);flex-shrink:0;}
+    .a-view .sl{color:var(--t2);font-weight:400;} .a-view .dot{background:var(--t3);}
+    .a-create .dot{background:var(--blue);}
+    .a-save .dot{background:var(--gold);}
+    .a-pub .dot{background:var(--green);}
+    .a-pdf .dot{background:var(--t2);}
+    .a-rm .dot{background:var(--red);} .a-rm .sl{color:var(--red);}
+    .a-stale .dot{background:var(--amber);}
+    .who{font-size:13px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .who.sys{color:var(--t3);}
+    mark{background:#F6E3B0;color:inherit;border-radius:2px;padding:0 1px;}
+    .empty{padding:56px 20px;text-align:center;color:var(--t2);}
+    .empty-t{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
+    .empty-s{font-size:13px;}
+    .msg{margin:12px 18px 0;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6;}
+    .msg.info{background:var(--gbg);color:var(--amber);}
+
+    /* Pager (same look as dashboard, as links) */
+    .pager{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap;}
+    .pg-info{font-size:12.5px;color:var(--t2);flex:1;font-variant-numeric:tabular-nums;}
+    .pg{display:flex;gap:4px;}
+    .pg a,.pg span.dis{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:32px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:var(--white);font-size:12.5px;color:var(--text);text-decoration:none;font-variant-numeric:tabular-nums;}
+    .pg a:hover{border-color:var(--text);}
+    .pg a.on{background:var(--text);border-color:var(--text);color:var(--white);font-weight:600;}
+    .pg span.dis{color:var(--t3);}
+    .pg .gap{padding:0 4px;color:var(--t3);align-self:center;}
+
+    @media(max-width:768px){
+      .sidebar{transform:translateX(-100%);}
+      .sidebar.open{transform:translateX(0);}
+      .main{margin-left:0;}
+      .hamburger{display:inline-flex;}
+      .page{padding:16px 12px 32px;gap:14px;}
+      .h1{font-size:19px;}
+      .search{padding:10px;flex-direction:column;gap:8px;}
+      .usel{width:100%;min-height:44px;}
+      .day{padding:9px 14px;}
+      .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"doc time" "act who";gap:6px 12px;padding:13px 14px;}
+      .c-doc{grid-area:doc;min-width:0;} .time{grid-area:time;align-self:start;text-align:right;font-size:12.5px;}
+      .c-act{grid-area:act;} .who{grid-area:who;text-align:right;font-size:12.5px;}
+      .sl{font-size:12.5px;}
+      .msg{margin:12px 14px 0;}
+      .pager{padding:12px;}
+      .pg-info{flex:1 1 100%;}
+      .pg .num-btn{display:none;} .pg .num-btn.on{display:inline-flex;}
+      .pg .gap{display:none;}
+      input,select{font-size:16px!important;}
     }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <a href="/documents/dashboard" class="back">← กลับ</a>
-    <div class="topbar-title">ประวัติการส่งออก (Export Logs)</div>
+
+<div class="overlay" id="overlay"></div>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-name">TNC BUILD STUDIO</div>
+    <div class="sb-brand-sub">ระบบเอกสาร</div>
   </div>
-  <div class="content">
-    <div class="card">
-      {!logs || logs.length === 0 ? (
-        <div class="empty">ยังไม่มีประวัติการดำเนินการ</div>
+  <div class="sb-nav">
+    <a href="/documents/dashboard" class="sb-link">เอกสาร</a>
+    <a href="/documents/new" class="sb-link">สร้างเอกสารใหม่</a>
+    <a href="/documents/customers" class="sb-link">ลูกค้า</a>
+    <a href="/documents/jobs" class="sb-link">งาน</a>
+    {user.role === 'superadmin' && <a href="/documents/users" class="sb-link">ผู้ใช้งาน</a>}
+    <a href="/documents/logs" class="sb-link active">ประวัติการใช้งาน</a>
+  </div>
+  <div class="sb-foot">
+    <div class="sb-user">{user.full_name}</div>
+    <div class="sb-role">{user.role}</div>
+    <form method="POST" action="/documents/logout"><button type="submit" class="sb-logout">ออกจากระบบ</button></form>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page">
+    <div class="head">
+      <button class="hamburger" id="hamburger" aria-label="เมนู"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:22px;height:22px"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <h1 class="h1">ประวัติการใช้งาน</h1>
+      <span class="head-note">เวลาประเทศไทย</span>
+    </div>
+
+    <div class="panel">
+      <form method="GET" action="/documents/logs" class="search" id="sform">
+        <div class="sbox">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input type="search" class="q" name="q" value={q} autocomplete="off" enterkeyhint="search" spellcheck="false" placeholder="ค้นหาเลขที่เอกสารหรือชื่อลูกค้า"/>
+          {q && <a class="icon-btn" href={href({ q: '' })} aria-label="ล้างคำค้นหา"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></a>}
+        </div>
+        {a && <input type="hidden" name="a" value={a}/>}
+        <select name="u" class={'usel' + (u ? ' on' : '')} id="usel" aria-label="ผู้ดำเนินการ">
+          <option value="">ผู้ใช้ทั้งหมด</option>
+          {users.map(x => <option value={x.id} selected={x.id === u}>{x.full_name}</option>)}
+          <option value="system" selected={u === 'system'}>ระบบอัตโนมัติ</option>
+        </select>
+      </form>
+      <nav class="tabs">
+        {TABS.map(t => (
+          <a class={'tab' + (t.k === a ? ' on' : '')} href={href({ a: t.k })}>{t.label}<span class="n">{fmt(counts[t.k])}</span></a>
+        ))}
+      </nav>
+    </div>
+
+    <div class="results">
+      <div class="res-head">
+        <div class="res-title">{fmt(total)} รายการ</div>
+        <div class="res-meta">
+          {[q && `ค้นหา "${q}"`, uName && `โดย ${uName}`].filter(Boolean).join(' · ') || 'เรียงจากล่าสุด'}
+        </div>
+        {filtered && <a class="res-clear" href="/documents/logs">ล้างตัวกรอง</a>}
+      </div>
+      {searchCapped && <div class="msg info">คำค้นหานี้ตรงกับเอกสารจำนวนมาก แสดงเฉพาะ 300 เอกสารแรก ลองพิมพ์ให้เจาะจงขึ้น</div>}
+
+      {total === 0 ? (
+        <div class="empty">
+          {filtered
+            ? <><div class="empty-t">ไม่พบประวัติที่ตรงกับตัวกรอง</div><div class="empty-s">ลองค้นหาด้วยคำอื่น หรือ <a href="/documents/logs">ล้างตัวกรอง</a></div></>
+            : <><div class="empty-t">ยังไม่มีประวัติการใช้งาน</div><div class="empty-s">การเปิดดู บันทึก ออกเอกสาร และพิมพ์ จะแสดงที่นี่</div></>}
+        </div>
       ) : (
-        <>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr>
-                <th>วันที่/เวลา</th>
-                <th>เลขที่เอกสาร</th>
-                <th>การดำเนินการ</th>
-                <th>ผู้ดำเนินการ</th>
-                <th>หมายเหตุ</th>
-              </tr></thead>
-              <tbody>
-                {logs.map((log: any) => (
-                  <tr>
-                    <td style="font-size:12px;white-space:nowrap;">{thaiDate(log.created_at)}</td>
-                    <td class="mono">{log.documents?.document_number || '—'}</td>
-                    <td><span class="badge" style={`background:${actionColor[log.action]||'#888'}`}>{actionLabel[log.action]||log.action}</span></td>
-                    <td>{log.tnc_users?.full_name || '—'}</td>
-                    <td style="color:var(--t3);font-size:12px;">{log.notes||''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div class="rows">
+          {groups.map(g => (
+            <>
+              <div class="day">{g.label}</div>
+              {g.items.map((l: any) => {
+                const doc = l.documents;
+                const act = ACTION[l.action] || { label: l.action, cls: '' };
+                const code = doc?.document_types?.code || '';
+                const cname = doc?.customers?.company_name || '';
+                const [n1, n2, n3] = hl(doc?.document_number || '', numNeedle);
+                const [c1, c2, c3] = hl(cname, nameNeedle);
+                return (
+                  <div class="row">
+                    <div class="time">{l.time}</div>
+                    <div class="c-doc">
+                      {doc
+                        ? <a class={'num t-' + code} href={'/documents/' + doc.id}>{n1}{n2 && <mark>{n2}</mark>}{n3}{doc.status === 'removed' && <span class="trash">ถังขยะ</span>}</a>
+                        : <span class="num none">ไม่มีเอกสาร</span>}
+                      {cname && <div class="sub">{c1}{c2 && <mark>{c2}</mark>}{c3}</div>}
+                      {l.notes && <div class="note">{l.notes}</div>}
+                    </div>
+                    <div class={'c-act ' + act.cls}><span class="sl"><span class="dot"></span>{act.label}</span></div>
+                    <div class={'who' + (l.tnc_users?.full_name ? '' : ' sys')}>{l.tnc_users?.full_name || (l.performed_by ? 'ผู้ใช้ที่ถูกลบ' : 'ระบบอัตโนมัติ')}</div>
+                  </div>
+                );
+              })}
+            </>
+          ))}
+        </div>
+      )}
+
+      {total > PER && (
+        <div class="pager">
+          <div class="pg-info">แสดง {fmt(from + 1)}–{fmt(Math.min(total, from + PER))} จาก {fmt(total)} รายการ</div>
+          <div class="pg">
+            {page > 1 ? <a href={href({ page: page - 1 })}>ก่อนหน้า</a> : <span class="dis">ก่อนหน้า</span>}
+            {nums.map(n => n === 'gap'
+              ? <span class="gap">…</span>
+              : <a class={'num-btn' + (n === page ? ' on' : '')} href={href({ page: n })}>{n}</a>)}
+            {page < pages ? <a href={href({ page: page + 1 })}>ถัดไป</a> : <span class="dis">ถัดไป</span>}
           </div>
-          <div class="mob-list">
-            {logs.map((log: any) => (
-              <div class="mob-item">
-                <div class="mob-row1">
-                  <span class="mob-docnum">{log.documents?.document_number || '—'}</span>
-                  <span class="badge" style={`background:${actionColor[log.action]||'#888'}`}>{actionLabel[log.action]||log.action}</span>
-                </div>
-                <div class="mob-row2">
-                  <span class="mob-user">{log.tnc_users?.full_name || '—'}</span>
-                  <span style="color:var(--b2);">·</span>
-                  <span class="mob-date">{thaiDate(log.created_at)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        </div>
       )}
     </div>
   </div>
+</div>
+
+<script is:inline>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  function toggleSidebar(){ $('sidebar').classList.toggle('open'); $('overlay').classList.toggle('show'); }
+  $('hamburger').addEventListener('click', toggleSidebar);
+  $('overlay').addEventListener('click', toggleSidebar);
+  $('usel').addEventListener('change', function(){ $('sform').submit(); });
+})();
+</script>
 </body>
 </html>

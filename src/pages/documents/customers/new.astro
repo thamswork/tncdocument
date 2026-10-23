@@ -1,35 +1,43 @@
 ---
-import { createCustomer, getNextCustomerCode, getCustomers } from '../../../lib/documents';
+import { createCustomer, getNextCustomerCode, getCustomers, findTaxDuplicate, parseCreditDays, branchKey } from '../../../lib/documents';
 const user = Astro.locals.user;
 let error = '';
 let codeValue = '';
 // Keep what was typed if the save fails
-let v: Record<string, string> = { contact_name: '', company_name: '', address: '', phone: '', fax: '', tax_id: '', email: '', notes: '' };
+let v: Record<string, string> = { contact_name: '', company_name: '', address: '', phone: '', fax: '', tax_id: '', branch: '', email: '', notes: '', credit_days: '' };
+let dupOf: any = null;
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   codeValue = (form.get('customer_code') as string || '').trim().toUpperCase();
   for (const k of Object.keys(v)) v[k] = (form.get(k) as string) || '';
-  const result = await createCustomer({
+  const taxDigits = v.tax_id.replace(/\D/g, '');
+  const taxToSave = taxDigits.length === 13 ? taxDigits : v.tax_id.trim();
+  // One customer per 13-digit tax ID and branch: block, don't just warn
+  dupOf = await findTaxDuplicate(taxToSave, v.branch);
+  const result = dupOf ? { error: { message: 'dup' } } : await createCustomer({
     customer_code: codeValue,
     company_name: (form.get('company_name') as string || '').trim(),
     contact_name: (form.get('contact_name') as string || '') || undefined,
     address: (form.get('address') as string || '') || undefined,
     phone: (form.get('phone') as string || '') || undefined,
     fax: (form.get('fax') as string || '') || undefined,
-    tax_id: (form.get('tax_id') as string || '') || undefined,
+    tax_id: taxToSave || undefined,
+    branch: v.branch.trim() || undefined,
+    credit_days: parseCreditDays(v.credit_days) ?? undefined,
     email: (form.get('email') as string || '') || undefined,
     notes: (form.get('notes') as string || '') || undefined,
     created_by: user.id,
   });
-  if (result.error) { error = result.error.message; }
+  if (dupOf) { error = ''; }
+  else if (result.error) { error = result.error.message; }
   else { return Astro.redirect('/documents/customers'); }
 } else {
   codeValue = await getNextCustomerCode();
 }
 
 // Existing customers, only to warn about a possible duplicate while typing
-const existing = (await getCustomers()).map((c: any) => ({ id: c.id, n: c.company_name || '', c: c.customer_code || '', t: c.tax_id || '' }));
+const existing = (await getCustomers()).map((c: any) => ({ id: c.id, n: c.company_name || '', c: c.customer_code || '', t: c.tax_id || '', b: branchKey(c.branch) }));
 const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
 ---
 <!DOCTYPE html>
@@ -195,6 +203,7 @@ const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
           <div class="card-h"><div class="card-t">ข้อมูลลูกค้า</div></div>
           <div class="card-b">
             {error && <div class="msg err show">บันทึกไม่สำเร็จ: {error}</div>}
+            {dupOf && <div class="msg err show">บันทึกไม่ได้ เลขประจำตัวผู้เสียภาษีและสาขานี้มีอยู่แล้ว: <a href={`/documents/customers/${dupOf.id}`}>{dupOf.company_name} ({dupOf.customer_code})</a> ถ้าเป็นบริษัทเดียวกันให้ใช้รายเดิม ถ้าเป็นคนละสาขาให้ใส่เลขสาขา</div>}
             <form method="POST" id="custForm">
               <div class="fields">
                 <div class="field">
@@ -216,12 +225,14 @@ const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
                   <label for="f_tax">เลขประจำตัวผู้เสียภาษี</label>
                   <input class="inp mono" id="f_tax" type="text" name="tax_id" value={v.tax_id} inputmode="numeric" placeholder="13 หลัก"/>
                   <div class="fhint" id="taxHint"></div>
-                  <div class="msg warn dup" id="dupTax"></div>
+                  <div class="msg err dup" id="dupTax"></div>
                 </div>
                 <div class="field">
-                  <label for="f_email">อีเมล</label>
-                  <input class="inp" id="f_email" type="email" name="email" value={v.email} autocapitalize="none" placeholder="ไม่บังคับ"/>
+                  <label for="f_branch">สาขา</label>
+                  <input class="inp" id="f_branch" type="text" name="branch" value={v.branch} placeholder="สำนักงานใหญ่"/>
+                  <div class="fhint">เว้นว่าง = สำนักงานใหญ่ หรือใส่เลขสาขา เช่น 00001</div>
                 </div>
+
                 <div class="field full">
                   <label for="f_addr">ที่อยู่</label>
                   <textarea class="inp" id="f_addr" name="address" rows="3" placeholder="ที่อยู่ตามที่จดทะเบียน (แสดงบนใบกำกับภาษี)">{v.address}</textarea>
@@ -233,6 +244,15 @@ const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
                 <div class="field">
                   <label for="f_fax">แฟกซ์</label>
                   <input class="inp" id="f_fax" type="tel" name="fax" value={v.fax} placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field">
+                  <label for="f_email">อีเมล</label>
+                  <input class="inp" id="f_email" type="email" name="email" value={v.email} autocapitalize="none" placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field">
+                  <label for="f_credit">เครดิต (วัน)</label>
+                  <input class="inp" id="f_credit" type="number" name="credit_days" value={v.credit_days} min="0" max="365" step="1" inputmode="numeric" placeholder="ไม่ระบุ"/>
+                  <div class="fhint">ใส่ให้อัตโนมัติในใบเสนอราคาและใบแจ้งหนี้ใหม่ของลูกค้ารายนี้</div>
                 </div>
                 <div class="field full">
                   <label for="f_notes">หมายเหตุ</label>
@@ -268,7 +288,15 @@ const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
 (function(){
   var $ = function(id){ return document.getElementById(id); };
   var EX = JSON.parse($('custData').textContent);
-  var form = $('custForm'), dirty = false, submitting = false;
+  var form = $('custForm'), dirty = false, submitting = false, dupBlock = false;
+  // Same rule as the server (branchKey in lib/documents.ts)
+  function branchKey(b){
+    var s = String(b == null ? '' : b).trim().toLowerCase().replace(/\s+/g, '');
+    if (!s || /สำนักงานใหญ่|headoffice|^hq$/.test(s)) return 'HQ';
+    var m = s.match(/^(?:สาขา(?:ที่)?|branch|no\.?)?0*(\d{1,5})$/);
+    if (m) return Number(m[1]) === 0 ? 'HQ' : ('00000' + m[1]).slice(-5);
+    return s;
+  }
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   // Compare names without spaces, "บริษัท", "จำกัด" and "(สำนักงานใหญ่)"
@@ -300,10 +328,17 @@ const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
     var sameName = k.length >= 3 ? EX.filter(function(c){ return key(c.n) === k; }) : [];
     d.innerHTML = sameName.length ? 'มีลูกค้าชื่อนี้แล้ว: ' + sameName.map(link).join(', ') + ' ถ้าเป็นบริษัทเดียวกันให้ใช้รายเดิม' : '';
     d.classList.toggle('show', !!sameName.length);
-    var t = v.replace(/\D/g, ''), dt = $('dupTax');
+    var t = v.replace(/\D/g, ''), dt = $('dupTax'), bk = branchKey($('f_branch').value);
     var sameTax = t.length === 13 ? EX.filter(function(c){ return String(c.t).replace(/\D/g, '') === t; }) : [];
-    dt.innerHTML = sameTax.length ? 'เลขนี้ใช้กับ ' + sameTax.map(link).join(', ') + ' แล้ว' : '';
-    dt.classList.toggle('show', !!sameTax.length);
+    var block = sameTax.filter(function(c){ return c.b === bk; });
+    dupBlock = !!block.length;
+    dt.innerHTML = block.length
+      ? 'บันทึกไม่ได้ เลขนี้และสาขานี้ใช้กับ ' + block.map(link).join(', ') + ' แล้ว ถ้าเป็นคนละสาขาให้ใส่เลขสาขา'
+      : '';
+    dt.classList.toggle('show', dupBlock);
+    var other = sameTax.filter(function(c){ return c.b !== bk; });
+    if (!dupBlock && other.length) { dt.className = 'msg warn dup show'; dt.innerHTML = 'เลขนี้ใช้กับสาขาอื่นแล้ว: ' + other.map(link).join(', '); }
+    else dt.className = 'msg err dup' + (dupBlock ? ' show' : '');
     $('codeEcho').textContent = $('f_code').value.trim().toUpperCase() || '—';
     return st;
   }
@@ -312,6 +347,7 @@ const dataJson = JSON.stringify(existing).replace(/</g, '\\u003c');
 
   form.addEventListener('submit', function(e){
     var st = update();
+    if (dupBlock) { e.preventDefault(); $('f_tax').focus(); $('dupTax').scrollIntoView({ block: 'center' }); return; }
     if ((st === 'len' || st === 'sum') && !confirm('เลขประจำตัวผู้เสียภาษีดูไม่ถูกต้อง ต้องการบันทึกต่อหรือไม่?')) { e.preventDefault(); $('f_tax').focus(); return; }
     // Save 13-digit IDs without spaces or dashes so they print cleanly
     var d = $('f_tax').value.replace(/\D/g, '');

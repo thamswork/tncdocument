@@ -40,6 +40,7 @@ const existingDoc = {
   discount_design: doc.discount_design || 0,
   discount_trade: doc.discount_trade || 0,
   apply_wht: doc.apply_wht !== false,
+  credit_days: doc.credit_days ?? null,
 };
 const cust = doc.customers || null;
 // The picker list is capped; make sure this document's customer is always in it
@@ -51,7 +52,7 @@ const job = doc.jobs || null;
 
 // Escape "<" so document text can never break out of the JSON <script> block.
 const dataJson = JSON.stringify({
-  custs: custList.map((c: any) => ({ id: c.id, customer_code: c.customer_code, company_name: c.company_name, tax_id: c.tax_id, phone: c.phone, address: c.address })),
+  custs: custList.map((c: any) => ({ id: c.id, customer_code: c.customer_code, company_name: c.company_name, tax_id: c.tax_id, phone: c.phone, address: c.address, credit_days: c.credit_days ?? null })),
   categories: doc.categories || [],
   items: doc.items || [],
   orig: { total: Number(doc.total_amount || 0), type: doc.document_type_id, customer: doc.customer_id },
@@ -143,6 +144,8 @@ const dataJson = JSON.stringify({
     .fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 20px;}
     .fields .full{grid-column:1 / -1;}
     .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .fhint{font-size:12px;color:var(--t3);line-height:1.5;}
+    .fhint .linkbtn{font-size:12px;}
     .field label,.flabel{font-size:12px;color:var(--t2);font-weight:500;}
     .inp{height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);background:var(--white);outline:none;width:100%;}
     .inp:hover{border-color:#CFCBC3;}
@@ -396,9 +399,14 @@ const dataJson = JSON.stringify({
                 <label for="issueDate" id="issueLbl">วันที่ออก</label>
                 <input type="date" class="inp" id="issueDate" value={existingDoc.issue_date}/>
               </div>
+              <div class="field" id="creditField">
+                <label for="creditDays">เครดิต (วัน)</label>
+                <input type="number" class="inp" id="creditDays" min="0" max="365" step="1" inputmode="numeric" placeholder="ไม่ระบุ" value={existingDoc.credit_days ?? ''}/>
+              </div>
               <div class="field">
                 <label for="dueDate" id="dueLbl">ราคามีผลถึง</label>
                 <input type="date" class="inp" id="dueDate" value={existingDoc.due_date}/>
+                <div class="fhint" id="dueHint" style="display:none"></div>
               </div>
               <div class="field ref">
                 <label for="refPO">อ้างอิง P/O</label>
@@ -495,6 +503,7 @@ const dataJson = JSON.stringify({
   var cats = [], ibc = {}, cc = 0, ic = 0;
   var busy = false, dirty = false, boqModified = false, typeCode = '', lastSaved = null;
   var $ = function(id){ return document.getElementById(id); };
+  var creditTouched = String($('creditDays').value).trim() !== '';
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function fmt(n) { return Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
@@ -609,9 +618,40 @@ const dataJson = JSON.stringify({
     } else tw.classList.remove('show');
     showCustWarn();
     if (user) markDirty();
+    syncCredit();
     recalc();
   }
   $('typeSeg').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b) setType(b, true); });
+
+  /* ── Credit term and invoice due date ──
+     Invoice due date = invoice date + credit days, filled in automatically
+     until someone types their own due date. */
+  var dueAuto = !$('dueDate').value;
+  function addDays(iso, n) { var d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  function creditVal() {
+    var v = String($('creditDays').value).trim();
+    if (v === '') return null;
+    var n = Math.round(Number(v));
+    return isFinite(n) ? Math.max(0, Math.min(365, n)) : null;
+  }
+  function creditShown() { return typeCode === 'QUOTATION' || typeCode === 'INVOICE'; }
+  function syncCredit() {
+    var cd = creditVal(), iso = $('issueDate').value, h = $('dueHint');
+    $('creditField').style.display = creditShown() ? '' : 'none';
+    if (typeCode === 'INVOICE' && cd !== null && iso) {
+      var calc = addDays(iso, cd);
+      if (dueAuto) $('dueDate').value = calc;
+      h.innerHTML = $('dueDate').value === calc
+        ? 'วันที่ออก + เครดิต ' + cd + ' วัน'
+        : 'กำหนดเอง · <button type="button" class="linkbtn" id="dueReset">ใช้วันที่ออก + ' + cd + ' วัน</button>';
+      h.style.display = '';
+    } else { h.textContent = ''; h.style.display = 'none'; }
+  }
+  $('creditDays').addEventListener('input', function(){ creditTouched = true; syncCredit(); });
+  $('issueDate').addEventListener('input', syncCredit);
+  $('issueDate').addEventListener('change', syncCredit);
+  $('dueDate').addEventListener('input', function(){ dueAuto = !$('dueDate').value; syncCredit(); });
+  $('dueHint').addEventListener('click', function(e){ if (e.target.id === 'dueReset') { dueAuto = true; syncCredit(); dirty = true; } });
 
   /* ── Customer picker ── */
   var custById = {}; CUSTS.forEach(function(c){ custById[c.id] = c; });
@@ -644,6 +684,7 @@ const dataJson = JSON.stringify({
     $('chosen').classList.add('show');
     closeDD();
     showCustWarn();
+    if (user && !creditTouched) { $('creditDays').value = c.credit_days == null ? '' : c.credit_days; syncCredit(); }
     if (user) markDirty();
   }
   function showCustWarn() {
@@ -867,8 +908,7 @@ const dataJson = JSON.stringify({
           is_subtotal_row: i.sub || false, temp_category_id: c.tid };
       });
     }));
-    return {
-      document: {
+    var docOut = {
         document_type_id: $('docType').value,
         customer_id: cid, status: 'draft', language: 'th',
         issue_date: $('issueDate').value,
@@ -879,7 +919,11 @@ const dataJson = JSON.stringify({
         discount_design: num($('dD').value),
         discount_trade: num($('dT').value),
         apply_wht: $('applyWht').checked,
-      },
+    };
+    // Credit is kept as it was when the field is hidden (tax invoice)
+    if (creditShown()) docOut.credit_days = creditVal();
+    return {
+      document: docOut,
       skipBOQ: !boqModified,
       categories: boqModified ? cats.map(function(c, i){ return { temp_id: c.tid, category_number: c.num, name_th: c.name || 'หมวดที่ ' + c.num, sort_order: i }; }) : [],
       items: boqModified ? items : []

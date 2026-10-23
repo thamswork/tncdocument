@@ -81,6 +81,11 @@ const remaining = Math.max(0, Math.round((total - billed) * 100) / 100);
 const today = new Date(); today.setHours(0, 0, 0, 0);
 const ageDays = doc.issue_date ? Math.max(0, Math.round((today.getTime() - new Date(doc.issue_date).getTime()) / 86400000)) : 0;
 const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); // Bangkok date
+const creditDays: number | null = (doc as any).credit_days ?? null;
+const creditText = creditDays === null ? '' : creditDays === 0 ? 'เงินสด (0 วัน)' : `${creditDays} วัน`;
+// Days past the invoice due date (Bangkok date), 0 when not yet due or no due date
+const dueIso = doc.due_date ? String(doc.due_date).slice(0, 10) : '';
+const overdueDays = dueIso && dueIso < todayIso ? Math.round((Date.parse(todayIso) - Date.parse(dueIso)) / 86400000) : 0;
 
 // One plain-language state, same wording as the dashboard
 let ws = 'open', wl = 'ยังไม่วางบิล';
@@ -218,6 +223,8 @@ const cust = doc.customers || {};
     .next-t{font-size:15px;font-weight:700;margin-bottom:4px;}
     .next-s{font-size:12.5px;color:var(--t2);line-height:1.6;margin-bottom:14px;}
     .next-s b{color:var(--text);font-weight:600;}
+    .inst-credit{font-size:12px;color:var(--t3);margin-top:6px;}
+    .inst-credit:empty{display:none;}
     .age-old{color:var(--red);font-weight:600;} .age-mid{color:var(--amber);font-weight:600;}
     .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:4px 0 10px;}
     .bar i{display:block;height:100%;background:var(--gold);}
@@ -371,8 +378,14 @@ const cust = doc.customers || {};
               </div>
               <div>
                 <div class="dt">{code === 'QUOTATION' ? 'ราคามีผลถึง' : 'กำหนดชำระ'}</div>
-                <div class={`dd${doc.due_date ? '' : ' muted'}`}>{doc.due_date ? thaiDate(doc.due_date) : 'ไม่ระบุ'}</div>
+                <div class={`dd${doc.due_date ? '' : ' muted'}`}>{doc.due_date ? thaiDate(doc.due_date) : 'ไม่ระบุ'}{code === 'INVOICE' && canIssueTx && overdueDays > 0 && <span class="age-old"> · เกินกำหนด {overdueDays} วัน</span>}</div>
               </div>
+              {(code === 'QUOTATION' || code === 'INVOICE') && (
+                <div>
+                  <div class="dt">เครดิต</div>
+                  <div class={`dd${creditText ? '' : ' muted'}`}>{creditText || 'ไม่ระบุ'}</div>
+                </div>
+              )}
               <div>
                 <div class="dt">อ้างอิง P/O</div>
                 <div class={`dd${doc.reference_po ? '' : ' muted'}`}>{doc.reference_po || 'ไม่ระบุ'}</div>
@@ -504,6 +517,9 @@ const cust = doc.customers || {};
               <div class="next-t">รอรับชำระเงิน</div>
               <div class="next-s">
                 วางบิลเมื่อ {thaiDate(doc.issue_date)} · <span class={ageDays > 60 ? 'age-old' : (ageDays > 30 ? 'age-mid' : '')}>ค้าง {ageDays} วัน</span><br/>
+                {doc.due_date && (overdueDays > 0
+                  ? <><span class="age-old">เกินกำหนดชำระ {overdueDays} วัน</span> (ครบกำหนด {thaiDate(doc.due_date)})<br/></>
+                  : <>ครบกำหนดชำระ {thaiDate(doc.due_date)}<br/></>)}
                 ลูกค้าต้องโอน <b>฿{money(W.applies ? W.net : doc.total_amount)}</b>{W.applies ? ' (หัก ณ ที่จ่าย 3% แล้ว)' : ''}
               </div>
               <button type="button" class="btn btn-dark btn-block" id="txBtn" onclick="openTxModal()">ลูกค้าชำระแล้ว ออกใบกำกับภาษี</button>
@@ -706,6 +722,7 @@ const cust = doc.customers || {};
           <div class="field" style="min-width:0;"><label for="instIssueDate">วันที่ออกใบแจ้งหนี้</label><input type="date" id="instIssueDate" class="inp"/></div>
           <div class="field" style="min-width:0;"><label for="instDueDate">กำหนดชำระ</label><input type="date" id="instDueDate" class="inp"/></div>
         </div>
+        <div class="inst-credit" id="instCreditHint"></div>
         <div class="msg" id="instCreateStatus"></div>
       </div>
       <div class="modal-f">
@@ -715,7 +732,7 @@ const cust = doc.customers || {};
     </div>
   </div>
 
-  <script is:inline define:vars={{ installments, docId: id, docNum: doc.document_number, docTotal: doc.total_amount, docCustomerId: doc.customer_id }}>
+  <script is:inline define:vars={{ installments, docId: id, docNum: doc.document_number, docTotal: doc.total_amount, docCustomerId: doc.customer_id, docCredit: creditDays }}>
   var TOTAL = Number(docTotal) || 0;
   var customRowCount = 0;
   var X_SVG = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
@@ -803,9 +820,29 @@ const cust = doc.customers || {};
     if (document.getElementById('customRows').children.length === 0) addInstRow();
     var d = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
     document.getElementById('instIssueDate').value = d;
+    instDueAuto = true;
+    syncInstDue();
     document.getElementById('instCreateStatus').className = 'msg';
     document.getElementById('instModal').classList.add('show');
   };
+
+  // Invoice due date = invoice date + the quotation's credit days (editable)
+  var instDueAuto = true;
+  function syncInstDue() {
+    var h = document.getElementById('instCreditHint');
+    if (docCredit === null || docCredit === undefined) { h.textContent = ''; return; }
+    var iso = document.getElementById('instIssueDate').value;
+    if (!iso) return;
+    var dt = new Date(iso + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + Number(docCredit));
+    var calc = dt.toISOString().slice(0, 10);
+    if (instDueAuto) document.getElementById('instDueDate').value = calc;
+    h.textContent = document.getElementById('instDueDate').value === calc
+      ? 'กำหนดชำระ = วันที่ออก + เครดิต ' + docCredit + ' วัน (ตามใบเสนอราคา)'
+      : 'เครดิตตามใบเสนอราคา ' + docCredit + ' วัน';
+  }
+  document.getElementById('instIssueDate').addEventListener('input', syncInstDue);
+  document.getElementById('instIssueDate').addEventListener('change', syncInstDue);
+  document.getElementById('instDueDate').addEventListener('input', function(){ instDueAuto = !this.value; syncInstDue(); });
 
   var genBtn = document.getElementById('genInstBtn');
   if (genBtn) genBtn.addEventListener('click', openInstModal);

@@ -1,6 +1,6 @@
 ---
 import { supabaseAdmin } from '../../../lib/supabase';
-import { getRemovedDocumentsForCustomer, restoreDocument } from '../../../lib/documents';
+import { getRemovedDocumentsForCustomer, restoreDocument, findTaxDuplicate, parseCreditDays, deleteCustomer, branchKey } from '../../../lib/documents';
 const user = Astro.locals.user;
 const { id } = Astro.params;
 
@@ -10,6 +10,8 @@ let { data: customer } = await supabaseAdmin
 if (!customer) return Astro.redirect('/documents/customers');
 
 let error = '', success = '';
+let dupOf: any = null;
+let delError = '';
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
@@ -21,27 +23,43 @@ if (Astro.request.method === 'POST') {
     return Astro.redirect(`/documents/customers/${id}?restored=1`);
   }
 
-  const { data: updated, error: updateError } = await supabaseAdmin
-    .from('customers')
-    .update({
+  if (action === 'delete') {
+    const { error: delErr } = await deleteCustomer(id!);
+    if (!delErr) return Astro.redirect(`/documents/customers?deleted=${encodeURIComponent(customer.customer_code || '')}`);
+    delError = delErr.message;
+  } else {
+    const rawTax = (form.get('tax_id') as string || '').trim();
+    const taxDigits = rawTax.replace(/\D/g, '');
+    const fields = {
       customer_code: (form.get('customer_code') as string || '').trim().toUpperCase(),
       company_name: (form.get('company_name') as string || '').trim(),
       contact_name: (form.get('contact_name') as string || '') || null,
       address: (form.get('address') as string || '') || null,
       phone: (form.get('phone') as string || '') || null,
       fax: (form.get('fax') as string || '') || null,
-      tax_id: (form.get('tax_id') as string || '') || null,
+      tax_id: (taxDigits.length === 13 ? taxDigits : rawTax) || null,
+      branch: (form.get('branch') as string || '').trim() || null,
+      credit_days: parseCreditDays(form.get('credit_days')),
       email: (form.get('email') as string || '') || null,
       notes: (form.get('notes') as string || '') || null,
-    })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (updateError) { error = updateError.message; }
-  else {
-    success = 'บันทึกข้อมูลลูกค้าแล้ว';
-    if (updated) customer = updated; // show what was just saved
+    };
+    // One customer per 13-digit tax ID and branch. Only checked when the tax ID or
+    // branch actually changes, so an existing duplicate can still be edited.
+    const keyOf = (t: any, b: any) => String(t || '').replace(/\D/g, '') + '|' + branchKey(b);
+    if (keyOf(fields.tax_id, fields.branch) !== keyOf(customer.tax_id, customer.branch)) {
+      dupOf = await findTaxDuplicate(fields.tax_id, fields.branch, id);
+    }
+    if (dupOf) {
+      customer = { ...customer, ...fields }; // keep what was typed
+    } else {
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('customers').update(fields).eq('id', id).select().single();
+      if (updateError) { error = updateError.message; customer = { ...customer, ...fields }; }
+      else {
+        success = 'บันทึกข้อมูลลูกค้าแล้ว';
+        if (updated) customer = updated; // show what was just saved
+      }
+    }
   }
 }
 
@@ -58,6 +76,7 @@ for (const d of (activeDocs || []) as any[]) {
   counts[c] = (counts[c] || 0) + 1;
 }
 const docTotal = (activeDocs || []).length;
+const canDeleteCustomer = docTotal === 0 && removedDocs.length === 0;
 const countRows = ['QUOTATION', 'INVOICE', 'TAX_INVOICE', 'BOQ'].filter(c => counts[c]).map(c => ({ label: typeLabels[c], n: counts[c], code: c }));
 
 function daysLeft(purgeAt: string) {
@@ -121,6 +140,8 @@ if (!String(customer.address || '').trim()) miss.push('ไม่มีที่�
     .btn-dark:hover{opacity:.88;}
     .btn-sm{height:30px;padding:0 11px;font-size:12.5px;font-weight:500;border-radius:7px;}
     .btn-block{width:100%;height:42px;}
+    .btn-danger{color:var(--red);}
+    .btn-danger:hover{border-color:var(--red);background:var(--redbg);}
     .btn[disabled]{opacity:.55;cursor:default;}
     .linkbtn{border:none;background:none;padding:0;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
     .linkbtn:hover{color:var(--text);}
@@ -253,6 +274,7 @@ if (!String(customer.address || '').trim()) miss.push('ไม่มีที่�
           <div class="card-b">
             {success && <div class="msg ok show">{success}</div>}
             {error && <div class="msg err show">บันทึกไม่สำเร็จ: {error}</div>}
+            {dupOf && <div class="msg err show">บันทึกไม่ได้ เลขประจำตัวผู้เสียภาษีและสาขานี้ใช้กับ <a href={`/documents/customers/${dupOf.id}`}>{dupOf.company_name} ({dupOf.customer_code})</a> แล้ว ถ้าเป็นคนละสาขาให้ใส่เลขสาขา</div>}
             <form method="POST" id="custForm">
               <div class="fields">
                 <div class="field">
@@ -274,8 +296,9 @@ if (!String(customer.address || '').trim()) miss.push('ไม่มีที่�
                   <div class="fhint" id="taxHint"></div>
                 </div>
                 <div class="field">
-                  <label for="f_email">อีเมล</label>
-                  <input class="inp" id="f_email" type="email" name="email" value={customer.email || ''} autocapitalize="none" placeholder="ไม่บังคับ"/>
+                  <label for="f_branch">สาขา</label>
+                  <input class="inp" id="f_branch" type="text" name="branch" value={customer.branch || ''} placeholder="สำนักงานใหญ่"/>
+                  <div class="fhint">เว้นว่าง = สำนักงานใหญ่ หรือใส่เลขสาขา เช่น 00001</div>
                 </div>
                 <div class="field full">
                   <label for="f_addr">ที่อยู่</label>
@@ -288,6 +311,15 @@ if (!String(customer.address || '').trim()) miss.push('ไม่มีที่�
                 <div class="field">
                   <label for="f_fax">แฟกซ์</label>
                   <input class="inp" id="f_fax" type="tel" name="fax" value={customer.fax || ''} placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field">
+                  <label for="f_email">อีเมล</label>
+                  <input class="inp" id="f_email" type="email" name="email" value={customer.email || ''} autocapitalize="none" placeholder="ไม่บังคับ"/>
+                </div>
+                <div class="field">
+                  <label for="f_credit">เครดิต (วัน)</label>
+                  <input class="inp" id="f_credit" type="number" name="credit_days" value={customer.credit_days ?? ''} min="0" max="365" step="1" inputmode="numeric" placeholder="ไม่ระบุ"/>
+                  <div class="fhint">ใส่ให้อัตโนมัติในใบเสนอราคาและใบแจ้งหนี้ใหม่</div>
                 </div>
                 <div class="field full">
                   <label for="f_notes">หมายเหตุ</label>
@@ -357,6 +389,20 @@ if (!String(customer.address || '').trim()) miss.push('ไม่มีที่�
             <a href={`/documents/new`} class="btn btn-block">สร้างเอกสารใหม่</a>
           </div>
         </section>
+        <section class="card">
+          <div class="card-h"><div class="card-t">ลบลูกค้า</div></div>
+          <div class="card-b">
+            {canDeleteCustomer ? (
+              <form method="POST" id="delForm" style="margin:0;">
+                <input type="hidden" name="action" value="delete"/>
+                <div class="hint" style="margin:0 0 12px;">ลูกค้ารายนี้ยังไม่มีเอกสาร ลบได้ การลบย้อนกลับไม่ได้</div>
+                <button type="submit" class="btn btn-block btn-danger" data-del={customer.company_name}>ลบลูกค้ารายนี้</button>
+              </form>
+            ) : (
+              <div class="hint" style="margin:0;">{delError && <span style="color:var(--red);display:block;margin-bottom:6px;">{delError}</span>}ลบไม่ได้ เพราะมีเอกสาร {docTotal + removedDocs.length} ฉบับ{removedDocs.length ? ` (รวมในถังขยะ ${removedDocs.length})` : ''} ลบได้เฉพาะลูกค้าที่ยังไม่มีเอกสาร</div>
+            )}
+          </div>
+        </section>
       </aside>
     </div>
   </main>
@@ -397,6 +443,11 @@ if (!String(customer.address || '').trim()) miss.push('ไม่มีที่�
   });
   window.addEventListener('beforeunload', function(e){ if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
 
+  var del = document.querySelector('[data-del]');
+  if (del) del.addEventListener('click', function(e){
+    if (!confirm('ลบลูกค้า "' + del.getAttribute('data-del') + '" ถาวร?\nการลบย้อนกลับไม่ได้')) e.preventDefault();
+    else submitting = true;
+  });
   document.querySelectorAll('[data-restore]').forEach(function(b){
     b.addEventListener('click', function(e){
       if (!confirm('กู้คืนเอกสาร ' + b.getAttribute('data-restore') + '?')) e.preventDefault();
