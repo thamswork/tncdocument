@@ -199,6 +199,8 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
     .sumrow.net span:last-child{font-weight:700;}
     .check{display:flex;align-items:center;gap:9px;padding:10px 0 4px;margin-top:6px;border-top:1px solid var(--line);font-size:13px;color:var(--t2);cursor:pointer;}
     .check input{width:16px;height:16px;accent-color:var(--text);}
+    .check.vat{border-top:none;margin-top:0;padding:6px 0 2px;}
+    .sumrow.off span:last-child{color:var(--t3);}
     .wht{display:none;} .wht.show{display:block;}
     .acts{display:flex;flex-direction:column;gap:8px;padding:0 20px 20px;}
     .acts .linkbtn{align-self:center;margin-top:4px;}
@@ -391,7 +393,8 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
             <div class="sumrow"><label for="dD">ส่วนลดค่าแบบ</label><input class="sinp" type="number" id="dD" value="0" min="0" step="0.01" inputmode="decimal"/></div>
             <div class="sumrow"><label for="dT">ส่วนลดการค้า</label><input class="sinp" type="number" id="dT" value="0" min="0" step="0.01" inputmode="decimal"/></div>
             <div class="sumrow"><span>ราคาก่อน VAT</span><span id="rBV">฿0.00</span></div>
-            <div class="sumrow"><span>VAT 7%</span><span id="rVAT">฿0.00</span></div>
+            <label class="check vat"><input type="checkbox" id="applyVat" checked/>คิดภาษีมูลค่าเพิ่ม (VAT) 7%</label>
+            <div class="sumrow" id="vatRow"><span id="vatLbl">VAT 7%</span><span id="rVAT">฿0.00</span></div>
             <div class="sumrow total"><span>ยอดรวมทั้งสิ้น</span><span id="rTot">฿0.00</span></div>
             <label class="check"><input type="checkbox" id="applyWht" checked/>หักภาษี ณ ที่จ่าย 3%</label>
             <div class="wht show" id="whtRows">
@@ -437,16 +440,18 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
     var sub = 0;
     cats.forEach(function(c){ (ibc[c.tid]||[]).forEach(function(i){ if (!i.sub) sub += num(i.amt); }); });
     var bv = sub - num($('dD').value) - num($('dT').value);
-    var vat = Math.round(bv * 7 + Number.EPSILON) / 100; // same satang rounding as the saved document
+    var vat = $('applyVat').checked ? Math.round(bv * 7 + Number.EPSILON) / 100 : 0; // same satang rounding as the saved document
     var tot = bv + vat;
     var wht = $('applyWht').checked ? Math.round(bv * 3 + Number.EPSILON) / 100 : 0;
     return { sub: sub, bv: bv, vat: vat, tot: tot, wht: wht, net: tot - wht };
   }
   function recalc() {
-    var t = totals(), w = $('applyWht').checked;
+    var t = totals(), w = $('applyWht').checked, v = $('applyVat').checked;
     $('rSub').textContent = baht(t.sub);
     $('rBV').textContent = baht(t.bv);
-    $('rVAT').textContent = baht(t.vat);
+    $('rVAT').textContent = v ? baht(t.vat) : 'ไม่มี VAT';
+    $('vatLbl').textContent = v ? 'VAT 7%' : 'VAT';
+    $('vatRow').classList.toggle('off', !v);
     $('rTot').textContent = baht(t.tot);
     $('rWht').textContent = '−' + baht(t.wht);
     $('rNet').textContent = baht(t.net);
@@ -751,6 +756,7 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
   $('dD').addEventListener('input', recalc);
   $('dT').addEventListener('input', recalc);
   $('applyWht').addEventListener('change', recalc);
+  $('applyVat').addEventListener('change', recalc);
   $('payCond').addEventListener('input', recalc);
   document.querySelectorAll('[data-preset]').forEach(function(b){
     b.addEventListener('click', function(){ $('payCond').value = b.getAttribute('data-preset').replace(/\\n/g, '\n'); recalc(); dirty = true; });
@@ -788,6 +794,7 @@ const todayIso = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 1
         discount_design: num($('dD').value),
         discount_trade: num($('dT').value),
         apply_wht: $('applyWht').checked,
+        apply_vat: $('applyVat').checked,
         credit_days: creditShown() ? creditVal() : null,
       },
       categories: cats.map(function(c, i){ return { temp_id: c.tid, category_number: c.num, name_th: c.name || 'หมวดที่ ' + c.num, sort_order: i }; }),

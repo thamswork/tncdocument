@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../../../lib/supabase';
 import { getSessionUser, SESSION_COOKIE } from '../../../lib/auth';
-import { round2, addDaysIso } from '../../../lib/documents';
+import { round2, addDaysIso, vatOf } from '../../../lib/documents';
 
 export async function POST({ request, cookies }: any) {
   const token = cookies.get(SESSION_COOKIE)?.value;
@@ -44,10 +44,11 @@ export async function POST({ request, cookies }: any) {
   // Work from the source document's before-VAT figure (pct × price_before_vat),
   // then VAT = 7% of that, total = before-VAT + VAT. Back-calculating from a
   // VAT-inclusive amount (÷1.07) made installments drift by a satang or two.
+  // No source (shouldn't happen): treat the amount as VAT-inclusive, as before.
   let beforeVat = round2(amount / 1.07);
   const pctNum = Number(pct);
   const { data: src } = source_doc_id
-    ? await supabaseAdmin.from('documents').select('price_before_vat, credit_days').eq('id', source_doc_id).single()
+    ? await supabaseAdmin.from('documents').select('price_before_vat, credit_days, apply_vat, apply_wht').eq('id', source_doc_id).single()
     : { data: null as any };
   if (src && pctNum > 0 && pctNum <= 100 && Number(src.price_before_vat) > 0) {
     beforeVat = round2(Number(src.price_before_vat) * pctNum / 100);
@@ -57,7 +58,12 @@ export async function POST({ request, cookies }: any) {
   const creditDays: number | null = src?.credit_days ?? null;
   const invDate = issue_date || new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const invDue = due_date || (creditDays !== null ? addDaysIso(invDate, creditDays) : null);
-  const vatAmt = round2(beforeVat * 0.07);
+  // The installment invoice follows the quotation: no VAT there means no VAT here,
+  // and the same for the 3% withholding.
+  const applyVat = src ? src.apply_vat !== false : true;
+  const applyWht = src ? src.apply_wht !== false : true;
+  if (src && !applyVat && !(pctNum > 0 && pctNum <= 100 && Number(src.price_before_vat) > 0)) beforeVat = round2(amount);
+  const vatAmt = vatOf(beforeVat, applyVat);
   const totalAmt = round2(beforeVat + vatAmt);
 
   // Insert document
@@ -82,6 +88,8 @@ export async function POST({ request, cookies }: any) {
       price_before_vat: beforeVat,
       vat_amount: vatAmt,
       total_amount: totalAmt,
+      apply_vat: applyVat,
+      apply_wht: applyWht,
       notes: '',
       created_by: user.id,
       issued_by: user.id,

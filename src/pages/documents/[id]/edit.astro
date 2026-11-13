@@ -40,6 +40,7 @@ const existingDoc = {
   discount_design: doc.discount_design || 0,
   discount_trade: doc.discount_trade || 0,
   apply_wht: doc.apply_wht !== false,
+  apply_vat: doc.apply_vat !== false,
   credit_days: doc.credit_days ?? null,
 };
 const cust = doc.customers || null;
@@ -56,6 +57,7 @@ const dataJson = JSON.stringify({
   categories: doc.categories || [],
   items: doc.items || [],
   orig: { total: Number(doc.total_amount || 0), type: doc.document_type_id, customer: doc.customer_id },
+  origVat: doc.apply_vat !== false,
   isPublished,
 }).replace(/</g, '\\u003c');
 ---
@@ -240,6 +242,8 @@ const dataJson = JSON.stringify({
     .sumrow.was span:last-child{color:var(--t3);font-weight:400;}
     .check{display:flex;align-items:center;gap:9px;padding:10px 0 4px;margin-top:6px;border-top:1px solid var(--line);font-size:13px;color:var(--t2);cursor:pointer;}
     .check input{width:16px;height:16px;accent-color:var(--text);}
+    .check.vat{border-top:none;margin-top:0;padding:6px 0 2px;}
+    .sumrow.off span:last-child{color:var(--t3);}
     .wht{display:none;} .wht.show{display:block;}
     .acts{display:flex;flex-direction:column;gap:8px;padding:0 20px 20px;}
     .acts .linkbtn{align-self:center;margin-top:4px;}
@@ -455,7 +459,8 @@ const dataJson = JSON.stringify({
             <div class="sumrow"><label for="dD">ส่วนลดค่าแบบ</label><input class="sinp" type="number" id="dD" value={existingDoc.discount_design} min="0" step="0.01" inputmode="decimal"/></div>
             <div class="sumrow"><label for="dT">ส่วนลดการค้า</label><input class="sinp" type="number" id="dT" value={existingDoc.discount_trade} min="0" step="0.01" inputmode="decimal"/></div>
             <div class="sumrow"><span>ราคาก่อน VAT</span><span id="rBV">฿0.00</span></div>
-            <div class="sumrow"><span>VAT 7%</span><span id="rVAT">฿0.00</span></div>
+            <label class="check vat"><input type="checkbox" id="applyVat" checked={existingDoc.apply_vat}/>คิดภาษีมูลค่าเพิ่ม (VAT) 7%</label>
+            <div class="sumrow" id="vatRow"><span id="vatLbl">VAT 7%</span><span id="rVAT">฿0.00</span></div>
             <div class="sumrow total"><span>ยอดรวมทั้งสิ้น</span><span id="rTot">฿0.00</span></div>
             <div class="sumrow was" id="rWasRow" style="display:none;"><span>ยอดเดิมก่อนแก้ไข</span><span id="rWas"></span></div>
             <label class="check"><input type="checkbox" id="applyWht" checked={existingDoc.apply_wht}/>หักภาษี ณ ที่จ่าย 3%</label>
@@ -557,16 +562,18 @@ const dataJson = JSON.stringify({
     cats.forEach(function(c){ (ibc[c.tid]||[]).forEach(function(i){ if (!i.sub) sub += num(i.amt); }); });
     sub = r2(sub);
     var bv = r2(sub - num($('dD').value) - num($('dT').value));
-    var vat = r2(bv * 0.07);
+    var vat = $('applyVat').checked ? r2(bv * 0.07) : 0;
     var tot = r2(bv + vat);
     var wht = $('applyWht').checked ? r2(bv * 0.03) : 0;
     return { sub: sub, bv: bv, vat: vat, tot: tot, wht: wht, net: r2(tot - wht) };
   }
   function recalc() {
-    var t = totals(), w = $('applyWht').checked;
+    var t = totals(), w = $('applyWht').checked, v = $('applyVat').checked;
     $('rSub').textContent = baht(t.sub);
     $('rBV').textContent = baht(t.bv);
-    $('rVAT').textContent = baht(t.vat);
+    $('rVAT').textContent = v ? baht(t.vat) : 'ไม่มี VAT';
+    $('vatLbl').textContent = v ? 'VAT 7%' : 'VAT';
+    $('vatRow').classList.toggle('off', !v);
     $('rTot').textContent = baht(t.tot);
     $('rWht').textContent = '−' + baht(t.wht);
     $('rNet').textContent = baht(t.net);
@@ -875,12 +882,13 @@ const dataJson = JSON.stringify({
   $('dD').addEventListener('input', recalc);
   $('dT').addEventListener('input', recalc);
   $('applyWht').addEventListener('change', recalc);
+  $('applyVat').addEventListener('change', recalc);
   $('payCond').addEventListener('input', recalc);
   document.querySelectorAll('[data-preset]').forEach(function(b){
     b.addEventListener('click', function(){ $('payCond').value = b.getAttribute('data-preset').replace(/\\n/g, '\n'); recalc(); markDirty(); });
   });
   document.querySelector('.wrap').addEventListener('input', function(e){ if (!e.target.closest('#custSearch')) markDirty(); });
-  document.querySelector('.wrap').addEventListener('change', function(e){ if (e.target.id === 'applyWht') markDirty(); });
+  document.querySelector('.wrap').addEventListener('change', function(e){ if (e.target.id === 'applyWht' || e.target.id === 'applyVat') markDirty(); });
   window.addEventListener('beforeunload', function(e){ if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   /* ── Save (same payload as before: saveDocument keeps the status and number) ── */
@@ -919,6 +927,7 @@ const dataJson = JSON.stringify({
         discount_design: num($('dD').value),
         discount_trade: num($('dT').value),
         apply_wht: $('applyWht').checked,
+        apply_vat: $('applyVat').checked,
     };
     // Credit is kept as it was when the field is hidden (tax invoice)
     if (creditShown()) docOut.credit_days = creditVal();
@@ -975,6 +984,7 @@ const dataJson = JSON.stringify({
     var pc = $('payCond').value.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
     var html = '<div class="kv"><span>ยอดรวมเดิม</span><span>' + baht(D.orig.total) + '</span></div>'
       + '<div class="kv"><span>ยอดรวมใหม่</span><span>' + baht(t.tot) + '</span></div>'
+      + ($('applyVat').checked !== D.origVat ? '<div class="kv"><span>VAT 7%</span><span>' + ($('applyVat').checked ? 'เปลี่ยนเป็นคิด VAT' : 'เปลี่ยนเป็นไม่มี VAT') + '</span></div>' : '')
       + (t.wht ? '<div class="kv"><span>ยอดโอนสุทธิ</span><span>' + baht(t.net) + '</span></div>' : '')
       + '<div class="kv"><span>เงื่อนไขชำระเงิน</span><span>' + (pc.length ? esc(pc[0]) + (pc.length > 1 ? ' และอีก ' + (pc.length - 1) + ' งวด' : '') : '—') + '</span></div>';
     if (!boqModified) {

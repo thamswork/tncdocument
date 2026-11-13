@@ -49,7 +49,7 @@ export async function POST({ request, cookies }: any) {
   // the total (÷1.07), which could leave the tax invoice 0.01 off its invoice.
   const { data: src } = await supabaseAdmin
     .from('documents')
-    .select('price_before_vat, vat_amount, total_amount, job_id, apply_wht')
+    .select('price_before_vat, vat_amount, total_amount, job_id, apply_wht, apply_vat')
     .eq('id', source_doc_id)
     .single();
   const beforeVat = src ? round2(Number(src.price_before_vat)) : round2(total_amount / 1.07);
@@ -78,6 +78,7 @@ export async function POST({ request, cookies }: any) {
       source_document_id: source_doc_id,
       job_id: job_id || src?.job_id || null,
       apply_wht: src ? src.apply_wht !== false : true,
+      apply_vat: src ? src.apply_vat !== false : true,
       last_activity_at: new Date().toISOString(),
       payment_condition: '',
       subtotal: beforeVat,

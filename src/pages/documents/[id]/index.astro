@@ -568,7 +568,9 @@ const cust = doc.customers || {};
             {doc.discount_design > 0 && <div class="sumrow"><span>ส่วนลดค่าแบบ</span><span>-฿{money(doc.discount_design)}</span></div>}
             {doc.discount_trade > 0 && <div class="sumrow"><span>ส่วนลดการค้า</span><span>-฿{money(doc.discount_trade)}</span></div>}
             <div class="sumrow"><span>ราคาก่อน VAT</span><span>฿{money(doc.price_before_vat)}</span></div>
-            <div class="sumrow"><span>VAT 7%</span><span>฿{money(doc.vat_amount)}</span></div>
+            {doc.apply_vat === false
+              ? <div class="sumrow"><span>VAT</span><span style="color:var(--t3)">ไม่มี VAT</span></div>
+              : <div class="sumrow"><span>VAT 7%</span><span>฿{money(doc.vat_amount)}</span></div>}
             <div class="sumrow total"><span>ยอดรวมทั้งสิ้น</span><span>฿{money(doc.total_amount)}</span></div>
             {W.applies ? (
               <>

@@ -257,10 +257,15 @@ export function computeItemAmount(item: any) {
   return round2(Number(item.amount) || 0);
 }
 
-export function calculateTotals(items: any[], discountDesign: number, discountTrade: number) {
+/** VAT 7% of the before-VAT amount, or 0 when the document has VAT switched off. */
+export function vatOf(priceBeforeVat: number, applyVat: boolean = true) {
+  return applyVat ? round2(Number(priceBeforeVat) * 0.07) : 0;
+}
+
+export function calculateTotals(items: any[], discountDesign: number, discountTrade: number, applyVat: boolean = true) {
   const subtotal = round2(items.filter(i => !i.is_subtotal_row).reduce((s, i) => s + computeItemAmount(i), 0));
   const priceBeforeVat = round2(subtotal - (Number(discountDesign) || 0) - (Number(discountTrade) || 0));
-  const vatAmount = round2(priceBeforeVat * 0.07);
+  const vatAmount = vatOf(priceBeforeVat, applyVat);
   const totalAmount = round2(priceBeforeVat + vatAmount);
   return { subtotal, price_before_vat: priceBeforeVat, vat_amount: vatAmount, total_amount: totalAmount };
 }
@@ -278,6 +283,15 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
   // When BOQ isn't being touched on an edit, recompute totals using the
   // EXISTING items in the DB so discount changes always reflect correctly.
   let itemsForTotals = items;
+  // VAT on/off: taken from the request when sent; on an edit that doesn't send
+  // it, keep the document's current setting; new documents default to VAT on.
+  let applyVat = true;
+  if ('apply_vat' in docData) applyVat = docData.apply_vat !== false;
+  else if (!isNew) {
+    const { data: cur } = await supabaseAdmin.from('documents').select('apply_vat').eq('id', docData.id).single();
+    applyVat = cur?.apply_vat !== false;
+  }
+  docData = { ...docData, apply_vat: applyVat };
   if (!isNew && (!items || items.length === 0)) {
     const { data: existingItems } = await supabaseAdmin
       .from('document_items')
@@ -285,7 +299,7 @@ export async function saveDocument(docData: any, categories: any[], items: any[]
       .eq('document_id', docData.id);
     itemsForTotals = existingItems || [];
   }
-  const totals = calculateTotals(itemsForTotals, docData.discount_design || 0, docData.discount_trade || 0);
+  const totals = calculateTotals(itemsForTotals, docData.discount_design || 0, docData.discount_trade || 0, applyVat);
   if ('credit_days' in docData) docData = { ...docData, credit_days: parseCreditDays(docData.credit_days) };
   if (isNew) {
     const { data: docType } = await supabaseAdmin.from('document_types').select('prefix').eq('id', docData.document_type_id).single();

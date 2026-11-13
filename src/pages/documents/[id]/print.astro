@@ -42,6 +42,8 @@ doc.categories.forEach((cat: any) => {
 const isQuotation = ['SV','QT','QUOTATION'].includes(doc.document_types?.code);
 const isInvoice = ['IV','IN','INVOICE'].includes(doc.document_types?.code);
 const LOGO = 'https://res.cloudinary.com/dynjnftnu/image/upload/v1780740967/LOGO_50mm20mm_thuhqd.png';
+// A tax invoice without VAT is not a ใบกำกับภาษี: print it as a receipt only.
+const noVatTx = doc.document_types?.code === 'TAX_INVOICE' && doc.apply_vat === false;
 const showCopy = ['TAX_INVOICE','INVOICE','IV','IN'].includes(doc.document_types?.code);
 ---
 <!DOCTYPE html>
@@ -234,8 +236,8 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <div class="co-tax">เลขประจำตัวผู้เสียภาษีอากร 0113561003884</div>
     </div>
     <div class="hdr-doc">
-      <span class="doc-type">{doc.document_types?.name_th}</span>
-      <span class={doc.document_types?.code==='TAX_INVOICE'?'doc-bar-light':'doc-bar'}>{doc.document_types?.name_en || doc.document_types?.code}</span>
+      <span class="doc-type">{noVatTx ? 'ใบเสร็จรับเงิน' : doc.document_types?.name_th}</span>
+      <span class={doc.document_types?.code==='TAX_INVOICE'?'doc-bar-light':'doc-bar'}>{noVatTx ? 'RECEIPT' : (doc.document_types?.name_en || doc.document_types?.code)}</span>
       {showCopy && <div><span class="copy-lbl" data-copy-lbl>ต้นฉบับ / ORIGINAL</span></div>}
       {doc.status==='draft' && <div style="margin-top:8px;"><div class="draft-stamp">DRAFT</div></div>}
     </div>
@@ -377,8 +379,8 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
       <tr><td class="tt-l">รวมจำนวนเงิน</td><td class="tt-r">{fmt(doc.subtotal)} บาท</td></tr>
       {doc.discount_design>0 && <tr><td class="tt-l">ส่วนลดค่าแบบ</td><td class="tt-r">- {fmt(doc.discount_design)} บาท</td></tr>}
       {doc.discount_trade>0 && <tr><td class="tt-l">ส่วนลดการค้า</td><td class="tt-r">- {fmt(doc.discount_trade)} บาท</td></tr>}
-      <tr><td class="tt-l">ราคาก่อน VAT</td><td class="tt-r">{fmt(doc.price_before_vat)} บาท</td></tr>
-      <tr><td class="tt-l">ภาษีมูลค่าเพิ่ม 7%</td><td class="tt-r">{fmt(doc.vat_amount)} บาท</td></tr>
+      {doc.apply_vat !== false && <tr><td class="tt-l">ราคาก่อน VAT</td><td class="tt-r">{fmt(doc.price_before_vat)} บาท</td></tr>}
+      {doc.apply_vat !== false && <tr><td class="tt-l">ภาษีมูลค่าเพิ่ม 7%</td><td class="tt-r">{fmt(doc.vat_amount)} บาท</td></tr>}
       <tr class="grand"><td class="tt-l">จำนวนเงินรวมทั้งสิ้น</td><td class="tt-r">{fmt(doc.total_amount)} บาท</td></tr>
       {doc.apply_wht !== false && (
         <>
@@ -410,7 +412,7 @@ html,body{font-family:'Sarabun',sans-serif;-webkit-print-color-adjust:exact;prin
         </div>
         <div class="tx-totals">
           <div class="tx-tot-row"><span class="tx-tot-lbl">จำนวนเงินรวม SUB TOTAL</span><span class="tx-tot-val">{fmt(doc.subtotal)}</span></div>
-          <div class="tx-tot-row"><span class="tx-tot-lbl">ภาษีมูลค่าเพิ่ม VAT 7%</span><span class="tx-tot-val">{fmt(doc.vat_amount)}</span></div>
+          {doc.apply_vat !== false && <div class="tx-tot-row"><span class="tx-tot-lbl">ภาษีมูลค่าเพิ่ม VAT 7%</span><span class="tx-tot-val">{fmt(doc.vat_amount)}</span></div>}
           <div class="tx-tot-row"><span class="tx-tot-lbl">จำนวนเงินสุทธิ NET TOTAL</span><span class="tx-tot-val">{fmt(doc.total_amount)}</span></div>
         </div>
       </div>
