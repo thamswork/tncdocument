@@ -1,0 +1,485 @@
+---
+import { prepareAlert, getLineUsage, getAlertHistory, baht, thDate } from '../../lib/line';
+import { supabaseAdmin } from '../../lib/supabase';
+
+const user = Astro.locals.user;
+const env = (Astro.locals as any).runtime?.env || {};
+const PER = 25;
+
+const mode = Astro.url.searchParams.get('mode') === 'all' ? 'all' : 'due';
+const configured = !!(env.LINE_CHANNEL_ACCESS_TOKEN && env.LINE_GROUP_ID);
+
+let loadError = '';
+let due: any = { messages: [], count: 0, totalNet: 0 };
+let all: any = { messages: [], count: 0, totalNet: 0 };
+try {
+  [due, all] = await Promise.all([prepareAlert('due'), prepareAlert('all')]);
+} catch (e: any) {
+  loadError = e?.message || String(e);
+}
+const preview = mode === 'all' ? all : due;
+
+const usage = configured ? await getLineUsage(env) : null;
+
+const { data: lastAuto } = await supabaseAdmin
+  .from('line_alerts').select('created_at, status').eq('trigger', 'scheduled')
+  .order('created_at', { ascending: false }).limit(1);
+const last = (lastAuto || [])[0] || null;
+
+const reqPage = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
+let hist = await getAlertHistory((reqPage - 1) * PER, reqPage * PER - 1);
+const histTotal = hist.total;
+const pages = Math.max(1, Math.ceil(histTotal / PER));
+const page = Math.min(pages, reqPage);
+if (page !== reqPage) hist = await getAlertHistory((page - 1) * PER, page * PER - 1);
+
+// ── Formatting ──
+const TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+function bkk(ts: string) {
+  const d = new Date(Date.parse(ts) + 7 * 3600 * 1000);
+  const hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${d.getUTCDate()} ${TH_M[d.getUTCMonth()]} ${d.getUTCFullYear() + 543} · ${hh}:${mm} น.`;
+}
+const TRIGGER: Record<string, string> = { scheduled: 'อัตโนมัติ 09:00', manual: 'กดส่งจากระบบ', keyword: 'ขอในกลุ่ม LINE' };
+const MODE: Record<string, string> = { due: 'ครบกำหนด / เกินกำหนด', all: 'ค้างรับทั้งหมด' };
+const STATUS: Record<string, { label: string; cls: string }> = {
+  sent: { label: 'ส่งแล้ว', cls: 's-ok' },
+  skipped: { label: 'ไม่ได้ส่ง (ไม่มีรายการ)', cls: 's-skip' },
+  failed: { label: 'ส่งไม่สำเร็จ', cls: 's-err' },
+};
+const fmt = (n: number) => Number(n || 0).toLocaleString('th-TH');
+
+// Split message text into plain text and links (rendered safely by Astro)
+const URL_RE = /(https:\/\/tncdocument\.pages\.dev\/[^\s]+)/g;
+const parts = (t: string) => t.split(URL_RE).map((s, i) => ({ s, link: i % 2 === 1 }));
+
+const membersPerSend = usage?.members ?? null;
+const remaining = usage && usage.limit != null && usage.used != null ? Math.max(0, usage.limit - usage.used) : null;
+const lowQuota = remaining != null && membersPerSend != null && remaining < membersPerSend * 3;
+
+const nums: (number | 'gap')[] = [];
+for (let p = 1; p <= pages; p++) {
+  if (p === 1 || p === pages || Math.abs(p - page) <= 1) nums.push(p);
+  else if (nums[nums.length - 1] !== 'gap') nums.push('gap');
+}
+const href = (o: Record<string, string | number>) => {
+  const p = new URLSearchParams();
+  const v: Record<string, string | number> = { mode: mode === 'all' ? 'all' : '', page: 1, ...o };
+  for (const [k, val] of Object.entries(v)) if (val && !(k === 'page' && val === 1)) p.set(k, String(val));
+  const s = p.toString();
+  return '/documents/line' + (s ? '?' + s : '');
+};
+const sendData = JSON.stringify({
+  mode, count: preview.count, total: baht(preview.totalNet), members: membersPerSend, bubbles: preview.messages.length,
+}).replace(/</g, '\\u003c');
+---
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <link rel="icon" type="image/png" href="https://res.cloudinary.com/dynjnftnu/image/upload/v1781103809/LOGO_TNC-02_xhpu0t.png"/>
+  <link rel="apple-touch-icon" href="https://res.cloudinary.com/dynjnftnu/image/upload/v1781103809/LOGO_TNC-02_xhpu0t.png"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>แจ้งเตือน LINE — TNC Build Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style is:global>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#F6F5F2;--white:#fff;--border:#E3E0DA;--line:#EEECE7;
+      --text:#1A1814;--t2:#66635C;--t3:#A9A69F;
+      --gold:#B8955A;--gbg:#FAF6EE;
+      --green:#2D7A4F;--grbg:#EEF6F1;--red:#B23B3B;--redbg:#FBF0F0;--amber:#B97A26;--blue:#2D5A9E;
+      --sb:216px;
+    }
+    html{height:100%;}
+    body{font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100%;font-size:14px;-webkit-font-smoothing:antialiased;}
+    a{color:inherit;}
+    button,select,input{font-family:inherit;}
+    button:focus{outline:none;}
+    button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+    .ic{width:16px;height:16px;flex-shrink:0;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+    .tnum{font-variant-numeric:tabular-nums;}
+    .nw{white-space:nowrap;}
+
+    /* Sidebar (same as dashboard) */
+    .sidebar{width:var(--sb);background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100dvh;z-index:200;transition:transform .25s cubic-bezier(.4,0,.2,1);}
+    .sb-brand{padding:22px 22px 18px;}
+    .sb-brand-name{font-size:13px;font-weight:700;letter-spacing:.06em;}
+    .sb-brand-sub{font-size:11px;color:var(--t3);margin-top:2px;}
+    .sb-nav{padding:6px 12px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+    .sb-link{display:block;padding:9px 12px;border-radius:6px;font-size:13.5px;color:var(--t2);text-decoration:none;}
+    .sb-link:hover{background:var(--bg);color:var(--text);}
+    .sb-link.active{background:var(--bg);color:var(--text);font-weight:600;}
+    .sb-foot{padding:16px 22px;border-top:1px solid var(--line);}
+    .sb-user{font-size:13px;font-weight:600;}
+    .sb-role{font-size:11px;color:var(--t3);margin-top:1px;text-transform:capitalize;}
+    .sb-logout{margin-top:10px;background:none;border:none;padding:0;font-size:12.5px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+    .sb-logout:hover{color:var(--red);}
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:190;}
+    .overlay.show{display:block;}
+
+    /* Page */
+    .main{margin-left:var(--sb);min-height:100dvh;}
+    .page{max-width:1180px;margin:0 auto;padding:28px 32px 48px;display:flex;flex-direction:column;gap:20px;}
+    .head{display:flex;align-items:center;gap:12px;}
+    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:6px;margin-left:-6px;color:var(--text);}
+    .h1{font-size:22px;font-weight:700;letter-spacing:-.01em;flex:1;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:7px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text);white-space:nowrap;}
+    .btn:hover{border-color:var(--text);}
+    .btn-dark{background:var(--text);border-color:var(--text);color:var(--white);}
+    .btn-dark:hover{opacity:.88;}
+    .btn:disabled{opacity:.45;cursor:not-allowed;}
+    .btn:disabled:hover{border-color:var(--border);}
+    .btn-dark:disabled:hover{border-color:var(--text);opacity:.45;}
+
+    .msg{padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6;}
+    .msg.ok{background:var(--grbg);color:var(--green);}
+    .msg.err{background:var(--redbg);color:var(--red);}
+    .msg.warn{background:var(--gbg);color:var(--amber);}
+    .msg code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;}
+
+    /* Status */
+    .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+    .stat{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;min-width:0;}
+    .stat-l{font-size:12px;color:var(--t2);font-weight:500;}
+    .stat-v{font-size:19px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;}
+    .stat-v.muted{color:var(--t3);font-size:15px;font-weight:600;}
+    .stat-s{font-size:12px;color:var(--t3);line-height:1.5;}
+    .stat-s.warn{color:var(--amber);}
+    .meter{height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:6px;}
+    .meter span{display:block;height:100%;background:var(--text);border-radius:2px;}
+    .meter.warn span{background:var(--amber);}
+
+    .kw{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;}
+    .kw-t{font-size:13px;font-weight:700;flex-basis:100%;}
+    .kw-i{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 8px;font-size:12.5px;color:var(--t2);}
+    .chip{display:inline-block;white-space:nowrap;padding:3px 9px;border-radius:6px;background:var(--bg);border:1px solid var(--line);color:var(--text);font-weight:600;font-size:12.5px;}
+    .kw-note{font-size:12px;color:var(--t3);flex-basis:100%;}
+
+    /* Tabs + preview */
+    .panel{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+    .tabs{display:flex;gap:4px;padding:0 10px;border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .tab{position:relative;padding:13px 10px;font-size:13px;font-weight:500;color:var(--t2);white-space:nowrap;text-decoration:none;}
+    .tab:hover{color:var(--text);}
+    .tab.on{color:var(--text);font-weight:700;}
+    .tab.on::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--text);border-radius:2px;}
+    .tab .n{margin-left:5px;font-size:11.5px;color:var(--t3);font-weight:600;font-variant-numeric:tabular-nums;}
+    .pv-head{display:flex;align-items:baseline;gap:14px;padding:14px 18px;flex-wrap:wrap;}
+    .pv-t{font-size:14px;font-weight:700;}
+    .pv-m{font-size:12.5px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .pv-note{margin-left:auto;font-size:12px;color:var(--t3);}
+    .chat{background:var(--bg);border-top:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:10px;max-height:560px;overflow-y:auto;}
+    .bubble{align-self:flex-start;max-width:min(560px,100%);background:var(--white);border:1px solid var(--border);border-radius:4px 14px 14px 14px;padding:12px 14px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+    .bubble a{color:var(--blue);text-decoration:none;word-break:break-all;}
+    .bubble a:hover{text-decoration:underline;}
+    .empty{padding:44px 20px;text-align:center;color:var(--t2);border-top:1px solid var(--line);}
+    .empty-t{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
+    .empty-s{font-size:13px;}
+
+    /* History */
+    .results{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+    .res-head{display:flex;align-items:baseline;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+    .res-title{font-size:14px;font-weight:700;}
+    .res-meta{font-size:12.5px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .hrow{display:grid;grid-template-columns:190px minmax(0,1fr) 150px 170px;gap:16px;align-items:start;padding:13px 18px;border-bottom:1px solid var(--line);}
+    .hist > .hrow:last-child{border-bottom:none;}
+    .h-time{font-size:13px;color:var(--t2);font-variant-numeric:tabular-nums;}
+    .h-what{min-width:0;}
+    .h-trig{font-size:13.5px;font-weight:600;}
+    .h-sub{font-size:12px;color:var(--t3);margin-top:3px;}
+    .h-err{font-size:12px;color:var(--red);margin-top:4px;word-break:break-word;}
+    .h-amt{font-size:13px;font-variant-numeric:tabular-nums;text-align:right;}
+    .h-amt .h-sub{text-align:right;}
+    .pill{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:500;white-space:nowrap;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--t3);flex-shrink:0;}
+    .s-ok .dot{background:var(--green);} .s-ok{color:var(--green);}
+    .s-skip{color:var(--t2);}
+    .s-err .dot{background:var(--red);} .s-err{color:var(--red);}
+    details.h-msg{margin-top:6px;}
+    details.h-msg summary{font-size:12px;color:var(--t2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;list-style:none;display:inline;}
+    details.h-msg summary::-webkit-details-marker{display:none;}
+    details.h-msg[open] summary{color:var(--text);}
+    details.h-msg pre{margin-top:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;color:var(--text);}
+
+    /* Pager (same look as dashboard, as links) */
+    .pager{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap;}
+    .pg-info{font-size:12.5px;color:var(--t2);flex:1;font-variant-numeric:tabular-nums;}
+    .pg{display:flex;gap:4px;}
+    .pg a,.pg span.dis{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:32px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:var(--white);font-size:12.5px;color:var(--text);text-decoration:none;font-variant-numeric:tabular-nums;}
+    .pg a:hover{border-color:var(--text);}
+    .pg a.on{background:var(--text);border-color:var(--text);color:var(--white);font-weight:600;}
+    .pg span.dis{color:var(--t3);}
+    .pg .gap{padding:0 4px;color:var(--t3);align-self:center;}
+
+    /* Confirm dialog + toast */
+    .modal{display:none;position:fixed;inset:0;background:rgba(26,24,20,.45);z-index:300;align-items:center;justify-content:center;padding:16px;}
+    .modal.show{display:flex;}
+    .box{background:var(--white);border-radius:14px;width:100%;max-width:440px;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.18);}
+    .box-t{font-size:16px;font-weight:700;margin-bottom:6px;}
+    .box-s{font-size:13px;color:var(--t2);line-height:1.6;}
+    .kv{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;}
+    .kv span:first-child{color:var(--t2);}
+    .kv span:last-child{font-weight:600;font-variant-numeric:tabular-nums;text-align:right;}
+    .box-list{margin:14px 0 4px;}
+    .box-err{margin-top:12px;display:none;}
+    .box-err.show{display:block;}
+    .box-acts{display:flex;gap:8px;margin-top:18px;}
+    .box-acts .btn{flex:1;height:40px;}
+    .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--white);padding:11px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:400;}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    @media(max-width:1020px){
+      .hrow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"time st" "what amt";gap:6px 12px;}
+      .h-time{grid-area:time;} .h-st{grid-area:st;justify-self:end;} .h-what{grid-area:what;} .h-amt{grid-area:amt;}
+    }
+    @media(max-width:768px){
+      .sidebar{transform:translateX(-100%);}
+      .sidebar.open{transform:translateX(0);}
+      .main{margin-left:0;}
+      .hamburger{display:inline-flex;}
+      .page{padding:16px 12px 32px;gap:14px;}
+      .h1{font-size:19px;}
+      .stats{grid-template-columns:1fr;gap:8px;}
+      .stat{padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2px 12px;}
+      .stat-l{grid-column:1;} .stat-v{grid-column:2;grid-row:1 / span 2;font-size:17px;text-align:right;} .stat-v.muted{font-size:13px;}
+      .stat-s{grid-column:1;} .meter{grid-column:1 / -1;margin-top:4px;}
+      .kw{padding:12px 14px;gap:10px;}
+      .pv-note{margin-left:0;flex-basis:100%;}
+      .chat{padding:12px;max-height:none;}
+      .hrow{padding:13px 14px;}
+      .pager{padding:12px;}
+      .pg-info{flex:1 1 100%;}
+      .pg .num-btn{display:none;} .pg .num-btn.on{display:inline-flex;}
+      .pg .gap{display:none;}
+    }
+    @media(max-width:640px){
+      .head .btn{padding:0 12px;}
+    }
+  </style>
+</head>
+<body>
+
+<div class="overlay" id="overlay"></div>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-name">TNC BUILD STUDIO</div>
+    <div class="sb-brand-sub">ระบบเอกสาร</div>
+  </div>
+  <div class="sb-nav">
+    <a href="/documents/dashboard" class="sb-link">เอกสาร</a>
+    <a href="/documents/new" class="sb-link">สร้างเอกสารใหม่</a>
+    <a href="/documents/customers" class="sb-link">ลูกค้า</a>
+    <a href="/documents/jobs" class="sb-link">งาน</a>
+    {user.role === 'superadmin' && <a href="/documents/users" class="sb-link">ผู้ใช้งาน</a>}
+    <a href="/documents/logs" class="sb-link">ประวัติการใช้งาน</a>
+    <a href="/documents/line" class="sb-link active">แจ้งเตือน LINE</a>
+  </div>
+  <div class="sb-foot">
+    <div class="sb-user">{user.full_name}</div>
+    <div class="sb-role">{user.role}</div>
+    <form method="POST" action="/documents/logout"><button type="submit" class="sb-logout">ออกจากระบบ</button></form>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page">
+    <div class="head">
+      <button class="hamburger" id="hamburger" aria-label="เมนู"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:22px;height:22px"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <h1 class="h1">แจ้งเตือน LINE</h1>
+      <button type="button" class="btn btn-dark" id="sendBtn" disabled={!configured || !preview.messages.length || !!loadError}>ส่งเข้ากลุ่มตอนนี้</button>
+    </div>
+
+    {!configured && <div class="msg warn">ยังไม่ได้ตั้งค่า LINE (ต้องมี Cloudflare secret <code>LINE_CHANNEL_ACCESS_TOKEN</code> และ <code>LINE_GROUP_ID</code>) จึงยังส่งข้อความไม่ได้</div>}
+    {loadError && <div class="msg err">โหลดรายการใบแจ้งหนี้ไม่สำเร็จ: {loadError}</div>}
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-l">ส่งอัตโนมัติ</div>
+        <div class="stat-v">ทุกวัน 09:00 น.</div>
+        <div class="stat-s">
+          {last ? <>ครั้งล่าสุด <span class="nw">{bkk(last.created_at)}</span> · <span class="nw">{STATUS[last.status]?.label || last.status}</span></> : 'ยังไม่มีการส่งอัตโนมัติ'}
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-l">โควตาข้อความเดือนนี้</div>
+        {usage && usage.used != null
+          ? <div class="stat-v">{fmt(usage.used)}{usage.limit != null && <span style="color:var(--t3);font-weight:600;font-size:15px"> / {fmt(usage.limit)}</span>}</div>
+          : <div class="stat-v muted">ดูไม่ได้ในตอนนี้</div>}
+        {usage && usage.limit != null && usage.used != null && (
+          <div class={'meter' + (lowQuota ? ' warn' : '')}><span style={`width:${Math.min(100, Math.round((usage.used / Math.max(1, usage.limit)) * 100))}%`}></span></div>
+        )}
+        <div class={'stat-s' + (lowQuota ? ' warn' : '')}>
+          {remaining != null ? `เหลือ ${fmt(remaining)} ข้อความ` : usage && usage.used != null ? 'แพ็กเกจนี้ไม่จำกัดจำนวน' : 'นับรวมกับบรอดแคสต์ที่ส่งให้ลูกค้า'}
+          {lowQuota && ' · ใกล้หมดแล้ว'}
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-l">ส่ง 1 ครั้งใช้โควตา</div>
+        {membersPerSend != null
+          ? <div class="stat-v">{fmt(membersPerSend)} ข้อความ</div>
+          : <div class="stat-v muted">ไม่ทราบจำนวนสมาชิก</div>}
+        <div class="stat-s">{membersPerSend != null ? `สมาชิกในกลุ่ม ${fmt(membersPerSend)} คน (นับคนละ 1 ข้อความ)` : 'LINE นับคนละ 1 ข้อความต่อการส่ง'}</div>
+      </div>
+    </div>
+
+    <div class="kw">
+      <div class="kw-t">ขอดูในกลุ่ม LINE ได้เลย ไม่เสียโควตา</div>
+      <div class="kw-i"><span class="chip">ค้างชำระ</span><span class="chip">ขอดูใบค้างชำระ</span> ใบแจ้งหนี้ค้างรับเงินทั้งหมด</div>
+      <div class="kw-i"><span class="chip">ครบกำหนด</span> ครบกำหนดพรุ่งนี้ วันนี้ และเกินกำหนด</div>
+      <div class="kw-note">พิมพ์คำนี้คำเดียวทั้งข้อความในกลุ่มทีม บอทจะตอบกลับทันที ใช้ได้เฉพาะกลุ่มทีมที่ตั้งค่าไว้</div>
+    </div>
+
+    <div class="panel">
+      <nav class="tabs">
+        <a class={'tab' + (mode === 'due' ? ' on' : '')} href={href({ mode: '' })}>ครบกำหนด / เกินกำหนด<span class="n">{fmt(due.count)}</span></a>
+        <a class={'tab' + (mode === 'all' ? ' on' : '')} href={href({ mode: 'all' })}>ค้างรับทั้งหมด<span class="n">{fmt(all.count)}</span></a>
+      </nav>
+      <div class="pv-head">
+        <div class="pv-t">ตัวอย่างข้อความ</div>
+        <div class="pv-m">{fmt(preview.count)} รายการ · รวม {baht(preview.totalNet)}</div>
+        <div class="pv-note">
+          {mode === 'due' ? 'ตัวอย่างจากข้อมูลตอนนี้ · ส่งอัตโนมัติทุกวัน 09:00 น. ด้วยข้อมูล ณ เวลานั้น' : 'ส่งเมื่อกดปุ่ม หรือพิมพ์ "ค้างชำระ" ในกลุ่ม'}
+        </div>
+      </div>
+      {preview.messages.length ? (
+        <div class="chat">
+          {preview.messages.map((m: string) => (
+            <div class="bubble">{parts(m).map(p => p.link ? <a href={p.s} target="_blank" rel="noopener">{p.s}</a> : p.s)}</div>
+          ))}
+        </div>
+      ) : (
+        <div class="empty">
+          <div class="empty-t">{mode === 'due' ? 'ไม่มีใบแจ้งหนี้ครบกำหนดหรือเกินกำหนด' : 'ไม่มีใบแจ้งหนี้ค้างรับเงิน'}</div>
+          <div class="empty-s">{mode === 'due' ? 'วันที่ไม่มีรายการ ระบบจะไม่ส่งข้อความตอน 09:00 น.' : 'ทุกใบแจ้งหนี้ออกใบกำกับภาษีแล้ว'}</div>
+        </div>
+      )}
+    </div>
+
+    <div class="results">
+      <div class="res-head">
+        <div class="res-title">ประวัติการส่ง</div>
+        <div class="res-meta">{fmt(histTotal)} ครั้ง · เวลาประเทศไทย</div>
+      </div>
+      {hist.rows.length === 0 ? (
+        <div class="empty" style="border-top:none">
+          <div class="empty-t">ยังไม่มีประวัติ</div>
+          <div class="empty-s">การส่งอัตโนมัติ การกดส่ง และการขอผ่านกลุ่ม LINE จะแสดงที่นี่</div>
+        </div>
+      ) : (
+        <div class="hist">
+          {hist.rows.map((r: any) => {
+            const st = STATUS[r.status] || { label: r.status, cls: '' };
+            const by = r.trigger === 'keyword' ? (r.requested_by_name || 'สมาชิกในกลุ่ม') : r.trigger === 'manual' ? (r.tnc_users?.full_name || 'ผู้ใช้') : 'ระบบ';
+            return (
+              <div class="hrow">
+                <div class="h-time">{bkk(r.created_at)}</div>
+                <div class="h-what">
+                  <div class="h-trig">{TRIGGER[r.trigger] || r.trigger}</div>
+                  <div class="h-sub">{MODE[r.mode] || r.mode} · โดย {by}</div>
+                  {r.status === 'failed' && r.error && <div class="h-err">{String(r.error).slice(0, 240)}</div>}
+                  {r.message && (
+                    <details class="h-msg"><summary>ดูข้อความที่ส่ง</summary><pre>{r.message}</pre></details>
+                  )}
+                </div>
+                <div class="h-amt">{fmt(r.invoice_count)} รายการ<div class="h-sub">{baht(Number(r.total_net))}</div></div>
+                <div class="h-st"><span class={'pill ' + st.cls}><span class="dot"></span>{st.label}</span></div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {histTotal > PER && (
+        <div class="pager">
+          <div class="pg-info">แสดง {fmt((page - 1) * PER + 1)}–{fmt(Math.min(histTotal, page * PER))} จาก {fmt(histTotal)} ครั้ง</div>
+          <div class="pg">
+            {page > 1 ? <a href={href({ page: page - 1 })}>ก่อนหน้า</a> : <span class="dis">ก่อนหน้า</span>}
+            {nums.map(n => n === 'gap' ? <span class="gap">…</span> : <a class={'num-btn' + (n === page ? ' on' : '')} href={href({ page: n })}>{n}</a>)}
+            {page < pages ? <a href={href({ page: page + 1 })}>ถัดไป</a> : <span class="dis">ถัดไป</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="cfT">
+  <div class="box">
+    <div class="box-t" id="cfT">ส่งเข้ากลุ่ม LINE ตอนนี้?</div>
+    <div class="box-s" id="cfS"></div>
+    <div class="box-list">
+      <div class="kv"><span>ข้อความ</span><span id="cfMode"></span></div>
+      <div class="kv"><span>ใบแจ้งหนี้</span><span id="cfCount"></span></div>
+      <div class="kv"><span>ยอดโอนสุทธิรวม</span><span id="cfTotal"></span></div>
+      <div class="kv"><span>ใช้โควตา</span><span id="cfQuota"></span></div>
+    </div>
+    <div class="msg err box-err" id="cfErr"></div>
+    <div class="box-acts">
+      <button type="button" class="btn" id="cfCancel">ยกเลิก</button>
+      <button type="button" class="btn btn-dark" id="cfSend">ส่งเลย</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="application/json" id="sendData" set:html={sendData}></script>
+<script is:inline>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  function toggleSidebar(){ $('sidebar').classList.toggle('open'); $('overlay').classList.toggle('show'); }
+  $('hamburger').addEventListener('click', toggleSidebar);
+  $('overlay').addEventListener('click', toggleSidebar);
+
+  var D = JSON.parse($('sendData').textContent || '{}');
+  var busy = false;
+  function nf(n){ return Number(n || 0).toLocaleString('th-TH'); }
+  function openConfirm(){
+    $('cfS').textContent = 'บอทจะส่งข้อความตามตัวอย่างไปที่กลุ่มทีมทันที';
+    $('cfMode').textContent = D.mode === 'all' ? 'ค้างรับทั้งหมด' : 'ครบกำหนด / เกินกำหนด';
+    $('cfCount').textContent = nf(D.count) + ' รายการ';
+    $('cfTotal').textContent = D.total;
+    $('cfQuota').textContent = D.members != null ? ('ประมาณ ' + nf(D.members) + ' ข้อความ') : 'คนละ 1 ข้อความ';
+    $('cfErr').classList.remove('show');
+    $('confirmModal').classList.add('show');
+    $('cfSend').focus();
+  }
+  function closeConfirm(){ if (!busy) $('confirmModal').classList.remove('show'); }
+  function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); setTimeout(function(){ el.classList.remove('show'); }, 2600); }
+
+  $('sendBtn').addEventListener('click', openConfirm);
+  $('cfCancel').addEventListener('click', closeConfirm);
+  $('confirmModal').addEventListener('click', function(e){ if (e.target === this) closeConfirm(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeConfirm(); });
+
+  $('cfSend').addEventListener('click', function(){
+    if (busy) return;
+    busy = true;
+    var b = $('cfSend');
+    b.disabled = true; $('cfCancel').disabled = true; b.textContent = 'กำลังส่ง';
+    fetch('/documents/api/line/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: D.mode }) })
+      .then(function(r){ return r.json().catch(function(){ return { error: 'ส่งไม่สำเร็จ (HTTP ' + r.status + ')' }; }); })
+      .then(function(res){
+        if (res && res.sent) {
+          $('confirmModal').classList.remove('show');
+          toast('ส่งเข้ากลุ่ม LINE แล้ว');
+          setTimeout(function(){ location.reload(); }, 900);
+          return;
+        }
+        var why = (res && (res.error || res.line_body || res.reason)) || 'ไม่ทราบสาเหตุ';
+        if (res && res.reason === 'nothing to send') why = 'ตอนนี้ไม่มีรายการที่ต้องส่งแล้ว';
+        $('cfErr').textContent = 'ส่งไม่สำเร็จ: ' + why;
+        $('cfErr').classList.add('show');
+        busy = false; b.disabled = false; $('cfCancel').disabled = false; b.textContent = 'ส่งเลย';
+      })
+      .catch(function(){
+        $('cfErr').textContent = 'ส่งไม่สำเร็จ: เชื่อมต่อระบบไม่ได้ ลองอีกครั้ง';
+        $('cfErr').classList.add('show');
+        busy = false; b.disabled = false; $('cfCancel').disabled = false; b.textContent = 'ส่งเลย';
+      });
+  });
+})();
+</script>
+</body>
+</html>
