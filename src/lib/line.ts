@@ -15,19 +15,32 @@ const TODO_LINK = `${SITE}/documents/dashboard?ws=todo`;
 export type AlertMode = 'due' | 'all';
 export type AlertTrigger = 'scheduled' | 'manual' | 'keyword';
 
-// ── Keywords the team can type in the group (the whole message must be the keyword) ──
-const KEYWORDS: Record<string, AlertMode> = {
-  'ค้างชำระ': 'all',
-  'ขอดูใบค้างชำระ': 'all',
-  'ขอดูใบข้างชำระ': 'all', // common typo
-  'ครบกำหนด': 'due',
-};
+// ── Words the team can type in the group (the whole message must be the word) ──
+export const WORD_ALL = 'บิลค้างทั้งหมด';
+export const WORD_DUE = 'บิลใกล้ครบ';
+export const WORD_MENU = 'เมนู';
+const KEYWORDS: Record<string, AlertMode> = { [WORD_ALL]: 'all', [WORD_DUE]: 'due' };
+const MENU_WORDS = new Set([WORD_MENU, 'menu']);
+const clean = (text: string) => String(text || '').replace(/[\s\u200b-\u200d\ufeff]/g, '').toLowerCase();
 /** Which alert a group message asks for, or null. Ignores spaces and invisible characters. */
 export function keywordMode(text: string): AlertMode | null {
-  const t = String(text || '').replace(/[\s\u200b-\u200d\ufeff]/g, '');
-  return KEYWORDS[t] || null;
+  return KEYWORDS[clean(text)] || null;
 }
-export const KEYWORD_HELP = 'พิมพ์ในกลุ่มนี้ได้เลย\n• ค้างชำระ หรือ ขอดูใบค้างชำระ = ใบแจ้งหนี้ค้างรับเงินทั้งหมด\n• ครบกำหนด = ครบกำหนดพรุ่งนี้ วันนี้ และเกินกำหนด';
+/** True when the message asks for the menu. */
+export function isMenuWord(text: string): boolean {
+  return MENU_WORDS.has(clean(text));
+}
+export const KEYWORD_HELP = `กดปุ่มด้านล่าง หรือพิมพ์ในกลุ่มนี้\n• ${WORD_ALL} = ใบแจ้งหนี้ค้างรับเงินทั้งหมด\n• ${WORD_DUE} = ครบกำหนดพรุ่งนี้ วันนี้ และเกินกำหนด\n• ${WORD_MENU} = แสดงปุ่มนี้อีกครั้ง`;
+export const MENU_TEXT = `บอทแจ้งเตือนใบแจ้งหนี้ TNC\n\n${KEYWORD_HELP}`;
+
+/** Tappable buttons shown under the bot's last message (LINE Quick Reply). */
+export const QUICK_REPLY = {
+  items: [
+    { type: 'action', action: { type: 'message', label: WORD_ALL, text: WORD_ALL } },
+    { type: 'action', action: { type: 'message', label: WORD_DUE, text: WORD_DUE } },
+    { type: 'action', action: { type: 'uri', label: 'เปิดในระบบ', uri: 'https://tncdocument.pages.dev/documents/line' } },
+  ],
+};
 
 // ── Dates (Bangkok, date only) ──
 export function bangkokToday(now = Date.now()): string {
@@ -137,7 +150,7 @@ export function buildAllUnpaidAlert(invoices: any[], today: string): string[] {
 export function nothingText(mode: AlertMode, today: string): string {
   return mode === 'all'
     ? `ไม่มีใบแจ้งหนี้ค้างรับเงิน ณ ${thDate(today)}`
-    : `ไม่มีใบแจ้งหนี้ครบกำหนดพรุ่งนี้ วันนี้ หรือเกินกำหนด ณ ${thDate(today)}\nพิมพ์ "ค้างชำระ" เพื่อดูรายการค้างรับเงินทั้งหมด`;
+    : `ไม่มีใบแจ้งหนี้ครบกำหนดพรุ่งนี้ วันนี้ หรือเกินกำหนด ณ ${thDate(today)}\nกด "${WORD_ALL}" เพื่อดูรายการค้างรับเงินทั้งหมด`;
 }
 
 /** Builds the message for a mode, with the counts the page and history need. */
@@ -170,13 +183,18 @@ async function lineGet(path: string, token: string): Promise<any> {
     return null;
   }
 }
-const asMessages = (texts: string[]) => texts.slice(0, 5).map(text => ({ type: 'text', text }));
-export function pushText(token: string, to: string, texts: string[]) {
-  return lineCall('/v2/bot/message/push', token, { to, messages: asMessages(texts) }, crypto.randomUUID());
+/** Text bubbles (max 5). With quick=true the buttons go on the last bubble, where LINE shows them. */
+function asMessages(texts: string[], quick: boolean) {
+  const msgs: any[] = texts.slice(0, 5).map(text => ({ type: 'text', text }));
+  if (quick && msgs.length) msgs[msgs.length - 1].quickReply = QUICK_REPLY;
+  return msgs;
+}
+export function pushText(token: string, to: string, texts: string[], quick = false) {
+  return lineCall('/v2/bot/message/push', token, { to, messages: asMessages(texts, quick) }, crypto.randomUUID());
 }
 /** Replies are free: they don't count toward the monthly message quota. */
-export function replyText(token: string, replyToken: string, texts: string | string[]) {
-  return lineCall('/v2/bot/message/reply', token, { replyToken, messages: asMessages(Array.isArray(texts) ? texts : [texts]) });
+export function replyText(token: string, replyToken: string, texts: string | string[], quick = false) {
+  return lineCall('/v2/bot/message/reply', token, { replyToken, messages: asMessages(Array.isArray(texts) ? texts : [texts], quick) });
 }
 /** Display name of a group member, or null. */
 export async function groupMemberName(token: string, groupId: string, userId: string): Promise<string | null> {
@@ -232,7 +250,7 @@ export async function runAlert(opts: {
   // Nothing to report: the 09:00 job and the button send nothing; a keyword still gets a short answer.
   if (!p.messages.length) {
     if (trigger === 'keyword' && replyToken && token) {
-      const r = await replyText(token, replyToken, nothingText(mode, p.today));
+      const r = await replyText(token, replyToken, nothingText(mode, p.today), true);
       await log({ status: r.ok ? 'sent' : 'failed', line_status: r.status, error: r.ok ? null : r.body, message: nothingText(mode, p.today) });
       return { ...base, sent: r.ok, httpStatus: 200 };
     }
@@ -244,9 +262,10 @@ export async function runAlert(opts: {
     await log({ status: 'failed', error });
     return { ...base, sent: false, error, httpStatus: 500 };
   }
+  // Every message to the team group carries the quick-reply buttons
   const r = trigger === 'keyword' && replyToken
-    ? await replyText(token, replyToken, p.messages)
-    : await pushText(token, env.LINE_GROUP_ID, p.messages);
+    ? await replyText(token, replyToken, p.messages, true)
+    : await pushText(token, env.LINE_GROUP_ID, p.messages, true);
   await log({ status: r.ok ? 'sent' : 'failed', line_status: r.status, error: r.ok ? null : r.body });
   return { ...base, sent: r.ok, line_status: r.status, line_body: r.ok ? undefined : r.body, httpStatus: r.ok ? 200 : 502 };
 }
