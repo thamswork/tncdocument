@@ -1,0 +1,26 @@
+name: LINE due-date alert
+
+on:
+  schedule:
+    # 02:00 UTC = 09:00 Bangkok, every day. GitHub can start scheduled runs a few minutes late.
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Preview only (show the message here, do not send to LINE)'
+        type: boolean
+        default: true
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send invoice due-date alert to the LINE group
+        env:
+          ALERT_SECRET: ${{ secrets.ALERT_SECRET }}
+          DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry && '1' || '0' }}
+        run: |
+          curl -sS --fail-with-body -X POST "https://tncdocument.pages.dev/documents/api/cron/line-alert?dry=$DRY" \
+            -H "x-alert-secret: $ALERT_SECRET" \
+            -H "Origin: https://tncdocument.pages.dev" \
+            -w "\nHTTP status: %{http_code}\n"

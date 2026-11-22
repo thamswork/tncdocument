@@ -30,6 +30,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return next();
   }
 
+  // LINE calls this webhook (no session cookie); the route checks LINE's signature itself.
+  if (pathname === '/documents/api/line/webhook') {
+    return next();
+  }
+
   // Check session cookie
   const token = context.cookies.get(SESSION_COOKIE)?.value;
   const user = await getSessionUser(token);
