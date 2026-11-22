@@ -9,7 +9,7 @@ const LINE_API = 'https://api.line.me';
 const SITE = 'https://tncdocument.pages.dev';
 const INVOICE_TYPE = '956e1ba7-6ffa-49e0-a009-c9a7a24ae8ab';
 const TAX_INVOICE_TYPE = '574ecc98-dd0b-4a7a-8eb2-39dedbcb1011';
-const MAX_ROWS = 20; // per section, keeps each LINE bubble well under 5,000 characters
+const MAX_ROWS = 15; // rows per section in the LINE message (the page shows them all)
 const TODO_LINK = `${SITE}/documents/dashboard?ws=todo`;
 
 export type AlertMode = 'due' | 'all';
@@ -97,70 +97,119 @@ const byIssue = (a: any, b: any) => {
   return x < y ? -1 : x > y ? 1 : String(a.document_number).localeCompare(String(b.document_number));
 };
 export const sumNet = (arr: any[]) => Math.round(arr.reduce((s, d) => s + whtInfo(d).net, 0) * 100) / 100;
-function row(d: any, i: number, extra = '') {
-  return `${i + 1}. ${d.document_number}${extra}\n   ${d.customers?.company_name || '-'}\n   ยอดโอนสุทธิ ${baht(whtInfo(d).net)}\n   ${SITE}/documents/${d.id}`;
+
+// ── Compact pieces for the LINE message ──
+const COMBINING = /[ัิ-ฺ็-๎]/;
+/** Customer name without บริษัท / จำกัด / (สำนักงานใหญ่) etc., cut to `max` characters. */
+export function shortName(name: string, max = 18): string {
+  let n = String(name || '-')
+    .replace(/\s*\((?:สำนักงานใหญ่|สาขา[^)]*)\)\s*/g, ' ')
+    .replace(/^\s*(?:บริษัท|บจก\.?|ห้างหุ้นส่วนจำกัด|หจก\.?)\s*/, '')
+    .replace(/\s*(?:จำกัด\s*\(มหาชน\)|จำกัด|\(มหาชน\))\s*$/, '')
+    .replace(/\s+/g, ' ').trim() || '-';
+  const ch = [...n];
+  if (ch.length <= max) return n;
+  let cut = max - 1;
+  while (cut < ch.length && COMBINING.test(ch[cut])) cut++; // never split a Thai vowel/tone mark from its letter
+  return ch.slice(0, cut).join('').trim() + '…';
 }
-function section(title: string, arr: any[], extra: (d: any) => string = () => '') {
-  const shown = arr.slice(0, MAX_ROWS).map((d, i) => row(d, i, extra(d)));
-  const more = arr.length > MAX_ROWS ? `\n\nและอีก ${arr.length - MAX_ROWS} รายการ ดูทั้งหมด: ${TODO_LINK}` : '';
-  return `${title}\n${arr.length} รายการ · รวม ${baht(sumNet(arr))}\n\n${shown.join('\n\n')}${more}`;
+/** Document number without the current Buddhist year (SV0106-63/2569 -> SV0106-63). Other years stay. */
+export function shortNo(no: string, today: string): string {
+  const y = String(Number(today.slice(0, 4)) + 543);
+  return String(no || '').replace(new RegExp('/' + y + '$'), '');
+}
+/** ฿110,448 or ฿62,056.80 (satang only when there are any). */
+export function bahtShort(n: number): string {
+  const v = Math.round(Number(n || 0) * 100) / 100;
+  return '฿' + v.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 });
+}
+
+export type AlertItem = { id: string; no: string; shortNo: string; customer: string; shortCustomer: string; net: number; note: string };
+export type AlertSection = { key: string; title: string; count: number; total: number; items: AlertItem[] };
+
+function mkSection(key: string, title: string, arr: any[], today: string, note: (d: any) => string = () => ''): AlertSection {
+  return {
+    key, title, count: arr.length, total: sumNet(arr),
+    items: arr.map(d => ({
+      id: d.id, no: d.document_number, shortNo: shortNo(d.document_number, today),
+      customer: d.customers?.company_name || '-', shortCustomer: shortName(d.customers?.company_name),
+      net: whtInfo(d).net, note: note(d),
+    })),
+  };
+}
+const lateNote = (today: string) => (d: any) => `${daysBetween(d.due_date, today)} วัน`;
+
+/** Sections for the daily alert: due tomorrow, due today, overdue (empty ones left out). */
+export function dueSections(invoices: any[], today: string): AlertSection[] {
+  const tomorrow = addDays(today, 1);
+  invoices = [...invoices].filter(d => d.due_date).sort(byDue);
+  return [
+    mkSection('tomorrow', `ครบพรุ่งนี้ (${thDate(tomorrow, false)})`, invoices.filter(d => d.due_date === tomorrow), today),
+    mkSection('today', `ครบวันนี้ (${thDate(today, false)})`, invoices.filter(d => d.due_date === today), today),
+    mkSection('over', 'เกินกำหนด', invoices.filter(d => d.due_date < today), today, lateNote(today)),
+  ].filter(s => s.count);
+}
+/** Sections for every unpaid invoice: overdue, today, tomorrow, later, no due date. */
+export function allSections(invoices: any[], today: string): AlertSection[] {
+  const tomorrow = addDays(today, 1);
+  const dated = invoices.filter(d => d.due_date).sort(byDue);
+  return [
+    mkSection('over', 'เกินกำหนด', dated.filter(d => d.due_date < today), today, lateNote(today)),
+    mkSection('today', `ครบวันนี้ (${thDate(today, false)})`, dated.filter(d => d.due_date === today), today),
+    mkSection('tomorrow', `ครบพรุ่งนี้ (${thDate(tomorrow, false)})`, dated.filter(d => d.due_date === tomorrow), today),
+    mkSection('later', 'ยังไม่ถึงกำหนด', dated.filter(d => d.due_date > tomorrow), today, d => `ครบ ${thDate(d.due_date, false, false)}`),
+    mkSection('none', 'ยังไม่ระบุวันครบกำหนด', invoices.filter(d => !d.due_date).sort(byIssue), today, d => (d.issue_date ? `ออก ${thDate(d.issue_date, false, false)}` : '')),
+  ].filter(s => s.count);
+}
+
+const LINE_LIMIT = 4800; // LINE allows 5,000 characters per bubble; keep a margin
+/** One line per invoice, one link at the end. Usually a single bubble; split by section only if very long. */
+function render(heading: string, sections: AlertSection[], count: number, total: number): string[] {
+  if (!sections.length) return [];
+  const blocks = sections.map(s => {
+    const rows = s.items.slice(0, MAX_ROWS).map(i => `• ${i.shortNo} ${i.shortCustomer} ${bahtShort(i.net)}${i.note ? ' · ' + i.note : ''}`);
+    if (s.count > MAX_ROWS) rows.push(`และอีก ${s.count - MAX_ROWS} ใบ`);
+    return `${s.title} · ${s.count} ใบ · ${bahtShort(s.total)}\n${rows.join('\n')}`;
+  });
+  const head = sections.length > 1 ? `${heading}\nรวม ${count} ใบ · ${bahtShort(total)}` : heading;
+  const foot = `ดูทั้งหมด: ${TODO_LINK}`;
+  const out: string[] = [];
+  let cur = head;
+  for (const b of blocks) {
+    if ((cur + '\n\n' + b).length > LINE_LIMIT && cur) { out.push(cur); cur = b; }
+    else cur = cur ? cur + '\n\n' + b : b;
+  }
+  if ((cur + '\n\n' + foot).length > LINE_LIMIT) { out.push(cur); cur = foot; } else cur += '\n\n' + foot;
+  out.push(cur);
+  return out.slice(0, 5);
 }
 
 /** Daily alert: due tomorrow, due today, overdue. Empty array = nothing to send. */
 export function buildDueAlert(invoices: any[], today: string): string[] {
-  const tomorrow = addDays(today, 1);
-  invoices = [...invoices].sort(byDue);
-  const dueTomorrow = invoices.filter(d => d.due_date === tomorrow);
-  const dueToday = invoices.filter(d => d.due_date === today);
-  const overdue = invoices.filter(d => d.due_date < today); // oldest due date first
-
-  const msgs: string[] = [];
-  if (dueTomorrow.length) msgs.push(section(`ครบกำหนดชำระพรุ่งนี้ (${thDate(tomorrow, false)})`, dueTomorrow));
-  if (dueToday.length) msgs.push(section(`ครบกำหนดชำระวันนี้ (${thDate(today, false)})`, dueToday));
-  if (overdue.length) msgs.push(section('เกินกำหนดชำระ', overdue, d => ` · เกิน ${daysBetween(d.due_date, today)} วัน`));
-  if (!msgs.length) return [];
-  msgs[0] = `แจ้งเตือนใบแจ้งหนี้ ${thDate(today)}\n\n` + msgs[0];
-  msgs[msgs.length - 1] += `\n\nรายการค้างรับเงินทั้งหมด: ${TODO_LINK}`;
-  return msgs; // at most 3 bubbles
+  const secs = dueSections(invoices, today);
+  const n = secs.reduce((a, s) => a + s.count, 0);
+  return render(`แจ้งเตือนบิล ${thDate(today)}`, secs, n, Math.round(secs.reduce((a, s) => a + s.total, 0) * 100) / 100);
 }
-
-/** Every unpaid invoice, grouped. At most 5 bubbles (LINE's limit per request). */
+/** Every unpaid invoice, grouped. */
 export function buildAllUnpaidAlert(invoices: any[], today: string): string[] {
-  const tomorrow = addDays(today, 1);
-  const dated = invoices.filter(d => d.due_date).sort(byDue);
-  const overdue = dated.filter(d => d.due_date < today);
-  const dueToday = dated.filter(d => d.due_date === today);
-  const dueTomorrow = dated.filter(d => d.due_date === tomorrow);
-  const later = dated.filter(d => d.due_date > tomorrow);
-  const noDue = invoices.filter(d => !d.due_date).sort(byIssue);
-
-  const msgs: string[] = [];
-  if (overdue.length) msgs.push(section('เกินกำหนดชำระ', overdue, d => ` · เกิน ${daysBetween(d.due_date, today)} วัน`));
-  if (dueToday.length) msgs.push(section(`ครบกำหนดชำระวันนี้ (${thDate(today, false)})`, dueToday));
-  if (dueTomorrow.length) msgs.push(section(`ครบกำหนดชำระพรุ่งนี้ (${thDate(tomorrow, false)})`, dueTomorrow));
-  if (later.length) msgs.push(section('ยังไม่ถึงกำหนดชำระ', later, d => ` · ครบกำหนด ${thDate(d.due_date, false, false)}`));
-  if (noDue.length) msgs.push(section('ยังไม่ได้ระบุวันครบกำหนด', noDue, d => (d.issue_date ? ` · ออกเมื่อ ${thDate(d.issue_date, false, false)} (${daysBetween(d.issue_date, today)} วัน)` : '')));
-  if (!msgs.length) return [];
-  msgs[0] = `สรุปใบแจ้งหนี้ค้างรับเงินทั้งหมด ${thDate(today)}\n${invoices.length} รายการ · รวม ${baht(sumNet(invoices))}\n\n` + msgs[0];
-  msgs[msgs.length - 1] += `\n\nดูในระบบ: ${TODO_LINK}`;
-  return msgs;
+  return render(`บิลค้างทั้งหมด ${thDate(today)}`, allSections(invoices, today), invoices.length, sumNet(invoices));
 }
 
 /** Text the bot replies with when someone asks and there is nothing to report. */
 export function nothingText(mode: AlertMode, today: string): string {
   return mode === 'all'
-    ? `ไม่มีใบแจ้งหนี้ค้างรับเงิน ณ ${thDate(today)}`
-    : `ไม่มีใบแจ้งหนี้ครบกำหนดพรุ่งนี้ วันนี้ หรือเกินกำหนด ณ ${thDate(today)}\nกด "${WORD_ALL}" เพื่อดูรายการค้างรับเงินทั้งหมด`;
+    ? `ไม่มีบิลค้างรับเงิน ณ ${thDate(today)}`
+    : `ไม่มีบิลครบพรุ่งนี้ วันนี้ หรือเกินกำหนด ณ ${thDate(today)}\nกด "${WORD_ALL}" เพื่อดูบิลค้างทั้งหมด`;
 }
 
-/** Builds the message for a mode, with the counts the page and history need. */
+/** Builds the message for a mode, with the sections and counts the page and history need. */
 export async function prepareAlert(mode: AlertMode, today = bangkokToday()) {
   if (mode === 'all') {
     const all = await getAllUnpaidInvoices();
-    return { mode, today, messages: buildAllUnpaidAlert(all, today), count: all.length, totalNet: sumNet(all) };
+    return { mode, today, messages: buildAllUnpaidAlert(all, today), sections: allSections(all, today), count: all.length, totalNet: sumNet(all) };
   }
   const due = await getDueInvoices(addDays(today, 1));
-  return { mode, today, messages: buildDueAlert(due, today), count: due.length, totalNet: sumNet(due) };
+  return { mode, today, messages: buildDueAlert(due, today), sections: dueSections(due, today), count: due.length, totalNet: sumNet(due) };
 }
 
 // ── LINE API ──

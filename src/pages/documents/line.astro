@@ -170,7 +170,29 @@ const sendData = JSON.stringify({
     .pv-t{font-size:14px;font-weight:700;}
     .pv-m{font-size:12.5px;color:var(--t2);font-variant-numeric:tabular-nums;}
     .pv-note{margin-left:auto;font-size:12px;color:var(--t3);}
-    .chat{background:var(--bg);border-top:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:10px;max-height:560px;overflow-y:auto;}
+    .inv{border-top:1px solid var(--line);}
+    .sec-h{display:flex;align-items:baseline;gap:10px;padding:11px 18px;background:var(--bg);border-bottom:1px solid var(--line);cursor:pointer;list-style:none;user-select:none;}
+    .sec-h::-webkit-details-marker{display:none;}
+    .sec-h::before{content:'▸';display:inline-block;width:10px;font-size:11px;color:var(--t3);transition:transform .15s;}
+    .sec[open] > .sec-h::before{transform:rotate(90deg);}
+    .sec-h:hover{background:var(--line);}
+    .sec-t{font-size:12.5px;font-weight:700;}
+    .sec-over .sec-t{color:var(--red,#B42318);}
+    .sec-m{margin-left:auto;font-size:12px;color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap;}
+    .ir{display:grid;grid-template-columns:150px minmax(0,1fr) 110px 120px;gap:12px;align-items:baseline;padding:8px 18px;border-bottom:1px solid var(--line);font-size:13px;color:var(--text);text-decoration:none;}
+    .ir:hover{background:var(--bg);}
+    .ir-no{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+    .ir-c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2);}
+    .ir-n{font-size:12px;color:var(--t3);white-space:nowrap;}
+    .sec-over .ir-n{color:var(--red,#B42318);}
+    .ir-a{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+    .pv-line{border-top:1px solid var(--line);margin-top:-1px;}
+    .pv-line summary{cursor:pointer;padding:12px 18px;font-size:12.5px;font-weight:600;color:var(--t2);list-style:none;}
+    .pv-line summary::-webkit-details-marker{display:none;}
+    .pv-line summary::before{content:'▸';display:inline-block;margin-right:6px;transition:transform .15s;}
+    .pv-line[open] summary::before{transform:rotate(90deg);}
+    .pv-line summary:hover{color:var(--text);}
+    .chat{background:var(--bg);border-top:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:10px;}
     .bubble{align-self:flex-start;max-width:min(560px,100%);background:var(--white);border:1px solid var(--border);border-radius:4px 14px 14px 14px;padding:12px 14px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
     .bubble a{color:var(--blue);text-decoration:none;word-break:break-all;}
     .bubble a:hover{text-decoration:underline;}
@@ -250,7 +272,11 @@ const sendData = JSON.stringify({
       .stat-s{grid-column:1;} .meter{grid-column:1 / -1;margin-top:4px;}
       .kw{padding:12px 14px;gap:10px;}
       .pv-note{margin-left:0;flex-basis:100%;}
-      .chat{padding:12px;max-height:none;}
+      .chat{padding:12px;}
+      .sec-h{padding:11px 14px;}
+      .ir{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"no a" "c n";gap:0 12px;padding:7px 14px;line-height:1.5;}
+      .ir-no{grid-area:no;} .ir-a{grid-area:a;} .ir-c{grid-area:c;font-size:12.5px;} .ir-n{grid-area:n;text-align:right;}
+      .pv-line summary{padding:12px 14px;}
       .hrow{padding:13px 14px;}
       .pager{padding:12px;}
       .pg-info{flex:1 1 100%;}
@@ -342,22 +368,40 @@ const sendData = JSON.stringify({
         <a class={'tab' + (mode === 'all' ? ' on' : '')} href={href({ mode: 'all' })}>ค้างรับทั้งหมด<span class="n">{fmt(all.count)}</span></a>
       </nav>
       <div class="pv-head">
-        <div class="pv-t">ตัวอย่างข้อความ</div>
-        <div class="pv-m">{fmt(preview.count)} รายการ · รวม {baht(preview.totalNet)}</div>
+        <div class="pv-t">รายการที่จะส่ง</div>
+        <div class="pv-m">{fmt(preview.count)} ใบ · รวม {baht(preview.totalNet)}</div>
         <div class="pv-note">
           {mode === 'due' ? 'ตัวอย่างจากข้อมูลตอนนี้ · ส่งอัตโนมัติทุกวัน 09:00 น. ด้วยข้อมูล ณ เวลานั้น' : `ส่งเมื่อกดปุ่มส่ง หรือกด "${WORD_ALL}" ในกลุ่ม`}
         </div>
       </div>
       {preview.messages.length ? (
-        <div class="chat">
-          {preview.messages.map((m: string) => (
-            <div class="bubble">{parts(m).map(p => p.link ? <a href={p.s} target="_blank" rel="noopener">{p.s}</a> : p.s)}</div>
+        <div class="inv">
+          {preview.sections.map((sec: any) => (
+            <details class={'sec sec-' + sec.key}>
+              <summary class="sec-h"><span class="sec-t">{sec.title}</span><span class="sec-m">{fmt(sec.count)} ใบ · {baht(sec.total)}</span></summary>
+              {sec.items.map((it: any) => (
+                <a class="ir" href={`/documents/${it.id}`}>
+                  <span class="ir-no">{it.no}</span>
+                  <span class="ir-c" title={it.customer}>{it.customer}</span>
+                  <span class="ir-n">{sec.key === 'over' ? 'เกิน ' + it.note : it.note}</span>
+                  <span class="ir-a">{baht(it.net)}</span>
+                </a>
+              ))}
+            </details>
           ))}
-          <div class="qr" aria-label="ปุ่มที่ทีมจะเห็นใต้ข้อความ">
-            <span class="qr-l">ปุ่มใต้ข้อความ</span>
-            <span class="qr-b">{WORD_ALL}</span><span class="qr-b">{WORD_DUE}</span><span class="qr-b">เปิดในระบบ</span>
-          </div>
         </div>
+        <details class="pv-line">
+          <summary>ดูข้อความที่จะส่งใน LINE</summary>
+          <div class="chat">
+            {preview.messages.map((m: string) => (
+              <div class="bubble">{parts(m).map(p => p.link ? <a href={p.s} target="_blank" rel="noopener">{p.s}</a> : p.s)}</div>
+            ))}
+            <div class="qr" aria-label="ปุ่มที่ทีมจะเห็นใต้ข้อความ">
+              <span class="qr-l">ปุ่มใต้ข้อความ</span>
+              <span class="qr-b">{WORD_ALL}</span><span class="qr-b">{WORD_DUE}</span><span class="qr-b">เปิดในระบบ</span>
+            </div>
+          </div>
+        </details>
       ) : (
         <div class="empty">
           <div class="empty-t">{mode === 'due' ? 'ไม่มีใบแจ้งหนี้ครบกำหนดหรือเกินกำหนด' : 'ไม่มีใบแจ้งหนี้ค้างรับเงิน'}</div>
